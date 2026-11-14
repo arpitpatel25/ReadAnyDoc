@@ -308,3 +308,20 @@ code{font-family:var(--mono)}
 .hero-copy .stats{display:grid;grid-template-columns:repeat(3,auto);gap:32px;justify-content:start}
 .hero-copy .stats dt{font-size:30px}
 .hero-copy .stats dd{font-size:13px;max-width:18ch}
+
+/* Resources menu */
+.nav-links{align-items:center}
+.has-menu{position:relative}
+.menu-btn{display:inline-flex;align-items:center;gap:4px;background:none;border:0;padding:0;font:inherit;font-size:14.5px;color:var(--gray);cursor:pointer}
+.menu-btn:hover,.has-menu.open .menu-btn{color:var(--ink)}
+.menu-btn svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.5;transition:transform .2s}
+.has-menu.open .menu-btn svg{transform:rotate(180deg)}
+.menu{position:absolute;top:calc(100% + 18px);left:50%;transform:translate(-50%,6px);width:640px;display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:14px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 48px -20px rgba(10,30,20,.28);opacity:0;visibility:hidden;transition:opacity .18s,transform .18s,visibility .18s;z-index:20}
+.has-menu.open .menu,.has-menu:focus-within .menu{opacity:1;visibility:visible;transform:translate(-50%,0)}
+.menu::before{content:"";position:absolute;top:-18px;left:0;right:0;height:18px}
+.menu-item{display:flex;gap:12px;align-items:flex-start;padding:12px;border-radius:10px;text-decoration:none;color:var(--ink)}
+.menu-item:hover{background:var(--warm)}
+.menu-item svg{flex:none;width:34px;height:34px;padding:7px;border-radius:9px;background:var(--green-soft);fill:none;stroke:var(--green);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.menu-item b{display:block;font-size:14.5px;font-weight:600}
+.menu-item small{display:block;margin-top:2px;font-size:13px;color:var(--gray);line-height:1.45}
+@media (hover:hover){.has-menu:hover .menu{opacity:1;visibility:visible;transform:translate(-50%,0)}}

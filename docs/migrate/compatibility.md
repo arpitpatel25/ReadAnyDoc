@@ -1,50 +1,9 @@
-# Running the server
+# Compatibility, route by route
 
-`readanydoc serve` (or the Docker image) exposes Reducto's v3 HTTP API. Point a Reducto client at it by changing one
-base URL; see the README for a short example.
+Every route and parse option was tested against Reducto's live API with the same request (12 November 2026).
 
-## Configuration
 
-| Variable | Default | Meaning |
-|---|---|---|
-| `READANYDOC_API_KEY` | unset | When set, every API route needs `Authorization: Bearer <key>`. Unset = open server, for local use. |
-| `READANYDOC_DATA_DIR` | `.cache/server` | SQLite job database, uploads, results. |
-| `READANYDOC_PROFILE` | `engine` | `engine` or `model-only` (see the README). |
-| `READANYDOC_READER` | Claude Haiku 5.5, high effort | Page-reading model as a spec, e.g. `anthropic_api:claude-sonnet-5-5#high` or `openai:<model>`. |
-| `READANYDOC_HANDWRITING_READER` | Claude Sonnet 5.5 | Reader for handwritten pages (engine only). |
-| `READANYDOC_TASK_LLM` | Claude Haiku 5.5 | Model for extract, split, classify and edit. |
-| `OPENAI_BASE_URL` | OpenAI's API | Address for `openai:` models, for a proxy or gateway (the OpenAI SDK's own setting). |
-| `READANYDOC_PUBLIC_URL` | from the request | Base URL written into file links and presigned upload URLs. Set it behind a proxy. |
-| `READANYDOC_UPLOAD_TTL_HOURS` | 24 | Uploads, downloaded inputs and edited documents expire after this. |
-| `READANYDOC_RESULT_TTL_HOURS` | 12 | Job results and result URLs expire after this (`settings.persist_results` skips it). |
-| `READANYDOC_JANITOR_SECONDS` | 300 | How often the clean-up pass runs (also once at start-up). `uv run readanydoc cleanup` runs the same pass by hand. |
-| `READANYDOC_MAX_DATA_GB` | 0 (no limit) | Above this size of uploads + results, finished jobs are removed oldest first (`persist_results` jobs last), then loose uploads. Waiting and running jobs and their files are never removed. |
-| `READANYDOC_CACHE_TTL_HOURS` | 6 | Page renders, decrypted copies and figure crops in the working cache (`READANYDOC_CACHE_DIR`, default `.cache`) older than this are removed. A task job's renders go when the job ends, a parse job's when its result expires or is deleted. |
-| `READANYDOC_REUSED_CACHE_TTL_DAYS` | 14 | Age limit for the reused caches (PDF words, OCR words, prepared images). |
-| `READANYDOC_MAX_CACHE_GB` | 5 | Size limit over all working caches; oldest entries go first. |
-| `READANYDOC_CLEAN_MIN_AGE_SECONDS` | 900 | Cache files and unknown folders younger than this are never removed (a running job may be using them). |
-| `READANYDOC_CLEAN_CACHE` | on | `0` = the server never touches the working cache. |
-| `READANYDOC_MAX_INLINE_BYTES` | 6000000 | Larger results are returned as `{"type": "url", "url", "result_id"}`. |
-| `READANYDOC_MAX_UPLOAD_MB` | 100 | Direct upload and URL download limit (413 above it). |
-| `READANYDOC_WORKERS` | 4 | Async jobs processed at once (pages of one document are read in parallel within a job). |
-| `READANYDOC_DOCUMENT_TIMEOUT_SECONDS` | 1800 | Longest time one document may take; longer fails with a 504 `timeout` error. `0` = no limit. |
-| `READANYDOC_API_CONCURRENCY` | 32 | Model requests in flight at once across the server. A rate-limit answer pauses all of them. |
-| `READANYDOC_WEBHOOK_SECRET` | unset | When set, webhooks are signed (below). |
-| `READANYDOC_WEBHOOK_URL` | unset | Default URL for `svix`-mode webhooks. |
-| `READANYDOC_WEBHOOK_RETRIES` | 3 | Retries after the first attempt, exponential backoff. |
-| `READANYDOC_JOB_STATUS_DETAIL` | off | `GET /job` reports `InProgress` / `Completing` / `Cancelled` instead of folding them. |
-| `READANYDOC_ALLOW_LOCAL_PATHS` | off | Accept server-side file paths as `input`. Leave off on a shared server. |
-| `READANYDOC_BLOCK_PRIVATE_URLS` | on | Refuse URL inputs that resolve to private or loopback addresses. Set to `0` to fetch from internal hosts. |
-| `READANYDOC_FIGURE_LLM` | the task model, else the reader's provider | Model for figure prompts and chart data, e.g. `anthropic_api:haiku`. Called only when a request asks for them. |
-| `READANYDOC_EMBED_LLM` | as above | Model for table summaries under `retrieval.embedding_optimized`; `off` = deterministic `header: value` lines. |
-| `READANYDOC_SOFFICE` | found on PATH | LibreOffice executable for DOC / XLS / PPT / RTF / ODT conversion. |
-| `READANYDOC_HEIC_DECODER` | first found | `pillow_heif`, `sips`, a `heif-convert` path, or `none`. |
-
-File links (`/files/<id>?token=...`) carry an unguessable token and need no API key, like a presigned URL.
-
-## Compatibility with Reducto's API
-
-Route by route against `reference/openapi.json` (20 routes). "Full" = documented request fields accepted
+Route by route against Reducto's published OpenAPI schema (20 routes). "Full" = documented request fields accepted
 with their defaults, response validates against Reducto's schema, behaviour implemented. Unknown fields
 are ignored, as on Reducto.
 
@@ -103,80 +62,4 @@ status code and the option's effect match; text differs wherever the two readers
 | v2-only fields (`options`, `advanced_options`, `experimental_options`, top-level `webhook` / `priority`) | accepted, ignored | v2 `document_url` is read as `input` |
 | invalid enum values (`chunk_mode`, `filter_blocks`, `table_output_format`) | full | 422 on both |
 
-File types, same file sent to both (words in common = token-set similarity of all text):
-
-| Type | Works | Against Reducto |
-|---|---|---|
-| PDF | yes | see the option table above |
-| PNG, JPG, GIF, BMP, WEBP | yes | 94-97% words in common on the test page (two different readers) |
-| TIFF, multi-page | yes | 96%; one page per frame |
-| HEIC | yes, with a decoder on the machine | 97% (decoded by macOS `sips` in the test) |
-| DOCX | yes, read natively | 100%, same 11 blocks, 2 pages, table, links, properties. Block boxes are estimates (no rendering) |
-| XLSX / XLSM | yes, read natively | 100%, same sheets, sheet-name titles and split tables; a single-row range is a Table here and Text on Reducto; 532 non-empty cells counted against 528 |
-| CSV | yes | 100%, one table |
-| PPTX | yes, read natively | 100%; a bullet list is one block here, one block per bullet on Reducto |
-| TXT | yes | 100%; a form feed starts a new page here, not on Reducto |
-| EML | yes | 100%; headers and body, attachments listed by name |
-| MSG | yes (`olefile`) | 89% on a public sample message; same subject, sender, date, attachment count |
-| RTF, ODT | with LibreOffice, or macOS `textutil` | 100% (through `textutil` in the test) |
-| DOC | with LibreOffice, or macOS `textutil` | 100% of the words through `textutil`, but the table arrives as paragraphs (Reducto: 1 table) |
-| XLS, PPT, ODS, ODP | with LibreOffice only | not run: LibreOffice is not installed on the build machine. The conversion path is unit-tested with a stand-in converter. Without LibreOffice the 415 error names the format, the program that is missing (or the `READANYDOC_SOFFICE` path that does not exist) and the install command for the server's system (`brew install --cask libreoffice`, `apt-get install -y libreoffice-core libreoffice-writer libreoffice-calc libreoffice-impress`, `winget install TheDocumentFoundation.LibreOffice`) |
-
-Response differences from Reducto: `usage.credits` is always null (no billing), `studio_link` is null,
-`pdf_url` is set for PDF inputs only, `usage.model_usage` (tokens per model) is extra.
-
-### Extract additions (not in Reducto's API)
-
-A client that sends none of these gets the same behaviour as before plus the `warnings` list.
-
-| Field | What it does |
-|---|---|
-| response `warnings` (always present) | One line per required field (`required` in the schema, at any level) that came back empty: `required field 'governing_law' was not found in the document`, `required field 'items[].price' was not found in 3 of 12 items`. Also notes about examples and failed model calls. |
-| `instructions.examples` | Up to 5 example outputs (objects that follow the schema, or JSON strings). They are shown to the model as format examples from other documents. A returned value that equals an example value and cannot be found in the document is removed and reported in `warnings`. |
-| `settings.relevance_filter: true` | For documents of 4 pages or more: one text-only model call sees a digest of every page (headings, first lines, table headers) and the schema's fields, and picks the pages to extract from. A top-level field that is still empty afterwards is looked for once in the pages that were left out. Measured: 80% cheaper with the same answers on an 86-page packet with a field-style schema; no saving on a 10-page document or on row-list schemas (every page is picked). `usage.extract_pages.relevance` lists the pages used. Never used by Parse. |
-| `settings.request_pages: true` | The model starts from the pages the relevance step picked and may ask for more before it answers: `{"need": [{"page": 12}, {"search": "Schedule B"}]}`, at most 3 rounds. `usage.extract_pages.page_requests` lists what it asked for. Meant for documents with cross-references that do not fit one call: on a 6-page contract it matched the single-call answer (24 of 24) where fixed one-page chunks got 18 of 24, at twice the cost of the single call. Not combined with `array_extract` / `deep_extract` segmenting. |
-
-### Errors
-
-Errors use Reducto's documented body plus FastAPI's `detail`, so both styles of client work:
-
-```json
-{"error": {"message": "...", "type": "file_download_failure", "code": 400, "name": "PROCESSING_FAILED"},
- "detail": "..."}
-```
-
-400 bad URL / page range / config, 401 bad key, 403 bad file token, 404 unknown file or job, 409 job state,
-410 deleted or expired job, 413 too large, 415 unsupported or damaged file, 422 validation
-(`HTTPValidationError`), 442 password needed, 500 internal, 501 not implemented, 502 model provider error.
-Failed jobs carry `error: {code, name, message, job_id}`.
-
-### Webhooks
-
-`async.webhook = {"mode": "direct", "url": "https://..."}` gets one `POST` when the job completes or fails:
-`{"job_id": "...", "status": "Completed" | "Failed", "metadata": <async.metadata>}`. Non-2xx answers are
-retried 3 times with backoff. `mode: "svix"` is accepted and sent the same way to the default URL
-(`POST /configure_webhook?url=...` or `READANYDOC_WEBHOOK_URL`).
-
-With `READANYDOC_WEBHOOK_SECRET` set, each request has
-`X-Readanydoc-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>." + raw body)>`. Verify it:
-
-```python
-from readanydoc.api.webhooks import verify
-ok = verify(raw_body_bytes, request.headers["X-Readanydoc-Signature"], secret)   # rejects stamps older than 5 min
-```
-
-## Development
-
-```bash
-uv run pytest -q                 # everything
-uv run pytest -q tests/api       # API: contract tests from the OpenAPI spec, end to end, webhooks, auth, SDK
-uv run readanydoc parse <pdf | image | cached stem> --profile cached-haiku
-uv run readanydoc bench --profile cached-haiku cached-glm --metrics
-```
-
-Layout: `readanydoc/api` (HTTP layer), `readanydoc/store` (SQLite jobs, file store), `readanydoc/pipeline`
-(the eight stages), `readanydoc/tasks` (extract, split, classify, edit), `readanydoc/readers` and
-`readanydoc/layout` (model adapters), `readanydoc/serialize` (Reducto response shape).
-The task call contract is documented in `readanydoc/api/contracts.py`.
-
-Licence: Apache-2.0.
+File types are compared in [File types](../guides/file-types.md).

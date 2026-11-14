@@ -6,8 +6,8 @@ How ReadAnyDoc was built and why it looks the way it does.
 |---|---|
 | [../story.md](../story.md) | The short story: the bet, what we found, what we chose to build |
 | [journey.md](journey.md) | The full record, stage by stage (11-14 November 2026): every idea tested, kept or dropped and why, the sample results the full benchmarks overturned, and the 272-entry experiment ledger (Appendix D) |
-| [../../BENCHMARKS.md](../../BENCHMARKS.md) | The final results against Reducto r-1, with method and caveats |
-| [../../results/](../../results/) | Per-document scores behind those results |
+| [../../BENCHMARKS.md](../resources/benchmarks.md) | The final results against Reducto r-1, with method and caveats |
+| [../../results/](https://github.com/arpitpatel25/ReadAnyDoc/tree/main/results) | Per-document scores behind those results |
 | [../decisions.md](../decisions.md) | Every design decision with its reason |
 
 Where to look in `journey.md` for common questions:

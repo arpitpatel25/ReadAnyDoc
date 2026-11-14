@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 
@@ -22,8 +22,20 @@
       <a href="#product">Product</a>
       <a href="#benchmarks">Benchmarks</a>
       <a href="build/">How we built it</a>
-      <a href="#faq">FAQ</a>
-      <a href="https://github.com/arpitpatel25/ReadAnyDoc#readme">Docs</a>
+      <a href="docs/">Docs</a>
+      <div class="has-menu">
+        <button class="menu-btn" type="button" aria-expanded="false" aria-haspopup="true">Resources<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3"/></svg></button>
+        <div class="menu" role="menu">
+          <a class="menu-item" href="docs/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h11a3 3 0 0 1 3 3v11H7a3 3 0 0 1-3-3V5zM8 9h6M8 13h6"/></svg><span><b>Documentation</b><small>Guides, references and examples to get you live.</small></span></a>
+          <a class="menu-item" href="docs/get-started/quickstart/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19l4-1 9-9-3-3-9 9-1 4zM13 7l3 3"/></svg><span><b>Quickstart</b><small>Parse your first document in five minutes.</small></span></a>
+          <a class="menu-item" href="docs/migrate/from-reducto/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg><span><b>Migrate from Reducto</b><small>Keep your code and SDK; change one URL.</small></span></a>
+          <a class="menu-item" href="docs/reference/http/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7l-4 5 4 5M16 7l4 5-4 5M13 5l-2 14"/></svg><span><b>API reference</b><small>Python library, HTTP routes, CLI and model specs.</small></span></a>
+          <a class="menu-item" href="docs/resources/benchmarks/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V11M10 19V6M15 19v-5M20 19V9"/></svg><span><b>Benchmarks</b><small>Measured against Reducto on public data.</small></span></a>
+          <a class="menu-item" href="build/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v8l5 3M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"/></svg><span><b>How we built it</b><small>Four days, 272 experiments, all written down.</small></span></a>
+          <a class="menu-item" href="docs/research/journey/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h9l3 3v13H6zM9 10h6M9 14h6M9 18h3"/></svg><span><b>Research record</b><small>Every stage and experiment, kept or dropped.</small></span></a>
+          <a class="menu-item" href="docs/resources/changelog/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h9"/></svg><span><b>Changelog</b><small>What changed in each release.</small></span></a>
+        </div>
+      </div>
     </nav>
     <a class="btn btn-green btn-sm" href="https://github.com/arpitpatel25/ReadAnyDoc">Star on GitHub</a>
   </div>
@@ -39,7 +51,7 @@
     <p class="hero-sub">The document parser built around Claude Haiku, or any model you choose. Turn PDFs, scans and
       forms into structured data, with a citation back to the page for every value.</p>
     <div class="actions">
-      <a class="btn btn-green" href="https://github.com/arpitpatel25/ReadAnyDoc#readme">Get started</a>
+      <a class="btn btn-green" href="docs/get-started/quickstart/">Get started</a>
       <a class="btn btn-line" href="#benchmarks">See the benchmarks</a>
     </div>
     
@@ -264,7 +276,7 @@ client = Reducto(api_key=<span class="s">"..."</span>,
       <li><a href="build/#ch-7"><span class="ch-n">Chapter 7</span><h3>Then the full benchmarks overturned our results</h3><p>On all 1,000 tables our lead disappeared. Only the complete benchmarks count.</p></a></li>
       <li><a href="build/#ch-8"><span class="ch-n">Chapter 8</span><h3>Where we landed</h3><p>Ahead on reading, level on tables and forms, behind on layout and speed, at half the price.</p></a></li>
     </ol>
-    <p class="actions"><a class="btn btn-green" href="build/">Read how we built it</a><a class="btn btn-line" href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/research/journey.md">Every experiment, stage by stage</a></p>
+    <p class="actions"><a class="btn btn-green" href="build/">Read how we built it</a><a class="btn btn-line" href="docs/research/journey/">Every experiment, stage by stage</a></p>
   </div>
 </section>
 
@@ -292,7 +304,7 @@ client = Reducto(api_key=<span class="s">"..."</span>,
   <div class="container closing-in">
     <h2 class="display">Try it on your own documents.</h2>
     <div class="actions">
-      <a class="btn btn-green" href="https://github.com/arpitpatel25/ReadAnyDoc#readme">Get started</a>
+      <a class="btn btn-green" href="docs/get-started/quickstart/">Get started</a>
       <a class="btn btn-line" href="https://github.com/arpitpatel25/ReadAnyDoc">Star on GitHub</a>
     </div>
   </div>
@@ -306,13 +318,13 @@ client = Reducto(api_key=<span class="s">"..."</span>,
     <nav aria-label="Footer">
       <a href="https://github.com/arpitpatel25/ReadAnyDoc">GitHub</a>
       <a href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/BENCHMARKS.md">Benchmarks</a>
-      <a href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/server.md">Server guide</a>
+      <a href="docs/">Documentation</a>
       <a href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/LICENSE">License</a>
     </nav>
   </div>
 </footer>
 
-<script src="site.js?v=7"></script>
+<script src="site.js?v=8"></script>
 <script data-goatcounter="https://readanydoc.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </body>
 </html>

@@ -1,9 +1,11 @@
 name: site
 
+# Builds the website (site/) and the documentation (docs/ + mkdocs.yml, served at /docs/) and publishes them to
+# GitHub Pages.
 on:
   push:
     branches: [main]
-    paths: ["site/**", ".github/workflows/pages.yml"]
+    paths: ["site/**", "docs/**", "mkdocs.yml", "BENCHMARKS.md", "CHANGELOG.md", "CONTRIBUTING.md", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -23,9 +25,17 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Build the documentation
+        run: NO_MKDOCS_2_WARNING=1 uv run --only-group docs mkdocs build --strict
+      - name: Assemble the site
+        run: |
+          mkdir -p _site
+          cp -R site/. _site/
+          cp -R build/docs _site/docs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4

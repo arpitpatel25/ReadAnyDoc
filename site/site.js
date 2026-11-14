@@ -47,7 +47,7 @@ linked.forEach((el) => {
   const tabs = [...document.querySelectorAll(".live-tabs span")];
   const out = document.querySelector(".live-out");
   const key = document.getElementById("live-key"), val = document.getElementById("live-val"), cite = document.getElementById("live-cite");
-  const conf = ["high", "high", "high", "medium"];
+  const conf = ["high", "high", "high", "low"];
   let d = 0, f = 0;
   function render() {
     const doc = docs[d];
@@ -74,3 +74,14 @@ linked.forEach((el) => {
   render(); step();
   if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) setInterval(tick, 2200);
 })();
+
+// Resources menu: open on click (touch), close on outside click or Escape.
+document.querySelectorAll(".has-menu").forEach((m) => {
+  const btn = m.querySelector(".menu-btn");
+  btn.addEventListener("click", () => {
+    const open = m.classList.toggle("open");
+    btn.setAttribute("aria-expanded", open);
+  });
+  document.addEventListener("click", (e) => { if (!m.contains(e.target)) { m.classList.remove("open"); btn.setAttribute("aria-expanded", false); } });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { m.classList.remove("open"); btn.setAttribute("aria-expanded", false); } });
+});

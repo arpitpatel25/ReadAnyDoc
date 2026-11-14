@@ -49,6 +49,7 @@ readanydoc = "readanydoc.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "fuzzysearch>=0.7", "beautifulsoup4>=4.12", "tqdm>=4"]
+docs = ["mkdocs-material>=9.5"]
 
 [build-system]
 requires = ["hatchling"]

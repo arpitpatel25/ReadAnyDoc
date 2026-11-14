@@ -130,7 +130,7 @@ result = client.parse.run(input=upload.file_id)
 ```
 
 Parse, extract, split, classify, edit, async jobs, webhooks and citations are implemented. Configuration,
-security settings and a route-by-route compatibility table: [docs/server.md](docs/server.md).
+security settings and a route-by-route compatibility table: [the documentation](https://arpitpatel25.github.io/ReadAnyDoc/docs/deploy/configuration/).
 
 ## How it works
 
@@ -156,7 +156,7 @@ independent evidence. Design decisions and their reasons: [docs/decisions.md](do
 | [docs/story.md](docs/story.md) | why this exists, the bet behind it, what we learned |
 | [docs/research/journey.md](docs/research/journey.md) | the full research record: every stage, every experiment, what was kept and dropped and why |
 | [docs/decisions.md](docs/decisions.md) | every design decision with its reason |
-| [docs/server.md](docs/server.md) | server settings, security, Reducto API compatibility |
+| [Documentation](https://arpitpatel25.github.io/ReadAnyDoc/docs/) | guides, API reference, configuration, migrating from Reducto |
 | [examples/](examples/) | runnable scripts |
 | [AGENTS.md](AGENTS.md), [llms.txt](llms.txt) | a map of the repo for AI agents; point your agent at it to ask questions |
 

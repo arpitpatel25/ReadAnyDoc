@@ -6,7 +6,7 @@
 - [README](README.md): install, parse, extract into a pydantic class, modes, model choice, CLI, server
 - [Examples](examples/): runnable scripts
 - [Library reference](readanydoc/library.py): every argument and result type
-- [Server guide](docs/server.md): settings, security, Reducto API compatibility
+- [Documentation](https://arpitpatel25.github.io/ReadAnyDoc/docs/): guides, API reference, configuration, migrating from Reducto
 
 ## Results
 - [Benchmarks](BENCHMARKS.md): against Reducto r-1 and the plain model on olmOCR-bench, OmniDocBench, RD-TableBench, FUNSD and long-document extraction

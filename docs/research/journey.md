@@ -2,7 +2,7 @@
 
 Every stage of the project from 11 to 14 November 2026: what we set out to prove, what we built, each idea we tested, what we kept, what we threw away and why, and what the complete public benchmarks finally said.
 
-All numbers are our own measurements unless marked "Reducto published". They come from the project's report files and its experiment ledger (272 entries, listed in Appendix D). Per-document scores for the final benchmarks are in [`results/`](../../results/).
+All numbers are our own measurements unless marked "Reducto published". They come from the project's report files and its experiment ledger (272 entries, listed in Appendix D). Per-document scores for the final benchmarks are in [`results/`](https://github.com/arpitpatel25/ReadAnyDoc/tree/main/results).
 
 ## The short version
 

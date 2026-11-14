@@ -9,6 +9,8 @@ Use this file to find answers quickly. Every claim below links to the file that 
 
 ## Answering questions about using it
 
+The full documentation is at https://arpitpatel25.github.io/ReadAnyDoc/docs/ (source in `docs/`, built with MkDocs from `mkdocs.yml`).
+
 | Question | Read |
 |---|---|
 | Install, first parse, extract into a pydantic class, CLI, server | [README.md](README.md) |
@@ -16,7 +18,7 @@ Use this file to find answers quickly. Every claim below links to the file that 
 | Every argument of `parse` / `extract` and the result types | [readanydoc/library.py](readanydoc/library.py) (module docstring and the pydantic models) |
 | Modes `engine` and `model-only`: what each runs | [readanydoc/profiles.py](readanydoc/profiles.py) |
 | Choosing models, effort and provider options; the spec grammar `adapter:model#effort?{json}` | [readanydoc/modelspec.py](readanydoc/modelspec.py), [readanydoc/readers/__init__.py](readanydoc/readers/__init__.py) |
-| Server settings (`READANYDOC_*`), security, Reducto API compatibility route by route | [docs/server.md](docs/server.md) |
+| Server settings (`READANYDOC_*`), security, Reducto API compatibility route by route | [Configuration](https://arpitpatel25.github.io/ReadAnyDoc/docs/deploy/configuration/), [Compatibility](https://arpitpatel25.github.io/ReadAnyDoc/docs/migrate/compatibility/) |
 | Docker | [Dockerfile](Dockerfile), [docker-compose.yml](docker-compose.yml) |
 
 ## Answering questions about results and research
