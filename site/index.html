@@ -3,262 +3,256 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ReadAnyDoc: open-source document parsing and extraction</title>
-<meta name="description" content="Turn PDFs, scans and photos into structured data that points back to the page. Open source, runs on your own Claude or OpenAI account, Reducto-compatible API.">
-<meta property="og:title" content="ReadAnyDoc: open-source document parsing and extraction">
-<meta property="og:description" content="Turn PDFs, scans and photos into structured data that points back to the page. Open source, Reducto-compatible.">
+<title>ReadAnyDoc: the open-source alternative to Reducto</title>
+<meta name="description" content="Parse and extract PDFs, scans and forms with Claude or any vision model. Same API as Reducto, runs on your own model account, open source.">
+<meta property="og:title" content="ReadAnyDoc: the open-source alternative to Reducto">
+<meta property="og:description" content="Parse and extract PDFs, scans and forms with Claude or any vision model. Same API as Reducto. Open source.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<header class="top">
-  <div class="wrap top-in">
-    <a class="mark" href="./" aria-label="ReadAnyDoc home"><span class="mark-glyph" aria-hidden="true"></span>ReadAnyDoc</a>
-    <nav class="nav" aria-label="Main">
-      <a href="#features">Product</a>
-      <a href="#results">Results</a>
-      <a href="#how">How it works</a>
+<header class="nav">
+  <div class="container nav-in">
+    <a class="brand" href="./"><img src="logo-mark.svg" alt="" width="28" height="28">ReadAnyDoc</a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="#features">Features</a>
+      <a href="#benchmarks">Benchmarks</a>
+      <a href="#story">Story</a>
+      <a href="#faq">FAQ</a>
       <a href="https://github.com/arpitpatel25/ReadAnyDoc#readme">Docs</a>
     </nav>
-    <a class="btn btn-ghost" href="https://github.com/arpitpatel25/ReadAnyDoc">GitHub</a>
+    <a class="button button-dark button-sm" href="https://github.com/arpitpatel25/ReadAnyDoc">Star on GitHub</a>
   </div>
 </header>
 
 <main>
 
 <section class="hero">
-  <div class="wrap hero-in">
-    <div class="hero-copy">
-      <h1>Read any document.<br>Get data that points back to the page.</h1>
-      <p class="lede">ReadAnyDoc turns PDFs, scans, photos and Office files into clean, typed data. Every value
-        comes with the exact place on the page it was read from. Open source, and it runs on your own model account.</p>
-      <div class="cta">
-        <button class="install" type="button" data-copy="pip install &quot;readanydoc[engine]&quot;" aria-label="Copy install command">
-          <code>pip install "readanydoc[engine]"</code><span class="copy-state" aria-live="polite">Copy</span>
-        </button>
-        <a class="btn btn-solid" href="https://github.com/arpitpatel25/ReadAnyDoc">View on GitHub</a>
-      </div>
-      <ul class="facts">
-        <li>Apache-2.0</li>
-        <li>Claude Haiku 5.5 by default, or any model you choose</li>
-        <li>Works with Reducto's API and SDK</li>
-      </ul>
+  <div class="container hero-in">
+    <a class="badge" href="https://github.com/arpitpatel25/ReadAnyDoc">Open source, Apache-2.0</a>
+    <h1>The open-source alternative to Reducto</h1>
+    <p class="hero-sub">Parse and extract PDFs, scans and forms with Claude or any vision model. Same API as Reducto, so
+      you switch by changing one URL. Runs on your own model account, at a fraction of the price.</p>
+    <div class="hero-actions">
+      <a class="button button-primary" href="https://github.com/arpitpatel25/ReadAnyDoc#readme">Get started</a>
+      <a class="button button-light" href="#benchmarks">See the benchmarks</a>
     </div>
+    <button class="install" type="button" data-copy="pip install &quot;readanydoc[engine]&quot;" aria-label="Copy install command">
+      <code>$ pip install "readanydoc[engine]"</code><span class="copy-state" aria-live="polite">Copy</span>
+    </button>
+  </div>
 
-    <figure class="demo" aria-label="An invoice on the left; the extracted fields on the right, each linked to where it was read">
-      <div class="page" role="img" aria-label="Scanned invoice">
-        <div class="page-head">
-          <div><b>Northwind Freight Ltd.</b><br>14 Harbour Road, Leith</div>
-          <div class="page-title">INVOICE</div>
+  <div class="container">
+    <div class="window">
+      <div class="window-bar"><span></span><span></span><span></span><p>invoice.pdf</p></div>
+      <div class="window-body">
+        <div class="doc" aria-label="Example invoice">
+          <div class="doc-head"><b>Northwind Freight Ltd.</b><b>INVOICE</b></div>
+          <p>Invoice no. <mark data-k="number">INV-2041</mark><br>Issued <mark data-k="issued">01 Mar 2026</mark></p>
+          <p>Bill to <mark data-k="customer">Harbor Supply Co.</mark></p>
+          <table>
+            <tr><th>Description</th><th>Amount</th></tr>
+            <tr><td><mark data-k="l0">Freight to Bremen</mark></td><td><mark data-k="l0">1,200.00</mark></td></tr>
+            <tr><td><mark data-k="l1">Handling and customs</mark></td><td><mark data-k="l1">375.00</mark></td></tr>
+          </table>
+          <p class="doc-total">Total due <mark data-k="total">£1,575.00</mark></p>
         </div>
-        <div class="page-meta">
-          <span>Invoice no. <mark data-k="number">INV-2041</mark></span>
-          <span>Issued <mark data-k="issued">01 Mar 2026</mark></span>
-        </div>
-        <div class="page-bill">Bill to: <mark data-k="customer">Harbor Supply Co.</mark></div>
-        <table class="page-table">
-          <thead><tr><th>Description</th><th>Amount</th></tr></thead>
-          <tbody>
-            <tr><td><mark data-k="l0d">Freight to Bremen</mark></td><td><mark data-k="l0a">1,200.00</mark></td></tr>
-            <tr><td><mark data-k="l1d">Handling and customs</mark></td><td><mark data-k="l1a">375.00</mark></td></tr>
-          </tbody>
-        </table>
-        <div class="page-total">Total due <mark data-k="total">£1,575.00</mark></div>
-        <div class="page-foot">Payment within 30 days. Thank you for your business.</div>
-      </div>
-      <div class="json" aria-label="Extracted data">
-<pre><code><span class="c">Invoice(</span>
-  <span class="row" data-k="number">number=<s>"INV-2041"</s>,</span>
-  <span class="row" data-k="issued">issued=<s>"2026-03-01"</s>,</span>
-  <span class="row" data-k="customer">customer=<s>"Harbor Supply Co."</s>,</span>
-  lines=[
-    <span class="row" data-k="l0d l0a">Line(<s>"Freight to Bremen"</s>, <s>1200.0</s>),</span>
-    <span class="row" data-k="l1d l1a">Line(<s>"Handling and customs"</s>, <s>375.0</s>),</span>
+        <div class="out">
+          <p class="out-label">readanydoc.extract("invoice.pdf", schema=Invoice)</p>
+<pre><code>{
+  <span data-k="number">"number": "INV-2041",</span>
+  <span data-k="issued">"issued": "2026-03-01",</span>
+  <span data-k="customer">"customer": "Harbor Supply Co.",</span>
+  "lines": [
+    <span data-k="l0">{ "item": "Freight to Bremen", "amount": 1200.0 },</span>
+    <span data-k="l1">{ "item": "Handling and customs", "amount": 375.0 }</span>
   ],
-  <span class="row" data-k="total">total=<s>1575.0</s>,</span>
-<span class="c">)</span></code></pre>
-        <p class="json-note">Hover a value to see where it came from. Each one carries its page and box.</p>
-      </div>
-    </figure>
-  </div>
-</section>
-
-<section id="features" class="band">
-  <div class="wrap">
-    <h2>One tool for every document task</h2>
-    <div class="feats">
-      <div class="feat">
-        <h3>Parse</h3>
-        <p>Every page becomes typed blocks (titles, text, tables, form fields, figures) with their positions, plus
-          Markdown for your LLM or search index. Headers, footers and page numbers are marked, not mixed in.</p>
-      </div>
-      <div class="feat">
-        <h3>Extract</h3>
-        <p>Give it a pydantic class or a JSON schema and get back an instance of it. Each value cites the words it
-          came from, so a reviewer can check it in one click. Long documents are read in parts and merged.</p>
-      </div>
-      <div class="feat">
-        <h3>Split, classify, edit</h3>
-        <p>Find where each document starts in a combined PDF, label documents by type, and fill in PDF forms.
-          The same API as Reducto, so existing code keeps working.</p>
+  <span data-k="total">"total": 1575.0</span>
+}</code></pre>
+          <p class="out-note">Every value comes with its page and position. Hover one to see where it was read.</p>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<section class="code-sec">
-  <div class="wrap code-in">
-    <div>
-      <h2>Your types in, your types out</h2>
-      <p>Describe what you need as a normal Python class. ReadAnyDoc reads the document, fills the class, and
-        tells you where each value is on the page. No server needed.</p>
-      <p class="muted">Prefer an API? Run <code>readanydoc serve</code> or the Docker image and call it over HTTP from any language.</p>
+<section class="section" id="why">
+  <div class="container">
+    <div class="three">
+      <div>
+        <h3>Same API as Reducto</h3>
+        <p>Point Reducto's own SDK at your ReadAnyDoc server. Parse, extract, split, classify, edit, jobs and webhooks
+          answer in the same format, so existing code keeps working.</p>
+      </div>
+      <div>
+        <h3>Your model, your account</h3>
+        <p>Documents go straight to the model provider you choose, under your own key. Claude Haiku 5.5 by default;
+          any Claude, OpenAI or self-hosted model works.</p>
+      </div>
+      <div>
+        <h3>A fraction of the price</h3>
+        <p>About $0.003 to $0.005 a page with the full engine, or $0.001 to $0.002 reading pages with the model alone.
+          Reducto charges $0.01. There is no fee on top.</p>
+      </div>
     </div>
-<pre class="code"><code><span class="k">from</span> pydantic <span class="k">import</span> BaseModel
-<span class="k">import</span> readanydoc
-
-<span class="k">class</span> <span class="t">Invoice</span>(BaseModel):
-    number: str
-    issued: str
-    total: float
-
-out = readanydoc.extract(<span class="s">"invoice.pdf"</span>, schema=Invoice)
-
-out.data.total             <span class="m"># 1575.0</span>
-out.citations[<span class="s">"total"</span>]     <span class="m"># page 1, box around "£1,575.00"</span>
-out.usage.cost_usd         <span class="m"># what the model calls cost</span></code></pre>
   </div>
 </section>
 
-<section id="results" class="band">
-  <div class="wrap">
-    <h2>Measured on public benchmarks, against Reducto</h2>
-    <p class="sec-lede">Five public benchmarks, about 4,250 pages and 10 long documents, each scored with the benchmark's
-      own grader. No AI judge. The same files went to all three systems. Higher is better unless marked.</p>
-    <div class="table-scroll">
-      <table class="results">
+<section class="section section-muted" id="benchmarks">
+  <div class="container">
+    <div class="section-head">
+      <h2>Benchmarked against Reducto</h2>
+      <p>Five public benchmarks, about 4,250 pages and 10 long documents. The same files went to all three systems, and
+        each benchmark's own grader scored them. Higher is better unless marked.</p>
+    </div>
+    <div class="table-wrap">
+      <table class="bench">
         <thead>
-          <tr><th scope="col">Benchmark</th><th scope="col">Reducto r-1</th><th scope="col">ReadAnyDoc<br><span>model only</span></th><th scope="col">ReadAnyDoc<br><span>engine</span></th></tr>
+          <tr><th>Benchmark</th><th>Reducto</th><th>ReadAnyDoc<small>model only</small></th><th>ReadAnyDoc<small>engine</small></th></tr>
         </thead>
         <tbody>
-          <tr><th scope="row">olmOCR-bench, 1,403 pages</th><td>80.9</td><td>82.2</td><td class="win"><span>84.2</span></td></tr>
-          <tr><th scope="row">OmniDocBench text error, 1,651 pages <span>lower is better</span></th><td>0.095</td><td class="win"><span>0.081</span></td><td class="win"><span>0.081</span></td></tr>
-          <tr><th scope="row">RD-TableBench, 1,000 tables</th><td class="win"><span>88.9</span></td><td>88.2</td><td>88.2</td></tr>
-          <tr><th scope="row">FUNSD form question and answer pairs, 199 forms</th><td class="win"><span>78.6</span></td><td>71.6</td><td>77.4</td></tr>
-          <tr><th scope="row">Page layout, block types right</th><td class="win"><span>84.6</span></td><td>55.6</td><td>78.3</td></tr>
-          <tr><th scope="row">Rows found in long-document extraction, 10 documents</th><td>53.9</td><td>75.4</td><td class="win"><span>75.9</span></td></tr>
-          <tr class="cost"><th scope="row">Cost per page</th><td>$0.010</td><td class="win"><span>$0.001–0.002</span></td><td>$0.003–0.005</td></tr>
+          <tr><td>olmOCR-bench, 1,403 pages</td><td>80.9</td><td>82.2</td><td class="best">84.2</td></tr>
+          <tr><td>OmniDocBench text error, 1,651 pages<small>lower is better</small></td><td>0.095</td><td class="best">0.081</td><td class="best">0.081</td></tr>
+          <tr><td>RD-TableBench, 1,000 tables</td><td class="best">88.9</td><td>88.2</td><td>88.2</td></tr>
+          <tr><td>FUNSD forms, question and answer pairs</td><td class="best">78.6</td><td>71.6</td><td>77.4</td></tr>
+          <tr><td>Page layout, block types right</td><td class="best">84.6</td><td>55.6</td><td>78.3</td></tr>
+          <tr><td>Long documents, table rows extracted</td><td>53.9</td><td>75.4</td><td class="best">75.9</td></tr>
+          <tr><td>Price per page</td><td>$0.010</td><td class="best">$0.001–0.002</td><td>$0.003–0.005</td></tr>
         </tbody>
       </table>
     </div>
-    <div class="honest">
-      <p><b>Where Reducto is ahead:</b> page layout by about 6 points, formulas, removing headers and footers, and speed
-        (about 5 seconds a page against 20–50 here). We publish these next to our wins so you can judge for yourself.</p>
-      <p class="pair"><a href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/BENCHMARKS.md">Full results and method</a>
-        <a href="https://github.com/arpitpatel25/ReadAnyDoc/tree/main/results">Every score, document by document</a></p>
+    <p class="note">Reducto is still ahead on page layout, formulas, removing headers and footers, and speed (about 5 seconds a
+      page against 20 to 50). <a href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/BENCHMARKS.md">Full results and method</a></p>
+  </div>
+</section>
+
+<section class="section" id="features">
+  <div class="container">
+    <div class="section-head">
+      <h2>Everything Reducto does, in the open</h2>
+      <p>One library and one server for every document task.</p>
+    </div>
+    <div class="grid">
+      <div class="card"><h3>Parse</h3><p>Pages become typed blocks (text, tables, forms, figures) with positions, plus Markdown for your LLM.</p></div>
+      <div class="card"><h3>Extract</h3><p>Pass a pydantic class or JSON schema and get it back filled in, with a citation for every value.</p></div>
+      <div class="card"><h3>Split</h3><p>Find where each document starts and ends inside one combined PDF.</p></div>
+      <div class="card"><h3>Classify</h3><p>Label documents by type, with the text that supports the label.</p></div>
+      <div class="card"><h3>Edit</h3><p>Fill in PDF forms, including flat and scanned ones.</p></div>
+      <div class="card"><h3>Jobs and webhooks</h3><p>Send large batches asynchronously and get notified when each one is done.</p></div>
     </div>
   </div>
 </section>
 
-<section class="modes">
-  <div class="wrap">
-    <h2>Pick how much work it does</h2>
-    <div class="mode-grid">
-      <div class="mode">
-        <h3>Engine <span>default</span></h3>
-        <p>The model reads each page, then ReadAnyDoc adds layout, form fields, table checks, zoomed re-reads of
-          scanned digits and word-level citations. Handwriting goes to a stronger model.</p>
-        <p class="mode-cost">About half Reducto's price per page.</p>
+<section class="section section-muted" id="start">
+  <div class="container">
+    <div class="section-head">
+      <h2>Start in a minute</h2>
+      <p>Use it as a Python library, or run the server and call it from any language.</p>
+    </div>
+    <div class="two">
+      <div class="code-card">
+        <p class="code-title">Python library</p>
+<pre><code>import readanydoc
+
+result = readanydoc.parse("statement.pdf")
+print(result.markdown)
+
+invoice = readanydoc.extract("invoice.pdf", schema=Invoice)
+print(invoice.data.total)</code></pre>
       </div>
-      <div class="mode">
-        <h3>Model only</h3>
-        <p>One model read per page and nothing else. Cheapest and fastest, and already level with Reducto on
-          reading text and tables.</p>
-        <p class="mode-cost">A fifth to a ninth of Reducto's price per page.</p>
-      </div>
-    </div>
-    <p class="models">Every model is your choice: any Claude model, OpenAI models, or a model you host yourself behind an
-      OpenAI-compatible server. Set the effort and any provider option per call. Benchmarks above use Claude Haiku 5.5.</p>
-  </div>
-</section>
+      <div class="code-card">
+        <p class="code-title">Switch from Reducto</p>
+<pre><code># docker compose up
+from reducto import Reducto
 
-<section id="how" class="band">
-  <div class="wrap">
-    <h2>How it works</h2>
-    <p class="sec-lede">Each page passes through the same steps. Nothing the model wrote is changed without independent
-      evidence, like a second zoomed read that agrees or the PDF's own text.</p>
-    <ol class="flow">
-      <li><b>Open</b><span>Detect the file type, decrypt, split into pages. PDF, images, Word, Excel, PowerPoint, email.</span></li>
-      <li><b>Look</b><span>Digital or scanned, rotated or not, and where the tables, forms and figures are, using a small layout model on your CPU.</span></li>
-      <li><b>Read</b><span>The vision model reads the page. Scanned pages get zoomed re-reads; a digit changes only when two reads agree.</span></li>
-      <li><b>Check</b><span>Table grids and printed totals are checked without a model. Problems become warnings, not silent errors.</span></li>
-      <li><b>Locate</b><span>Every word and table cell is matched to its position, so every value can cite its source.</span></li>
-      <li><b>Deliver</b><span>Blocks, Markdown, chunks for search, or your schema filled in. The same JSON shape as Reducto.</span></li>
-    </ol>
-  </div>
-</section>
-
-<section class="switch">
-  <div class="wrap code-in">
-    <div>
-      <h2>Already on Reducto? Change one URL</h2>
-      <p>Run the ReadAnyDoc server and point Reducto's own SDK at it. Parse, extract, split, classify, edit,
-        async jobs, webhooks and citations all answer in Reducto's format.</p>
-      <p class="muted">Your documents go only to the model provider you choose, under your own account.</p>
-    </div>
-<pre class="code"><code><span class="m"># docker compose up   or   readanydoc serve</span>
-<span class="k">from</span> reducto <span class="k">import</span> Reducto
-
-client = Reducto(
-    api_key=<span class="s">"..."</span>,
-    base_url=<span class="s">"http://localhost:8000"</span>,
-)
+client = Reducto(api_key="...",
+                 base_url="http://localhost:8000")
 result = client.parse.run(input=upload.file_id)</code></pre>
-  </div>
-</section>
-
-<section class="open band">
-  <div class="wrap open-in">
-    <div>
-      <h2>Built in the open</h2>
-      <p>We bet that a general model plus careful software can match a model trained only for documents, and get better
-        every time the models do. We tested 272 ideas to find out. Most failed, and some early wins disappeared on the full
-        benchmarks. All of it is written down.</p>
+      </div>
     </div>
-    <ul class="links">
-      <li><a href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/story.md">The story</a><span>Why we built it and what we learned</span></li>
-      <li><a href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/research/journey.md">The full research record</a><span>Every stage, every experiment, kept and dropped</span></li>
-      <li><a href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/decisions.md">Design decisions</a><span>Each choice with its reason</span></li>
-      <li><a href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/AGENTS.md">Ask your agent</a><span>Point Claude or Cursor at the repo; AGENTS.md maps every question to its answer</span></li>
-    </ul>
   </div>
 </section>
 
-<section class="final">
-  <div class="wrap">
-    <h2>Start with one document</h2>
-    <div class="cta">
-      <button class="install" type="button" data-copy="pip install &quot;readanydoc[engine]&quot;" aria-label="Copy install command">
-        <code>pip install "readanydoc[engine]"</code><span class="copy-state" aria-live="polite">Copy</span>
-      </button>
-      <a class="btn btn-solid" href="https://github.com/arpitpatel25/ReadAnyDoc#readme">Read the quick start</a>
+<section class="section" id="story">
+  <div class="container">
+    <div class="section-head">
+      <h2>How we built it</h2>
+      <p>Reducto trained its own model. We bet that a general model plus careful software could match it, and keep
+        getting better every time the models do. Four days, 272 experiments, all written down.</p>
+    </div>
+    <ol class="timeline">
+      <li>
+        <h3>The model could already read</h3>
+        <p>Plain Claude Haiku matched Reducto's own model at reading text and tables, for a fifth of the price. What it
+          lacked was structure: layout, forms, headers, and where each value came from.</p>
+      </li>
+      <li>
+        <h3>Most clever ideas failed</h3>
+        <p>Asking the model twice, cheaper images, compact formats: most made things worse. What worked was a different
+          view of the page, like zoomed re-reads that must agree before a digit changes.</p>
+      </li>
+      <li>
+        <h3>We stopped trusting small tests</h3>
+        <p>On 100 tables we looked ahead of Reducto. On all 1,000 we were level. We dropped AI judges and small samples
+          and ran every benchmark in full, with its own grader.</p>
+      </li>
+      <li>
+        <h3>We built the whole product</h3>
+        <p>The value turned out to be everything around the model: layout, citations, typed extraction, long documents,
+          jobs, and Reducto's API. That is what ReadAnyDoc gives away.</p>
+      </li>
+    </ol>
+    <p class="story-link"><a class="button button-light" href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/story.md">Read the full story</a>
+      <a class="text-link" href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/research/journey.md">Every experiment, stage by stage</a></p>
+  </div>
+</section>
+
+<section class="section section-muted" id="faq">
+  <div class="container faq">
+    <h2>Questions</h2>
+    <details><summary>Is it really free?</summary><p>Yes. ReadAnyDoc is Apache-2.0. You pay only your model provider for the
+      calls it makes, and every result tells you what those calls cost.</p></details>
+    <details><summary>Which models can I use?</summary><p>Any Claude model, OpenAI models, or a model you host behind an
+      OpenAI-compatible server such as vLLM. You set the model, effort and request options per call. The benchmarks
+      above use Claude Haiku 5.5, with Sonnet 5.5 for handwriting.</p></details>
+    <details><summary>Is it as good as Reducto?</summary><p>Ahead on reading text, level on
+      tables and forms, behind on page layout, formulas and speed. The full numbers and how we measured them are in
+      the benchmarks.</p></details>
+    <details><summary>Where do my documents go?</summary><p>To your machine and to the model provider you configure, under
+      your account. Nothing goes to us. With a self-hosted model, nothing leaves your network.</p></details>
+    <details><summary>Do I need to run a server?</summary><p>No. <code>pip install readanydoc</code> and call it from Python. Run
+      the server only if you want the Reducto-compatible API or call it from other languages.</p></details>
+    <details><summary>What is the difference between engine and model only?</summary><p>Model only sends each page to the
+      model once: cheapest and fastest. The engine adds layout, form fields, table checks, zoomed re-reads of scans
+      and word-level citations, for about two to three times the model cost.</p></details>
+  </div>
+</section>
+
+<section class="cta">
+  <div class="container cta-in">
+    <h2>Try it on your own documents</h2>
+    <p>Install the library, set your Anthropic key, and parse your first file.</p>
+    <div class="hero-actions">
+      <a class="button button-primary" href="https://github.com/arpitpatel25/ReadAnyDoc#readme">Get started</a>
+      <a class="button button-light" href="https://github.com/arpitpatel25/ReadAnyDoc">Star on GitHub</a>
     </div>
   </div>
 </section>
 
 </main>
 
-<footer class="foot">
-  <div class="wrap foot-in">
-    <span>ReadAnyDoc, built by Unmute. Apache-2.0.</span>
+<footer class="footer">
+  <div class="container footer-in">
+    <div class="footer-brand"><img src="logo-mark.svg" alt="" width="22" height="22"><span>ReadAnyDoc, built by Unmute</span></div>
     <nav aria-label="Footer">
       <a href="https://github.com/arpitpatel25/ReadAnyDoc">GitHub</a>
       <a href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/BENCHMARKS.md">Benchmarks</a>
       <a href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/server.md">Server guide</a>
-      <a href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/SECURITY.md">Security</a>
+      <a href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/LICENSE">License</a>
     </nav>
   </div>
 </footer>
