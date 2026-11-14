@@ -42,7 +42,7 @@ pip install readanydoc                  # model-only mode, no local models
 
 The engine also uses [Tesseract](https://github.com/tesseract-ocr/tesseract) when it is installed
 (`brew install tesseract` / `apt install tesseract-ocr`). The layout and OCR weights (about 200 MB, Apache-2.0)
-are downloaded on first use. Python 3.12.
+are downloaded on first use, so the very first parse takes a few minutes longer; later runs start straight away. Python 3.12.
 
 Set your model provider's key: `export ANTHROPIC_API_KEY=...` (or `OPENAI_API_KEY` for OpenAI models).
 

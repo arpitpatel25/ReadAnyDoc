@@ -25,7 +25,8 @@ RUN uv sync --frozen --no-dev --extra engine
 
 ENV PATH="/app/.venv/bin:${PATH}" \
     READANYDOC_DATA_DIR=/data \
-    READANYDOC_CACHE_DIR=/data/cache
+    READANYDOC_CACHE_DIR=/data/cache \
+    READANYDOC_LAYOUT_MODELS=/data/models
 
 RUN useradd --create-home --uid 10001 readanydoc \
     && mkdir -p /data \

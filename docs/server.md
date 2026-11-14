@@ -13,6 +13,7 @@ base URL; see the README for a short example.
 | `READANYDOC_READER` | Claude Haiku 5.5, high effort | Page-reading model as a spec, e.g. `anthropic_api:claude-sonnet-5-5#high` or `openai:<model>`. |
 | `READANYDOC_HANDWRITING_READER` | Claude Sonnet 5.5 | Reader for handwritten pages (engine only). |
 | `READANYDOC_TASK_LLM` | Claude Haiku 5.5 | Model for extract, split, classify and edit. |
+| `OPENAI_BASE_URL` | OpenAI's API | Address for `openai:` models, for a proxy or gateway (the OpenAI SDK's own setting). |
 | `READANYDOC_PUBLIC_URL` | from the request | Base URL written into file links and presigned upload URLs. Set it behind a proxy. |
 | `READANYDOC_UPLOAD_TTL_HOURS` | 24 | Uploads, downloaded inputs and edited documents expire after this. |
 | `READANYDOC_RESULT_TTL_HOURS` | 12 | Job results and result URLs expire after this (`settings.persist_results` skips it). |

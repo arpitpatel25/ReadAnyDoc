@@ -11,6 +11,8 @@ The JSON after ``?`` holds extra fields for the provider's request body (see ``r
 
 from __future__ import annotations
 
+import os
+
 import inspect
 from typing import Callable, Optional
 
@@ -92,13 +94,15 @@ def _openai_compatible(arg: str, options: Optional[dict] = None) -> Reader:
 
 @register_reader("openai")
 def _openai(arg: str, options: Optional[dict] = None) -> Reader:
-    """OpenAI's own API: OPENAI_API_KEY, no temperature, ``max_completion_tokens``."""
+    """OpenAI's API: OPENAI_API_KEY (and OPENAI_BASE_URL for a proxy or gateway), no temperature,
+    ``max_completion_tokens``."""
     from .openai_compatible import OpenAICompatibleReader
     model, _, effort = arg.partition("#")
     extra = dict(options or {})
     if effort:
         extra.setdefault("reasoning_effort", effort)
-    return OpenAICompatibleReader(model, base_url="https://api.openai.com/v1", api_key_env="OPENAI_API_KEY",
+    return OpenAICompatibleReader(model, base_url=os.environ.get("OPENAI_BASE_URL") or "https://api.openai.com/v1",
+                                  api_key_env="OPENAI_API_KEY",
                                   temperature=None, token_field="max_completion_tokens", max_tokens=32000,
                                   extra_body=extra, name_prefix="openai")
 

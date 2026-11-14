@@ -80,7 +80,11 @@ def _download(name: str) -> Path:
         return path
     if os.environ.get("READANYDOC_LAYOUT_NO_DOWNLOAD") == "1":
         raise LayoutError(f"layout weights missing: {path} (download {spec['repo']}/{spec['file']})")
+    import sys
+
     import httpx
+    print(f"readanydoc: downloading the layout model {name} (one time, 100-200 MB) to {path.parent}. "
+          "This happens once; later runs start straight away.", file=sys.stderr, flush=True)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".part")
     url = f"https://huggingface.co/{spec['repo']}/resolve/main/{spec['file']}"

@@ -312,7 +312,7 @@ class AnthropicAPILLM(LLM):
 # ---------------------------------------------------------------- OpenAI chat completions
 
 class OpenAILLM(LLM):
-    """OpenAI's API (default) or any OpenAI-compatible endpoint (``base_url``, optional key)."""
+    """OpenAI's API (default; ``OPENAI_BASE_URL`` overrides the address) or any OpenAI-compatible endpoint."""
     supports_images = True
     parallel_safe = True
 
@@ -442,7 +442,8 @@ def get_llm(spec: str = DEFAULT_LLM, **kwargs: Any) -> LLM:
     if kind == "anthropic_api":
         return AnthropicAPILLM(model or "haiku", extra=options, **kwargs)
     if kind == "openai":
-        return OpenAILLM(model, extra=options, **kwargs)
+        return OpenAILLM(model, base_url=os.environ.get("OPENAI_BASE_URL") or "https://api.openai.com/v1",
+                         extra=options, **kwargs)
     if kind == "openai_compatible":
         name, _, base = model.partition("@")
         return OpenAILLM(name, base_url=base or "http://127.0.0.1:8000/v1", api_key_env=None,

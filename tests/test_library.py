@@ -77,3 +77,14 @@ def test_parse_and_extract_with_saved_model_outputs(monkeypatch):
     monkeypatch.setattr("readanydoc.tasks.llm.get_llm", lambda spec: FakeLLM(['{"title": "X"}']))
     out = readanydoc.extract(str(pdf), schema=Page, mode="model-only", model="cached:haiku", citations=False)
     assert isinstance(out.data, Page)
+
+
+def test_openai_base_url_can_be_overridden(monkeypatch):
+    from readanydoc.readers import make_reader
+    from readanydoc.tasks.llm import get_llm
+
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://gateway.example/v1/")
+    assert get_llm("openai:gpt-5").base_url == "https://gateway.example/v1"
+    assert make_reader("openai:gpt-5").base_url == "https://gateway.example/v1"
+    monkeypatch.delenv("OPENAI_BASE_URL")
+    assert get_llm("openai:gpt-5").base_url == "https://api.openai.com/v1"
