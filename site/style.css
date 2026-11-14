@@ -216,3 +216,59 @@ code{font-family:var(--mono)}
 .checks li::before{content:"";width:18px;height:18px;border-radius:50%;background:var(--green) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 8.5l2.2 2.2 4.8-5' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/14px no-repeat;flex:none}
 @media (prefers-reduced-motion:no-preference){ .checks{opacity:0;animation:rise .8s .85s cubic-bezier(.2,.7,.2,1) forwards} }
 .stats{margin-top:44px}
+
+/* hero, left-aligned */
+.hero-left{align-items:flex-start;text-align:left}
+.hero-left h1{max-width:17ch}
+.hero-left .hero-sub{max-width:60ch}
+.hero-left .actions,.hero-left .checks,.hero-left .stats{justify-content:flex-start}
+.hero-left .stats div{text-align:left}
+.hero-left .checks{max-width:760px}
+.hero{background:
+  radial-gradient(50% 60% at 85% 10%,#E6F0EB 0%,rgba(255,255,255,0) 100%),
+  linear-gradient(to right,rgba(14,77,60,.045) 1px,transparent 1px) 0 0/48px 48px,
+  linear-gradient(to bottom,rgba(14,77,60,.045) 1px,transparent 1px) 0 0/48px 48px}
+.hero .actions{justify-content:flex-start}
+
+/* landing: chapters of the build */
+.chapters{list-style:none;padding:0;margin:48px 0 0;display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.chapters a{display:block;height:100%;background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px;text-decoration:none;transition:border-color .15s}
+.chapters a:hover{border-color:var(--green)}
+.ch-n{font:500 12.5px var(--mono);color:var(--green)}
+.chapters h3{margin-top:10px;font-family:var(--serif);font-weight:500;font-size:19px;line-height:1.25;letter-spacing:-.01em}
+.chapters p{margin-top:8px;color:var(--gray);font-size:14.5px}
+#story .actions{margin-top:36px}
+@media (max-width:920px){.chapters{grid-template-columns:1fr 1fr}}
+@media (max-width:600px){.chapters{grid-template-columns:1fr}}
+
+/* the build page */
+.build{background:var(--white)}
+.build-col{max-width:740px;margin:0 auto;padding:88px 24px 40px;font:18.5px/1.75 var(--serif);color:#1A1A1A}
+.build-col header{padding-bottom:40px;border-bottom:1px solid var(--line)}
+.build-col .kicker{font:500 13.5px var(--mono);color:var(--green)}
+.build-col h1{margin-top:16px;font-family:var(--serif);font-weight:400;font-size:clamp(32px,4.2vw,46px);line-height:1.12;letter-spacing:-.02em}
+.build-col header p{margin-top:20px;color:var(--gray);font-size:20px}
+.build-col .ch{padding:64px 0 0;scroll-margin-top:80px}
+.build-col .num{font:500 13px var(--mono);color:var(--green)}
+.build-col h2{margin:10px 0 18px;font-family:var(--serif);font-weight:500;font-size:30px;line-height:1.2;letter-spacing:-.015em}
+.build-col p{margin:0 0 18px}
+.build-col ul{padding-left:22px;margin:0 0 18px}
+.build-col li{margin:8px 0}
+.build-col a{color:var(--green)}
+.build-col .beats{display:grid;grid-template-columns:96px 1fr;gap:10px 20px;margin:26px 0;padding:22px 24px;background:var(--warm);border:1px solid var(--line);border-radius:14px;font:15.5px/1.6 var(--sans)}
+.build-col .beats b{font:500 12.5px/1.9 var(--mono)}
+.build-col .exp{color:var(--gray)} .build-col .got{color:#A33A2A} .build-col .did,.build-col .ok{color:var(--green)}
+.build-col .pull{margin:34px 0;padding:4px 0 4px 22px;border-left:3px solid var(--green);font-size:25px;line-height:1.4;font-style:italic}
+.build-col .meanwhile{margin:26px 0;padding:18px 22px;background:var(--green-soft);border-radius:14px;font:15.5px/1.6 var(--sans)}
+.build-col .meanwhile .t{display:block;margin-bottom:4px;font:500 12.5px var(--mono);color:var(--green)}
+.build-col table{width:100%;border-collapse:collapse;margin:20px 0;font:15px/1.45 var(--sans)}
+.build-col th,.build-col td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left}
+.build-col th{font-weight:500;font-size:13px;color:var(--gray)}
+.build-col td.n,.build-col th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.build-col .best{color:var(--green);font-weight:600}
+.build-col .dead{font:15.5px/1.6 var(--sans)}
+.build-col .x{color:#A33A2A;font-weight:600} .build-col .v{color:var(--green);font-weight:600}
+.build-col .small{font:14px/1.55 var(--sans);color:var(--gray)}
+.build-col footer{margin-top:64px;padding-top:28px;border-top:1px solid var(--line)}
+.build-cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:40px}
+@media (max-width:600px){.build-col{font-size:17px;padding-top:56px}.build-col .beats{grid-template-columns:1fr}}

@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 
@@ -21,7 +21,7 @@
     <nav class="nav-links" aria-label="Main">
       <a href="#product">Product</a>
       <a href="#benchmarks">Benchmarks</a>
-      <a href="#story">Story</a>
+      <a href="build/">How we built it</a>
       <a href="#faq">FAQ</a>
       <a href="https://github.com/arpitpatel25/ReadAnyDoc#readme">Docs</a>
     </nav>
@@ -32,7 +32,7 @@
 <main>
 
 <section class="hero">
-  <div class="container hero-in">
+  <div class="container hero-in hero-left">
     <a class="pill" href="https://github.com/arpitpatel25/ReadAnyDoc"><span class="pill-dot"></span>Open source under Apache-2.0</a>
     <h1 class="reveal">The open-source alternative to Reducto.</h1>
     <p class="hero-sub">The document parser built around Claude Haiku, or any model you choose. Turn PDFs, scans and
@@ -237,20 +237,21 @@ client = Reducto(api_key=<span class="s">"..."</span>,
 
 <section class="section section-warm" id="story">
   <div class="container">
-    <h2 class="display">Why we built it this way.</h2>
-    <p class="lead">Reducto trained its own model. We bet that a general model with careful software around it could
-      match one, and get better every time the models do. Four days, 272 experiments, all written down.</p>
-    <ol class="timeline cards">
-      <li><h3>The model could already read</h3><p>Plain Claude Haiku matched Reducto's model on text and tables for a fifth
-        of the price. What it lacked was structure: layout, forms, headers, and where each value came from.</p></li>
-      <li><h3>Most clever ideas failed</h3><p>Asking twice, smaller images, compact formats: most made things worse. What
-        worked was a second view of the page, like zoomed re-reads that must agree before a digit changes.</p></li>
-      <li><h3>Small tests misled us</h3><p>On 100 tables we were ahead of Reducto. On all 1,000 we were level. We dropped
-        AI judges and partial runs, and scored every benchmark in full with its own grader.</p></li>
-      <li><h3>So we built the whole product</h3><p>The value is everything around the model: layout, citations, typed
-        extraction, long documents, jobs and Reducto's API. That is what ReadAnyDoc gives away.</p></li>
+    <h2 class="display">How we built it.</h2>
+    <p class="lead">We tried to replace a purpose-built document model with an off-the-shelf one. Four days, more than
+      5,300 benchmark pages and 272 experiments. Most of our ideas failed, and the biggest surprise came at the very end.
+      Here is everything that happened.</p>
+    <ol class="chapters">
+      <li><a href="build/#ch-1"><span class="ch-n">Chapter 1</span><h3>The bet</h3><p>Leave the model untouched and build the layer around it, so every new model is a free upgrade.</p></a></li>
+      <li><a href="build/#ch-2"><span class="ch-n">Chapter 2</span><h3>We measured before we built</h3><p>Plain Haiku was already level with Reducto on reading. That changed everything that came next.</p></a></li>
+      <li><a href="build/#ch-3"><span class="ch-n">Chapter 3</span><h3>Our first layer made the model worse</h3><p>Reading every page twice and refereeing scored below one plain read, at nine times the price.</p></a></li>
+      <li><a href="build/#ch-4"><span class="ch-n">Chapter 4</span><h3>We stopped trusting our own numbers</h3><p>Cost was overstated four times, the AI judge misread numbers, and small samples flattered us.</p></a></li>
+      <li><a href="build/#ch-5"><span class="ch-n">Chapter 5</span><h3>272 ideas, and most of them failed</h3><p>What the model does not give you: layout, forms, checks and citations. 75 ideas were dropped outright.</p></a></li>
+      <li><a href="build/#ch-6"><span class="ch-n">Chapter 6</span><h3>Meanwhile, making it usable in real work</h3><p>Citations, confidence, long contracts, handwriting and large schemas, built from what teams ask for.</p></a></li>
+      <li><a href="build/#ch-7"><span class="ch-n">Chapter 7</span><h3>Then the full benchmarks overturned our results</h3><p>On all 1,000 tables our lead disappeared. Only the complete benchmarks count.</p></a></li>
+      <li><a href="build/#ch-8"><span class="ch-n">Chapter 8</span><h3>Where we landed</h3><p>Ahead on reading, level on tables and forms, behind on layout and speed, at half the price.</p></a></li>
     </ol>
-    <p class="links-row"><a href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/story.md">Read the full story</a><a href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/research/journey.md">Every experiment, stage by stage</a></p>
+    <p class="actions"><a class="btn btn-green" href="build/">Read how we built it</a><a class="btn btn-line" href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/research/journey.md">Every experiment, stage by stage</a></p>
   </div>
 </section>
 
@@ -298,6 +299,6 @@ client = Reducto(api_key=<span class="s">"..."</span>,
   </div>
 </footer>
 
-<script src="site.js?v=5"></script>
+<script src="site.js?v=6"></script>
 </body>
 </html>
