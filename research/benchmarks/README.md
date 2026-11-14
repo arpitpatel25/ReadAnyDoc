@@ -1,0 +1,18 @@
+# Benchmark scripts
+
+The scripts that ran and scored the comparison in [BENCHMARKS.md](../../BENCHMARKS.md), kept as they were run.
+They expect the benchmark data downloaded next to the repository (see `hf_fetch.py`) and a running ReadAnyDoc
+server; paths at the top of each script may need adjusting for your machine.
+
+| Script | What it does |
+|---|---|
+| `run.py`, `common.py` | send every case to each system (Reducto's API, ReadAnyDoc `model-only`, ReadAnyDoc `engine`), with budget caps and resumable progress |
+| `run_rd_tablebench.py` | the same for RD-TableBench |
+| `score_olmocr.py` | olmOCR-bench with the official test classes (math tests rendered as upstream) |
+| `score_omnidocbench.py` | OmniDocBench end-to-end evaluation without CDM, plus layout matching |
+| `score_rd_tablebench.py` | RD-TableBench with Reducto's published grading code |
+| `score_funsd.py` | FUNSD question-answer links found as key-value pairs |
+| `score_longextract.py` | LongExtract row recall and value accuracy |
+| `stats.py` | bootstrap intervals and paired differences |
+
+No model is called while scoring.
