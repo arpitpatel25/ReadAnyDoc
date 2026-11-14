@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (0.1.1)
+## 0.1.1 (2026-11-15)
 
 - A page the model provider declines to read (content filtering) is no longer empty: a second model reads it if
   `READANYDOC_REFUSAL_READER` (or the read option `refusal_reader`) is set, otherwise the page's local OCR text is
