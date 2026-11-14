@@ -1,0 +1,38 @@
+# readanydoc server. Settings come from environment variables exported in your shell before
+# `docker compose up`; nothing in this file is a secret. Full list: docs/server.md.
+#
+#   export ANTHROPIC_API_KEY=...
+#   docker compose up --build
+#   curl http://localhost:8000/version
+services:
+  readanydoc:
+    build: .
+    image: readanydoc:local
+    ports:
+      - "${READANYDOC_PORT:-8000}:8000"
+    environment:
+      # --- access ---
+      READANYDOC_API_KEY: ${READANYDOC_API_KEY:-}                 # empty = open server; set it before exposing the port
+      READANYDOC_PUBLIC_URL: ${READANYDOC_PUBLIC_URL:-}           # base URL in file links; empty = from each request
+      READANYDOC_WEBHOOK_SECRET: ${READANYDOC_WEBHOOK_SECRET:-}   # signs webhooks (X-Readanydoc-Signature) when set
+      # --- what runs (empty = the defaults: engine, Haiku 5.5 high effort, Sonnet 5.5 for handwriting) ---
+      READANYDOC_PROFILE: ${READANYDOC_PROFILE:-engine}           # engine | model-only
+      READANYDOC_READER: ${READANYDOC_READER:-}                   # e.g. anthropic_api:claude-sonnet-5-5#high, openai:<model>
+      READANYDOC_HANDWRITING_READER: ${READANYDOC_HANDWRITING_READER:-}
+      READANYDOC_TASK_LLM: ${READANYDOC_TASK_LLM:-}               # extract / split / classify / edit
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # --- capacity and limits ---
+      READANYDOC_WORKERS: ${READANYDOC_WORKERS:-4}
+      READANYDOC_API_CONCURRENCY: ${READANYDOC_API_CONCURRENCY:-32}
+      READANYDOC_DOCUMENT_TIMEOUT_SECONDS: ${READANYDOC_DOCUMENT_TIMEOUT_SECONDS:-1800}
+      READANYDOC_UPLOAD_TTL_HOURS: ${READANYDOC_UPLOAD_TTL_HOURS:-24}
+      READANYDOC_RESULT_TTL_HOURS: ${READANYDOC_RESULT_TTL_HOURS:-12}
+    volumes:
+      - readanydoc-data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # reach a model server running on the host
+    restart: unless-stopped
+
+volumes:
+  readanydoc-data:

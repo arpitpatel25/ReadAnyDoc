@@ -1,0 +1,46 @@
+{
+ "seed": 20261111,
+ "per_category": 6,
+ "pages": {
+  "headers_footers": [
+   "0f692b1bde8c3e04d1ec47ae43d616fc5c2ff2a9_page_23_processed",
+   "12abc83ccaae0bd5e561b1c4d1d76cfcdc5873e3_page_144",
+   "12e836a20227be4b63f7dcdebb2498e9d189d4da_page_5_processed",
+   "138610e542a26fff250aae7fb5ebdbd2d2da17c2_page_2",
+   "526f5d467f36aa2f5fa93a48e82d64f4f5f38de9_page_4",
+   "fc5b2acd2b4af4c9fdcf1f53d157589cba990759_page_17"
+  ],
+  "long_tiny_text": [
+   "11_pg161_pg1",
+   "11_pg186_pg1",
+   "11_pg375_pg1",
+   "17_pg17_pg1",
+   "17_pg2_pg1",
+   "20_pg39_pg1"
+  ],
+  "multi_column": [
+   "00e2c7719d58bb49fd4031cce9dcccdddec2_page_4_pg1",
+   "01ed6dcc6a3d0237daa88b293d0c0667df1a_page_12_pg1",
+   "028649690bbc67fe3ba040b4b2bf6c37f487_page_18_pg1",
+   "02943986dff2d4a84b7c2dd81abfc51fceea_page_7_pg1",
+   "03b953c18a4f7d2bbe390940dec839395cdd_page_29_pg1",
+   "0cf93d937e0f519965d4ff67daec8dd5dea1_page_5_pg1"
+  ],
+  "old_scans": [
+   "18",
+   "36",
+   "46",
+   "75",
+   "80",
+   "85"
+  ],
+  "table_tests": [
+   "26f221a3e03a0084c486be718476250c9247_pg2_pg1",
+   "31d7e5e596b5aa3a0824f576f2769c2e9408_pg162_pg1",
+   "bef02dc2be210b816ef02973edeebe3a9631_pg6_pg1",
+   "de5a70a52f98b51f94ad02dda266d1a1e2b6_pg2",
+   "f5e5d540d2d21fb259a00bbbfbed7abacdf2_pg12",
+   "f828606a3bb8b458fe49a4b6d79b3554961b_pg1"
+  ]
+ }
+}

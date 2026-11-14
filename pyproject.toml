@@ -1,0 +1,57 @@
+[project]
+name = "readanydoc"
+version = "0.1.0"
+description = "Document parsing and extraction with vision models: an open engine around Claude (or any model), with a Reducto-compatible API"
+readme = "README.md"
+authors = [{ name = "readanydoc contributors" }]
+keywords = ["pdf", "ocr", "document-parsing", "extraction", "llm", "claude", "reducto"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing",
+]
+license = "Apache-2.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pydantic>=2.6",
+    "pypdfium2>=4.30",
+    "pdfplumber>=0.11",
+    "pillow>=10",
+    "rapidfuzz>=3",
+    "httpx>=0.27",
+    "jsonschema>=4.21",
+    "pikepdf>=9",
+    "python-docx>=1.1",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "python-multipart>=0.0.9",
+    "openpyxl>=3.1",
+    "python-pptx>=1.0",
+    "olefile>=0.47",
+]
+
+[project.optional-dependencies]
+# everything the default engine uses on your machine: the layout model and OCR (CPU, ONNX Runtime)
+# The layout model (Docling "heron", Apache-2.0) and PP-OCR weights (Apache-2.0) are downloaded on first use.
+# The engine also uses the tesseract program when it is installed (apt install tesseract-ocr / brew install tesseract).
+engine = ["onnxruntime>=1.18", "numpy>=1.26", "rapidocr>=3.10"]
+
+[project.scripts]
+readanydoc = "readanydoc.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "fuzzysearch>=0.7", "beautifulsoup4>=4.12", "tqdm>=4"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["readanydoc"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["research"]
+markers = ["slow: full 140-page runs"]
