@@ -1,7 +1,7 @@
 # ReadAnyDoc
 
 Parse and extract documents with vision models, on your own machine and your own model account.
-Open source, Reducto-compatible, built by Unmute.
+Open source, Reducto-compatible, built by Unmute. Website: https://arpitpatel25.github.io/ReadAnyDoc/
 
 ReadAnyDoc reads every page of a PDF, scan, photo or Office file with a vision model (Claude Haiku 5.5 by default)
 and returns typed blocks, tables, Markdown, or the fields of your schema, each with the place on the page it came
