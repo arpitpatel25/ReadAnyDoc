@@ -1,0 +1,19 @@
+# ReadAnyDoc
+
+> Open-source document parsing and extraction on vision models (Claude Haiku 5.5 by default): typed blocks, tables, Markdown, form fields, word-level citations, extraction into your own schema. A Python library and a Reducto-compatible HTTP server. Apache-2.0, built by Unmute.
+
+## Use
+- [README](README.md): install, parse, extract into a pydantic class, modes, model choice, CLI, server
+- [Examples](examples/): runnable scripts
+- [Library reference](readanydoc/library.py): every argument and result type
+- [Server guide](docs/server.md): settings, security, Reducto API compatibility
+
+## Results
+- [Benchmarks](BENCHMARKS.md): against Reducto r-1 and the plain model on olmOCR-bench, OmniDocBench, RD-TableBench, FUNSD and long-document extraction
+- [Per-document scores](results/README.md)
+
+## Background
+- [Story](docs/story.md): why it exists and what was learned
+- [Full research record](docs/research/journey.md): every stage, every experiment, kept and dropped
+- [Design decisions](docs/decisions.md)
+- [Guide for agents](AGENTS.md)
