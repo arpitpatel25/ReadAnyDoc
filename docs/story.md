@@ -127,4 +127,4 @@ And because the engine never touches the model, it gets better on its own: every
 - **The product is complete:** the same API, every task, citations, you choose the model, and it's open source.
 We didn't build a better model. We built everything around one, so you can swap in the next one.
 
-Every number here comes from official graders on public data, run live on all three systems. The full record, with all 28 stages, every benchmark breakdown and all 272 experiments with the reason each was kept or dropped, is in journey.html.
+Every number here comes from official graders on public data, run live on all three systems. The full record, with all 28 stages, every benchmark breakdown and all 272 experiments with the reason each was kept or dropped, is in [docs/research/journey.md](research/journey.md).
