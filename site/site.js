@@ -1,3 +1,12 @@
+// Headline: reveal word by word, once, on load.
+document.querySelectorAll(".reveal").forEach((el) => {
+  const words = el.textContent.trim().split(/\s+/);
+  el.setAttribute("aria-label", el.textContent.trim());
+  el.innerHTML = words
+    .map((w, i) => `<span class="w" aria-hidden="true" style="animation-delay:${0.08 + i * 0.07}s">${w}${i < words.length - 1 ? " " : ""}</span>`)
+    .join("");
+});
+
 // Copy the install command.
 document.querySelectorAll(".install").forEach((button) => {
   button.addEventListener("click", async () => {
@@ -12,11 +21,10 @@ document.querySelectorAll(".install").forEach((button) => {
   });
 });
 
-// Hovering a value in the output outlines where it was read on the page, and the other way round.
+// Hovering a value outlines where it was read on the page, and the other way round.
 const linked = [...document.querySelectorAll("[data-k]")];
 linked.forEach((el) => {
-  const key = el.dataset.k;
-  const toggle = (on) => linked.forEach((x) => x.classList.toggle("on", on && x.dataset.k === key));
+  const toggle = (on) => linked.forEach((x) => x.classList.toggle("on", on && x.dataset.k === el.dataset.k));
   el.addEventListener("mouseenter", () => toggle(true));
   el.addEventListener("mouseleave", () => toggle(false));
 });
