@@ -80,10 +80,16 @@
         </div>
       </div>
     </div>
+    <div class="works">
+      <p>Works with</p>
+      <ul>
+        <li>Claude</li><li>OpenAI</li><li>vLLM and any OpenAI-compatible server</li><li>Reducto's Python SDK</li><li>Docker</li>
+      </ul>
+    </div>
   </div>
 </section>
 
-<section class="section" id="product">
+<section class="section section-dark" id="product">
   <div class="container">
     <h2 class="display">Reducto's product, without the lock-in.</h2>
     <div class="three">
@@ -120,11 +126,61 @@
   </div>
 </section>
 
-<section class="section" id="benchmarks">
+<section class="section" id="how">
+  <div class="container">
+    <h2 class="display">What happens to each page.</h2>
+    <p class="lead">The model does the reading. ReadAnyDoc does everything a model alone does not: it checks the work,
+      finds where every value sits, and returns it in the shape you asked for.</p>
+    <ol class="pipe">
+      <li>
+        <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="9" y="5" width="22" height="30" rx="3"/><path d="M14 13h12M14 19h12M14 25h7"/></svg>
+        <h3>Open</h3><p>PDF, scan, photo, Word, Excel, PowerPoint or email, split into pages.</p>
+      </li>
+      <li>
+        <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="5" y="7" width="13" height="11" rx="2"/><rect x="22" y="7" width="13" height="26" rx="2"/><rect x="5" y="22" width="13" height="11" rx="2"/></svg>
+        <h3>Look</h3><p>A small layout model on your CPU finds tables, forms, figures and headers.</p>
+      </li>
+      <li>
+        <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M4 20s6-10 16-10 16 10 16 10-6 10-16 10S4 20 4 20z"/><circle cx="20" cy="20" r="4.5"/></svg>
+        <h3>Read</h3><p>Claude reads each page. Scans get zoomed re-reads that must agree before a digit changes.</p>
+      </li>
+      <li>
+        <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="14"/><path d="M13.5 20.5l4.5 4.5 8.5-9"/></svg>
+        <h3>Check</h3><p>Table grids and printed totals are verified without a model. Problems become warnings.</p>
+      </li>
+      <li>
+        <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6 13V6h7M27 6h7v7M34 27v7h-7M13 34H6v-7"/><path d="M14 20h12"/></svg>
+        <h3>Cite</h3><p>Every word and table cell is matched to its position, so every value can show its source.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section class="section section-warm" id="benchmarks">
   <div class="container">
     <h2 class="display">Measured against Reducto, in public.</h2>
     <p class="lead">Five public benchmarks, about 4,250 pages and 10 long documents. The same files went to all three
       systems and each benchmark's own grader scored them. No AI judge. Higher is better unless marked.</p>
+    <div class="charts">
+      <figure class="chart">
+        <figcaption><b>olmOCR-bench</b><span>overall score, higher is better</span></figcaption>
+        <div class="bar"><span>Reducto</span><i style="--v:80.9"></i><em>80.9</em></div>
+        <div class="bar"><span>Model only</span><i style="--v:82.2"></i><em>82.2</em></div>
+        <div class="bar us"><span>Engine</span><i style="--v:84.2"></i><em>84.2</em></div>
+      </figure>
+      <figure class="chart">
+        <figcaption><b>Forms (FUNSD)</b><span>question and answer pairs found</span></figcaption>
+        <div class="bar"><span>Reducto</span><i style="--v:78.6"></i><em>78.6</em></div>
+        <div class="bar"><span>Model only</span><i style="--v:71.6"></i><em>71.6</em></div>
+        <div class="bar us"><span>Engine</span><i style="--v:77.4"></i><em>77.4</em></div>
+      </figure>
+      <figure class="chart">
+        <figcaption><b>Price per page</b><span>US dollars, lower is better</span></figcaption>
+        <div class="bar"><span>Reducto</span><i style="--v:100"></i><em>$0.010</em></div>
+        <div class="bar"><span>Model only</span><i style="--v:15"></i><em>$0.0015</em></div>
+        <div class="bar us"><span>Engine</span><i style="--v:40"></i><em>$0.004</em></div>
+      </figure>
+    </div>
     <div class="table-wrap">
       <table class="bench">
         <thead>
@@ -149,7 +205,7 @@
   </div>
 </section>
 
-<section class="section section-warm" id="start">
+<section class="section" id="start">
   <div class="container split">
     <div>
       <h2 class="display">Running in a minute.</h2>
@@ -173,12 +229,12 @@ client = Reducto(api_key=<span class="s">"..."</span>,
   </div>
 </section>
 
-<section class="section" id="story">
+<section class="section section-warm" id="story">
   <div class="container">
     <h2 class="display">Why we built it this way.</h2>
     <p class="lead">Reducto trained its own model. We bet that a general model with careful software around it could
       match one, and get better every time the models do. Four days, 272 experiments, all written down.</p>
-    <ol class="timeline">
+    <ol class="timeline cards">
       <li><h3>The model could already read</h3><p>Plain Claude Haiku matched Reducto's model on text and tables for a fifth
         of the price. What it lacked was structure: layout, forms, headers, and where each value came from.</p></li>
       <li><h3>Most clever ideas failed</h3><p>Asking twice, smaller images, compact formats: most made things worse. What
@@ -192,7 +248,7 @@ client = Reducto(api_key=<span class="s">"..."</span>,
   </div>
 </section>
 
-<section class="section section-warm" id="faq">
+<section class="section" id="faq">
   <div class="container faq">
     <h2 class="display">Questions.</h2>
     <details><summary>Is it really free?</summary><p>Yes. ReadAnyDoc is Apache-2.0. You pay only your model provider for the
