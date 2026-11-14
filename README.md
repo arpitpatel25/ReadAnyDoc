@@ -1,5 +1,7 @@
 # ReadAnyDoc
 
+[![PyPI](https://img.shields.io/pypi/v/readanydoc)](https://pypi.org/project/readanydoc/) [![Downloads](https://static.pepy.tech/badge/readanydoc)](https://pepy.tech/project/readanydoc) [![Tests](https://github.com/arpitpatel25/ReadAnyDoc/actions/workflows/ci.yml/badge.svg)](https://github.com/arpitpatel25/ReadAnyDoc/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+
 Parse and extract documents with vision models, on your own machine and your own model account.
 Open source, Reducto-compatible, built by Unmute. Website: https://arpitpatel25.github.io/ReadAnyDoc/
 
