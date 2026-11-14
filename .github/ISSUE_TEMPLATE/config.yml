@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a question
+    url: https://github.com/arpitpatel25/ReadAnyDoc/discussions/categories/q-a
+    about: Help with setup, a document type or results. Answers here help the next person too.
+  - name: Documentation
+    url: https://arpitpatel25.github.io/ReadAnyDoc/docs/
+    about: Guides, API reference, configuration and migrating from Reducto.
+  - name: Report a security problem
+    url: https://github.com/arpitpatel25/ReadAnyDoc/security/advisories/new
+    about: Privately, not as a public issue.

@@ -38,6 +38,11 @@ expected. Tests never call a model provider: they use recorded outputs and fake 
 - Tests for new behaviour; no network in tests.
 - Small pull requests with one purpose are reviewed fastest.
 
+## Questions and ideas
+
+Ask questions, propose ideas and share what you built in [GitHub Discussions](https://github.com/arpitpatel25/ReadAnyDoc/discussions). Issues are for bugs and
+concrete feature requests.
+
 ## Reporting bugs
 
 Include the ReadAnyDoc version, the mode and model, the command or code you ran, and what you expected. If you can,

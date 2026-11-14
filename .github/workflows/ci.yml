@@ -12,5 +12,5 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv python install 3.12
-      - run: uv sync --extra engine --locked
+      - run: uv sync --extra engine --extra mcp --locked
       - run: uv run pytest -q

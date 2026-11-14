@@ -1,0 +1,24 @@
+name: Feature request
+description: Something ReadAnyDoc should do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Not sure yet? Start a thread in [Discussions, Ideas](https://github.com/arpitpatel25/ReadAnyDoc/discussions/categories/ideas) first.
+  - type: textarea
+    id: goal
+    attributes:
+      label: What you are trying to do
+    validations:
+      required: true
+  - type: textarea
+    id: missing
+    attributes:
+      label: What is missing today
+    validations:
+      required: true
+  - type: input
+    id: docs
+    attributes:
+      label: Documents it matters for
+      placeholder: bank statements, about 2,000 pages a month

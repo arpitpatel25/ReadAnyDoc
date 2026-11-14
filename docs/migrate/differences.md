@@ -11,7 +11,7 @@ What is different from Reducto, so nothing surprises you after switching.
 | Formulas | ahead | behind (formula edit distance 0.156 against 0.133) |
 | Headers and footers left out | 90.1 | 81.2 |
 | Text, multi-column pages | | ahead (olmOCR-bench 84.2 against 80.9) |
-| Pages the provider will not return | not applicable | 1.5% to 3% of pages in large public sets come back empty because the model provider declines them (content filtering). The response says so in `warnings` |
+| Pages the provider will not return | not applicable | 1.5% to 3% of pages in large public sets are declined by the model provider (content filtering). They fall back to plain OCR text at `low` confidence, or to a second model with `READANYDOC_REFUSAL_READER`. The response says so in `warnings` |
 | Confidence | | tiers from how a value was found, not calibrated probabilities |
 
 ## Response fields

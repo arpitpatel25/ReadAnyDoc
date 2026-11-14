@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 
@@ -33,6 +33,9 @@
           <a class="menu-item" href="docs/resources/benchmarks/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V11M10 19V6M15 19v-5M20 19V9"/></svg><span><b>Benchmarks</b><small>Measured against Reducto on public data.</small></span></a>
           <a class="menu-item" href="build/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v8l5 3M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"/></svg><span><b>How we built it</b><small>Four days, 272 experiments, all written down.</small></span></a>
           <a class="menu-item" href="docs/research/journey/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h9l3 3v13H6zM9 10h6M9 14h6M9 18h3"/></svg><span><b>Research record</b><small>Every stage and experiment, kept or dropped.</small></span></a>
+          <a class="menu-item" href="docs/get-started/agent-setup/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v10H8l-4 4V6zM8 10h8M8 13h5"/></svg><span><b>Set up with your agent</b><small>One prompt for Claude Code, Codex or Cursor.</small></span></a>
+          <a class="menu-item" href="docs/get-started/mcp/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v4M15 3v4M7 7h10v4a5 5 0 0 1-10 0V7zM12 16v5"/></svg><span><b>MCP server</b><small>Parse and extract as tools inside Claude or Cursor.</small></span></a>
+          <a class="menu-item" href="https://github.com/arpitpatel25/ReadAnyDoc/discussions"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h12v8H8l-4 3V5zM16 9h4v10l-3-2h-7v-4"/></svg><span><b>Community</b><small>Questions, ideas and what people built.</small></span></a>
           <a class="menu-item" href="docs/resources/changelog/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h9"/></svg><span><b>Changelog</b><small>What changed in each release.</small></span></a>
         </div>
       </div>
@@ -54,6 +57,7 @@
       <a class="btn btn-green" href="docs/get-started/quickstart/">Get started</a>
       <a class="btn btn-line" href="#benchmarks">See the benchmarks</a>
     </div>
+    <p class="agent-hint">Using Claude Code, Codex or Cursor? <a href="#agent">Let your agent set it up</a> with one prompt.</p>
     
     <dl class="stats">
       <div><dt>84.2</dt><dd>olmOCR-bench, best of the three</dd></div>
@@ -245,6 +249,15 @@
       <button class="install" type="button" data-copy="pip install &quot;readanydoc[engine]&quot;" aria-label="Copy install command">
         <code>pip install "readanydoc[engine]"</code><span class="copy-state" aria-live="polite">Copy</span>
       </button>
+      <div class="agent" id="agent">
+        <h3>Or let your coding agent do it</h3>
+        <p>Paste this into Claude Code, Codex or Cursor. It installs ReadAnyDoc, tests it on one of your files and
+          wires it into your project. Your API key stays in <code>.env</code>, never in the chat.</p>
+        <button class="install agent-copy" type="button" data-copy="Set up ReadAnyDoc in this project. Follow the instructions at https://raw.githubusercontent.com/arpitpatel25/ReadAnyDoc/main/AGENT_SETUP.md" aria-label="Copy the setup prompt for your agent">
+          <code>Set up ReadAnyDoc in this project. Follow the instructions at https://raw.githubusercontent.com/arpitpatel25/ReadAnyDoc/main/AGENT_SETUP.md</code><span class="copy-state" aria-live="polite">Copy</span>
+        </button>
+        <p class="agent-more">Want it inside Claude or Cursor as tools instead? <a href="docs/get-started/mcp/">Run it as an MCP server</a>.</p>
+      </div>
     </div>
     <div class="code-stack">
 <pre class="code"><code><span class="c"># as a library</span>
@@ -300,6 +313,20 @@ client = Reducto(api_key=<span class="s">"..."</span>,
   </div>
 </section>
 
+<section class="community" id="community">
+  <div class="container community-in">
+    <div>
+      <h2 class="display">Built in the open.</h2>
+      <p class="lead">Ask a question, suggest a document type to support, or show what you built. Every answer stays
+        searchable for the next person.</p>
+    </div>
+    <div class="actions">
+      <a class="btn btn-green" href="https://github.com/arpitpatel25/ReadAnyDoc/discussions">Join the discussion</a>
+      <a class="btn btn-line" href="https://github.com/arpitpatel25/ReadAnyDoc/issues/new/choose">Report a bug</a>
+    </div>
+  </div>
+</section>
+
 <section class="closing">
   <div class="container closing-in">
     <h2 class="display">Try it on your own documents.</h2>
@@ -319,12 +346,13 @@ client = Reducto(api_key=<span class="s">"..."</span>,
       <a href="https://github.com/arpitpatel25/ReadAnyDoc">GitHub</a>
       <a href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/BENCHMARKS.md">Benchmarks</a>
       <a href="docs/">Documentation</a>
+      <a href="https://github.com/arpitpatel25/ReadAnyDoc/discussions">Community</a>
       <a href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/LICENSE">License</a>
     </nav>
   </div>
 </footer>
 
-<script src="site.js?v=8"></script>
+<script src="site.js?v=9"></script>
 <script data-goatcounter="https://readanydoc.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </body>
 </html>

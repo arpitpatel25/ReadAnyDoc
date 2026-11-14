@@ -3,6 +3,8 @@
 > Open-source document parsing and extraction on vision models (Claude Haiku 5.5 by default): typed blocks, tables, Markdown, form fields, word-level citations, extraction into your own schema. A Python library and a Reducto-compatible HTTP server. Apache-2.0, built by Unmute.
 
 ## Use
+- [Agent setup](AGENT_SETUP.md): step-by-step instructions for a coding agent to install and wire it into a project
+- [MCP server](https://arpitpatel25.github.io/ReadAnyDoc/docs/get-started/mcp/): `readanydoc mcp`, parse and extract as tools
 - [README](README.md): install, parse, extract into a pydantic class, modes, model choice, CLI, server
 - [Examples](examples/): runnable scripts
 - [Library reference](readanydoc/library.py): every argument and result type
@@ -17,3 +19,7 @@
 - [Full research record](docs/research/journey.md): every stage, every experiment, kept and dropped
 - [Design decisions](docs/decisions.md)
 - [Guide for agents](AGENTS.md)
+
+## Community
+- [Discussions](https://github.com/arpitpatel25/ReadAnyDoc/discussions): questions, ideas, show and tell
+- [Issues](https://github.com/arpitpatel25/ReadAnyDoc/issues/new/choose): bugs and feature requests

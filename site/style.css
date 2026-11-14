@@ -51,7 +51,7 @@ code{font-family:var(--mono)}
 @media (prefers-reduced-motion:no-preference){
   .reveal .w{opacity:0;filter:blur(6px);transform:translateY(8px);animation:word .7s cubic-bezier(.2,.7,.2,1) forwards}
   @keyframes word{to{opacity:1;filter:none;transform:none}}
-  .hero-sub,.hero .actions,.stats,.window{opacity:0;animation:rise .8s .75s cubic-bezier(.2,.7,.2,1) forwards}
+  .hero-sub,.hero .actions,.agent-hint,.stats,.window{opacity:0;animation:rise .8s .75s cubic-bezier(.2,.7,.2,1) forwards}
   .window{animation-delay:1s}
   @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 }
@@ -112,6 +112,18 @@ code{font-family:var(--mono)}
 .split>*{min-width:0}
 .install{margin-top:30px;display:inline-flex;align-items:center;gap:14px;max-width:100%;padding:8px 8px 8px 18px;border:1px solid var(--line);border-radius:999px;background:#fff;font:inherit;color:var(--ink);cursor:pointer}
 .install code{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent-hint{margin-top:18px;font-size:14.5px;color:var(--gray)}
+.agent-hint a,.agent-more a{color:var(--green);font-weight:500;text-decoration:underline;text-underline-offset:4px;text-decoration-color:rgba(14,77,60,.3)}
+.agent{margin-top:40px;padding-top:28px;border-top:1px solid var(--line)}
+.agent h3{font-size:17px;font-weight:600}
+.agent p{margin-top:8px;color:var(--gray);font-size:15px;max-width:58ch}
+.agent p code{font:13px var(--mono);background:var(--warm);padding:1px 6px;border-radius:5px}
+.agent-copy{margin-top:16px;border-radius:12px;align-items:flex-start;text-align:left;padding:14px 10px 14px 16px}
+.agent-copy code{font:13px/1.6 var(--mono);white-space:normal;overflow:visible;overflow-wrap:anywhere}
+.agent-more{font-size:14px}
+.community{padding:88px 0;border-top:1px solid var(--line)}
+.community-in{display:flex;align-items:flex-end;justify-content:space-between;gap:40px;flex-wrap:wrap}
+.community .actions{margin-top:0}
 .copy-state{font-size:12.5px;font-weight:500;color:var(--gray);background:var(--warm);padding:5px 10px;border-radius:999px}
 .code{margin:0;background:#0F1D18;color:#E6EDE9;border-radius:14px;padding:26px 28px;font:13.5px/1.8 var(--mono);overflow-x:auto}
 .code .k{color:#8FD3B4}.code .s{color:#F2D59B}.code .c{color:#6F8A80}

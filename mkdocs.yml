@@ -51,6 +51,9 @@ extra:
       link: https://github.com/arpitpatel25/ReadAnyDoc
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/readanydoc/
+    - icon: fontawesome/solid/comments
+      link: https://github.com/arpitpatel25/ReadAnyDoc/discussions
+      name: Community discussions
 
 markdown_extensions:
   - admonition
@@ -74,6 +77,8 @@ nav:
       - Overview: index.md
       - Quickstart (Python): get-started/quickstart.md
       - Quickstart (server): get-started/server-quickstart.md
+      - Set up with your coding agent: get-started/agent-setup.md
+      - Use from Claude and Cursor (MCP): get-started/mcp.md
       - Guide for coding agents: get-started/agents.md
     - Concepts:
       - How it works: concepts/how-it-works.md
@@ -110,4 +115,5 @@ nav:
     - Design decisions: decisions.md
     - FAQ and troubleshooting: resources/faq.md
     - Changelog: resources/changelog.md
+    - Community and support: resources/community.md
     - Contributing: resources/contributing.md

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2 (2026-11-15)
+
+- `readanydoc mcp`: an MCP server with two tools, `parse_document` and `extract_fields` (with citations), for Claude
+  Code, Claude Desktop, Cursor and other assistants. Install with `pip install "readanydoc[engine,mcp]"`.
+- [AGENT_SETUP.md](AGENT_SETUP.md): step-by-step setup instructions for coding agents, and a one-line prompt to
+  paste into Claude Code, Codex or Cursor (README, website and docs).
+- Community: GitHub Discussions, issue forms, and links from the README, website and docs.
+
 ## 0.1.1 (2026-11-15)
 
 - A page the model provider declines to read (content filtering) is no longer empty: a second model reads it if

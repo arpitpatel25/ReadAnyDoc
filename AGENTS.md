@@ -13,7 +13,10 @@ The full documentation is at https://arpitpatel25.github.io/ReadAnyDoc/docs/ (so
 
 | Question | Read |
 |---|---|
+| Install and set it up in a user's project (step by step, for agents) | [AGENT_SETUP.md](AGENT_SETUP.md) |
 | Install, first parse, extract into a pydantic class, CLI, server | [README.md](README.md) |
+| Use it as MCP tools in Claude, Cursor and others (`readanydoc mcp`) | [readanydoc/mcp_server.py](readanydoc/mcp_server.py), [MCP guide](https://arpitpatel25.github.io/ReadAnyDoc/docs/get-started/mcp/) |
+| Where to ask questions or report bugs | [GitHub Discussions](https://github.com/arpitpatel25/ReadAnyDoc/discussions), [issues](https://github.com/arpitpatel25/ReadAnyDoc/issues/new/choose) |
 | Runnable examples | [examples/](examples/) (`parse.py`, `extract_typed.py`, `choose_models.py`, `reducto_sdk.py`) |
 | Every argument of `parse` / `extract` and the result types | [readanydoc/library.py](readanydoc/library.py) (module docstring and the pydantic models) |
 | Modes `engine` and `model-only`: what each runs | [readanydoc/profiles.py](readanydoc/profiles.py) |

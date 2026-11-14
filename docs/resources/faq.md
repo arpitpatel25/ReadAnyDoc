@@ -30,7 +30,7 @@ No. It is a tier (`high`, `low`) from how a value was found. Use it to decide wh
 | The first parse takes minutes | The layout and OCR weights (100 to 200 MB) download once. Later runs are normal speed |
 | `warnings` says the layout model is not installed | `pip install "readanydoc[engine]"` |
 | 401 or `authentication_error` from the provider | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` missing or wrong where the code runs |
-| A page is empty and `warnings` mentions content filtering | The provider declined to return that page. Try another model for that document |
+| `warnings` says a page used OCR text (content filtering) | The provider declined that page, so its plain OCR text was used at `low` confidence. Set `READANYDOC_REFUSAL_READER` to a second model (for example `anthropic_api:sonnet` or `openai:gpt-5`) to read such pages again |
 | 415 for a `.doc`, `.xls`, `.ppt` or `.heic` file | Install LibreOffice or a HEIC decoder; the error names the command |
 | 442 | The PDF is password protected: send `settings.document_password` |
 | 504 `timeout` | Raise `READANYDOC_DOCUMENT_TIMEOUT_SECONDS`, or split the document |
@@ -39,3 +39,8 @@ No. It is a tier (`high`, `low`) from how a value was found. Use it to decide wh
 
 Still stuck? [Open an issue](https://github.com/arpitpatel25/ReadAnyDoc/issues) with the version, mode, model and
 the command you ran.
+
+## Where to ask
+
+Questions that are not answered here: [GitHub Discussions](https://github.com/arpitpatel25/ReadAnyDoc/discussions).
+Bugs: [open an issue](https://github.com/arpitpatel25/ReadAnyDoc/issues/new/choose).

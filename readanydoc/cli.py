@@ -102,6 +102,12 @@ def _cleanup(args: argparse.Namespace) -> int:
     return 0
 
 
+def _mcp(args) -> int:
+    from .mcp_server import main as run
+    run()
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="readanydoc", description="Parse and extract documents with vision models.")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -131,6 +137,9 @@ def main(argv: list[str] | None = None) -> int:
     c = sub.add_parser("cleanup", help="one clean-up pass over the server's data folder and working caches")
     c.add_argument("--json", action="store_true", help="print the report as JSON")
     c.set_defaults(fn=_cleanup)
+
+    m = sub.add_parser("mcp", help="run as an MCP server (stdio) for Claude, Cursor and other agents")
+    m.set_defaults(fn=_mcp)
 
     args = ap.parse_args(argv)
     return args.fn(args)

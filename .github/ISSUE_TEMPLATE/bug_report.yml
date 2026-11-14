@@ -1,0 +1,65 @@
+name: Bug report
+description: Wrong output, an error or a crash
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Questions and "how do I" go to [Discussions](https://github.com/arpitpatel25/ReadAnyDoc/discussions); this form is for bugs.
+        Never paste API keys, and only attach documents you are allowed to share.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The wrong output or the error message (full traceback if there is one).
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: The code or command you ran. Attach a page that shows it if you can.
+      render: python
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: ReadAnyDoc version
+      description: python -c "import readanydoc; print(readanydoc.__version__)"
+      placeholder: "0.1.2"
+    validations:
+      required: true
+  - type: dropdown
+    id: interface
+    attributes:
+      label: How you ran it
+      options: [Python library, HTTP server, Docker, CLI, MCP server, Reducto SDK against ReadAnyDoc]
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options: [engine (default), model-only, not sure]
+  - type: input
+    id: model
+    attributes:
+      label: Model and effort
+      placeholder: claude-haiku-5-5, high (the default)
+  - type: input
+    id: file
+    attributes:
+      label: Document type
+      placeholder: scanned PDF, invoice, 12 pages
+  - type: input
+    id: os
+    attributes:
+      label: OS and Python version
+      placeholder: macOS 15, Python 3.12

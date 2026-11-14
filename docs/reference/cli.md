@@ -26,6 +26,15 @@ readanydoc extract FILE --schema SCHEMA.json [--instructions TEXT] [--extract-mo
 
 `SCHEMA.json` is a JSON Schema file. Prints the extracted data with citations as JSON.
 
+## `readanydoc mcp`
+
+```bash
+readanydoc mcp
+```
+
+Runs an MCP server on stdio with two tools, `parse_document` and `extract_fields`, for Claude Code, Claude Desktop,
+Cursor and other MCP clients. Needs `pip install "readanydoc[engine,mcp]"`. See [MCP](../get-started/mcp.md).
+
 ## `readanydoc serve`
 
 ```bash

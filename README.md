@@ -48,6 +48,16 @@ are downloaded on first use, so the very first parse takes a few minutes longer;
 
 Set your model provider's key: `export ANTHROPIC_API_KEY=...` (or `OPENAI_API_KEY` for OpenAI models).
 
+### Or let your coding agent set it up
+
+Paste this into Claude Code, Codex or Cursor. It installs ReadAnyDoc, tests it on one of your files and wires it
+into your project the way you choose ([what it follows](AGENT_SETUP.md)):
+
+```text
+Set up ReadAnyDoc in this project. Follow the instructions at
+https://raw.githubusercontent.com/arpitpatel25/ReadAnyDoc/main/AGENT_SETUP.md
+```
+
 ## Use
 
 ### Parse
@@ -132,6 +142,16 @@ result = client.parse.run(input=upload.file_id)
 Parse, extract, split, classify, edit, async jobs, webhooks and citations are implemented. Configuration,
 security settings and a route-by-route compatibility table: [the documentation](https://arpitpatel25.github.io/ReadAnyDoc/docs/deploy/configuration/).
 
+### Inside Claude, Cursor and other assistants (MCP)
+
+```bash
+pip install "readanydoc[engine,mcp]"
+claude mcp add readanydoc -e ANTHROPIC_API_KEY=your-key -- readanydoc mcp
+```
+
+Gives the assistant two tools, `parse_document` and `extract_fields` (with citations), on files on your computer.
+Setup for Claude Desktop, Cursor and others: [MCP guide](https://arpitpatel25.github.io/ReadAnyDoc/docs/get-started/mcp/).
+
 ## How it works
 
 Each page goes through a fixed sequence of stages (`readanydoc/pipeline/`): intake (file type, pages), triage
@@ -144,8 +164,9 @@ independent evidence. Design decisions and their reasons: [docs/decisions.md](do
 ## Limits
 
 - Slower than Reducto: 20-50 s per page here against about 5 s.
-- About 1.5-3% of pages in large public benchmarks come back empty because the model provider declines to return
-  their text (content filtering); the response says so in `warnings`.
+- About 1.5-3% of pages in large public benchmarks are declined by the model provider (content filtering). Those
+  pages fall back to plain OCR text at `low` confidence, or to a second model if you set
+  `READANYDOC_REFUSAL_READER`; the response says so in `warnings`.
 - Confidence values are tiers from how a value was found on the page, not calibrated probabilities.
 
 ## Documentation
@@ -159,6 +180,12 @@ independent evidence. Design decisions and their reasons: [docs/decisions.md](do
 | [Documentation](https://arpitpatel25.github.io/ReadAnyDoc/docs/) | guides, API reference, configuration, migrating from Reducto |
 | [examples/](examples/) | runnable scripts |
 | [AGENTS.md](AGENTS.md), [llms.txt](llms.txt) | a map of the repo for AI agents; point your agent at it to ask questions |
+
+## Community
+
+Questions, ideas and what you built: [GitHub Discussions](https://github.com/arpitpatel25/ReadAnyDoc/discussions).
+Bugs: [open an issue](https://github.com/arpitpatel25/ReadAnyDoc/issues/new/choose). Release news: watch the
+repository (*Watch, Custom, Releases*).
 
 ## Contributing
 

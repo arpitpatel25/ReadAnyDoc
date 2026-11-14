@@ -1,6 +1,6 @@
 [project]
 name = "readanydoc"
-version = "0.1.1"
+version = "0.1.2"
 description = "Document parsing and extraction with vision models: an open engine around Claude (or any model), with a Reducto-compatible API"
 readme = "README.md"
 authors = [{ name = "readanydoc contributors" }]
@@ -43,6 +43,8 @@ Changelog = "https://github.com/arpitpatel25/ReadAnyDoc/blob/main/CHANGELOG.md"
 # The layout model (Docling "heron", Apache-2.0) and PP-OCR weights (Apache-2.0) are downloaded on first use.
 # The engine also uses the tesseract program when it is installed (apt install tesseract-ocr / brew install tesseract).
 engine = ["onnxruntime>=1.18", "numpy>=1.26", "rapidocr>=3.10"]
+# `readanydoc mcp`: parse and extract as tools for Claude, Cursor and other MCP clients
+mcp = ["mcp>=2.3"]
 
 [project.scripts]
 readanydoc = "readanydoc.cli:main"
