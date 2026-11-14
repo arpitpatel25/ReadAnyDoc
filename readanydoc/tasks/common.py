@@ -212,6 +212,7 @@ def bbox_dict(region: Region, pref: PageRef, box: Any = None) -> dict[str, Any]:
 
 
 def sum_usage(results: Iterable[Any]) -> dict[str, Any]:
+    results = list(results)
     tot = {"calls": 0, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0}
     for r in results:
         tot["calls"] += 1
@@ -220,4 +221,7 @@ def sum_usage(results: Iterable[Any]) -> dict[str, Any]:
             if isinstance(v, (int, float)):
                 tot[k] += v
     tot["cost_usd"] = round(tot["cost_usd"], 6)
+    models = sorted({str(getattr(r, "model", None)) for r in results if getattr(r, "model", None)})
+    if models:  # usage.by_model shows the model, not just the task
+        tot["model"] = "+".join(models)
     return tot

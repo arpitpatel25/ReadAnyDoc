@@ -16,6 +16,7 @@ Kinds of candidates:
 
 from __future__ import annotations
 
+import os
 import re
 from collections import Counter
 from dataclasses import dataclass, field
@@ -32,6 +33,8 @@ from . import evidence as ev
 from .hygiene import clean_table
 
 TABLE_LIKE = {"table": 0.5, "document_index": 0.6}
+MAX_REREADS = 16    # table-only re-reads per page (``max_rereads``)
+MAX_SECONDS = 180   # seconds a page waits for its table re-reads (``max_seconds``, READANYDOC_TABLE_SECONDS; 0 = no limit)
 # Block types that may be running text of a missed table. Header / Footer are in: Ground's position rules type a
 # short line near the page edge as furniture before the layout types are applied (seen on an olmOCR page: the last
 # row of a table was a "Footer"), and the acceptance rule still requires the table to hold every word.
@@ -329,7 +332,8 @@ def decide_table(kind: str, mine: str, cand: str, fit_mine: ev.Fit, fit_cand: ev
     return True, "same cell text; cells fit the columns and rows of the page at least as well", detail
 
 
-def _read_jobs(doc: Document, page: Page, jobs: list, reader_spec: str, pad: float) -> list:
+def _read_jobs(doc: Document, page: Page, jobs: list, reader_spec: str, pad: float,
+               deadline: Optional[float] = None) -> list:
     """``crops.read_many``, except that a read the Read stage already started (prefetch.py) is waited for instead of
     made again. The result is checked and billed exactly as ``crops.read_crop`` does."""
     from ..reading.robust import detect_problems
@@ -342,7 +346,8 @@ def _read_jobs(doc: Document, page: Page, jobs: list, reader_spec: str, pad: flo
             rest.append(k)
             continue
         try:
-            res = fut.result()
+            import time
+            res = fut.result(timeout=None if deadline is None else max(deadline - time.monotonic(), 0.0))
         except Exception as e:
             doc.note("tables", f"page {page.index}: prefetched table read ({tag}) unavailable ({str(e)[:120]})", "warning")
             continue
@@ -354,7 +359,8 @@ def _read_jobs(doc: Document, page: Page, jobs: list, reader_spec: str, pad: flo
             continue
         out[k] = res
     if rest:
-        for k, res in zip(rest, crops.read_many(doc, page, [jobs[k] for k in rest], reader_spec, pad=pad)):
+        for k, res in zip(rest, crops.read_many(doc, page, [jobs[k] for k in rest], reader_spec, pad=pad,
+                                                     deadline=deadline)):
             out[k] = res
     return out
 
@@ -382,8 +388,16 @@ def run(stage, doc: Document, page: Page, spec: dict[str, Any], reader_spec: str
                                            "read": sum(1 for c in found if c.kind == "table")}
     cands = [c for c in found if c.kind != "dropped"][:int(spec.get("max_tables", 6))] + \
             [c for c in found if c.kind == "dropped"][:int(spec.get("max_dropped", 30))]
+    cap = int(spec.get("max_rereads", MAX_REREADS))  # a page with very many tables must not stall the document
+    if len(cands) > cap:
+        page.properties["table_rereads_capped"] = {"found": len(cands), "read": cap}
+        doc.note("tables", f"page {page.index}: {len(cands)} table re-reads found; only the first {cap} made", "warning")
+        cands = cands[:cap]
     if not cands:
         return False
+    import time
+    seconds = float(spec.get("max_seconds", os.environ.get("READANYDOC_TABLE_SECONDS", MAX_SECONDS)))
+    deadline = time.monotonic() + seconds if seconds > 0 else None
     accept = str(spec.get("accept", "content"))
     prompt = PROMPTS[str(spec.get("prompt", "clean"))]
     # a region that takes up most of the page is read from the whole page image: a detection box that is a little
@@ -393,7 +407,7 @@ def run(stage, doc: Document, page: Page, spec: dict[str, Any], reader_spec: str
     maybe = prompt if spec.get("missed_prompt") == "force" else prompts.TABLE_MAYBE_FILE
     jobs = [(WHOLE if area(c.box) >= whole_at else c.box, maybe if c.kind in ("missed", "dropped") else prompt,
              f"tread:{c.tag}") for c in cands]
-    results = _read_jobs(doc, page, jobs, reader_spec, float(spec.get("pad", 0.012)))
+    results = _read_jobs(doc, page, jobs, reader_spec, float(spec.get("pad", 0.012)), deadline)
     report, plan = [], []
     for c, res in zip(cands, results):
         entry: dict[str, Any] = {"kind": c.kind, "tag": c.tag, "label": c.label, "score": round(c.score, 3),

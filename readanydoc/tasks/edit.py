@@ -1085,5 +1085,5 @@ def run(document: Any, config: dict, *, llm: LLM, source_path: Any, output_path:
     if spent["calls"]:  # Edit has no parsed Document to carry its calls, so it reports them itself
         m = {"calls": spent["calls"], "input_tokens": spent["input_tokens"], "output_tokens": spent["output_tokens"],
              "cached_calls": 0}
-        usage["model_usage"] = {**m, "models": {"task:edit": dict(m)}}
+        usage["model_usage"] = {**m, "models": {spent.get("model") or "task:edit": dict(m)}}
     return {"response_type": "edit", "document_url": str(out), "form_schema": form_schema, "usage": usage}

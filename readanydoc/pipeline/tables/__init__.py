@@ -15,6 +15,9 @@ such as ``reread=missed;clean=1;merge=layout``:
                                signs (reread.all_trigger); such reads cannot start before the page read
     prefetch=1                 the table-only reads of layout table regions start together with the page read
                                (prefetch.py): same output, a table page waits max(page read, table read)
+    max_rereads=16             at most this many table-only re-reads per page (the first ones found)
+    max_seconds=180            a page waits at most this long for its table re-reads (READANYDOC_TABLE_SECONDS);
+                               unfinished ones keep the page read's table
     keep=1                     keep every candidate table in ``page.properties["table_reads"]`` (analysis)
 Any other ``key=value`` is passed to the rules as a threshold (e.g. ``words_at=0.95``). ``missed_table_score`` /
 ``missed_index_score`` (defaults 0.5 / 0.6) are the layout scores a region needs to be a ``missed`` candidate: with

@@ -374,7 +374,7 @@ def test_flat_pdf_without_schema_detects_fields_on_the_page_image_then_fills(fla
         streams = b"".join(c.read_bytes() for c in pdf.pages[0].Contents) if isinstance(pdf.pages[0].Contents, pikepdf.Array) \
             else pdf.pages[0].Contents.read_bytes()
         assert b"1.000 0.000 0.000 rg" in streams               # drawn in edit_options.color, red by default
-    assert out["usage"]["model_usage"]["models"]["task:edit"]["calls"] == 2
+    assert out["usage"]["model_usage"]["models"]["fake"]["calls"] == 2
     # the returned schema can be passed back: no detection, no model call, same result
     again = FakeLLM()
     out2 = edit.run(None, {"edit_instructions": "ignored", "form_schema": schema}, llm=again, source_path=flat_pdf,

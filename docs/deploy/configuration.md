@@ -20,6 +20,7 @@ settings only apply to `readanydoc serve` and Docker.
 | `READANYDOC_PROFILE` | `engine` | `engine` or `model-only` (see [Modes](../concepts/modes.md)). |
 | `READANYDOC_READER` | Claude Haiku 5.5, high effort | Page-reading model as a spec, e.g. `anthropic_api:claude-sonnet-5-5#high` or `openai:<model>`. |
 | `READANYDOC_HANDWRITING_READER` | Claude Sonnet 5.5 | Reader for handwritten pages (engine only). |
+| `READANYDOC_REFUSAL_READER` | not set | Second reader for a page the first model declines (content filtering). Not set: the page's OCR text is used, at `low` confidence. |
 | `READANYDOC_TASK_LLM` | Claude Haiku 5.5 | Model for extract, split, classify and edit. |
 | `OPENAI_BASE_URL` | OpenAI's API | Address for `openai:` models, for a proxy or gateway (the OpenAI SDK's own setting). |
 | `READANYDOC_PUBLIC_URL` | from the request | Base URL written into file links and presigned upload URLs. Set it behind a proxy. |
@@ -36,6 +37,7 @@ settings only apply to `readanydoc serve` and Docker.
 | `READANYDOC_MAX_UPLOAD_MB` | 100 | Direct upload and URL download limit (413 above it). |
 | `READANYDOC_WORKERS` | 4 | Async jobs processed at once (pages of one document are read in parallel within a job). |
 | `READANYDOC_DOCUMENT_TIMEOUT_SECONDS` | 1800 | Longest time one document may take; longer fails with a 504 `timeout` error. `0` = no limit. |
+| `READANYDOC_TABLE_SECONDS` | 180 | Longest a page waits for its table re-reads; unfinished ones keep the page read's table. `0` = no limit. |
 | `READANYDOC_API_CONCURRENCY` | 32 | Model requests in flight at once across the server. A rate-limit answer pauses all of them. |
 | `READANYDOC_WEBHOOK_SECRET` | unset | When set, webhooks are signed (below). |
 | `READANYDOC_WEBHOOK_URL` | unset | Default URL for `svix`-mode webhooks. |

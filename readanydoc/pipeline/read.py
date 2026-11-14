@@ -44,6 +44,28 @@ FURNITURE = {RegionType.HEADER, RegionType.FOOTER, RegionType.PAGE_NUMBER}
 Match = tuple[Optional[int], float, float]  # (layout index, block-in-layout, layout-in-block)
 
 
+OCR_SOURCES = ("pdf", "tesseract", "ppocr", "rapidocr", "rapidocr_fill")
+
+
+def ocr_page_text(page: Page, image=None) -> str:
+    """The page as plain lines from the best word source already on the page (PDF text layer, then OCR);
+    runs the local OCR on ``image`` when the page has no words yet and OCR is installed. '' when none."""
+    words = next((page.words[k] for k in OCR_SOURCES if page.words.get(k)), None)
+    if not words and image:
+        try:
+            from .grounding import ocr
+            if ocr.available():
+                words = ocr.ocr_words(image, page.index, source="ppocr")
+        except Exception:
+            words = None
+    if not words:
+        return ""
+    lines: dict[int, list[str]] = {}
+    for w in words:
+        lines.setdefault(w.line or 0, []).append(w.text)
+    return "\n".join(" ".join(ws) for _, ws in sorted(lines.items()))
+
+
 class PageRead:
     def __init__(self, source: str, result: ReadResult, tier: str = "reader"):
         self.source = source
@@ -183,6 +205,8 @@ class Read(Stage):
                 forms.apply_page(doc, page, self)
             for i, r in enumerate(page.regions):
                 r.order = i
+                if best.source == "ocr_fallback":
+                    r.meta["ocr_fallback"] = True  # Ground keeps these blocks low confidence
                 if not r.meta.get("from_layout_only"):
                     r.meta.setdefault("tier", best.tier)  # Verify only lets same-or-higher tiers correct it
         workers = int(self.opt("page_workers", 1))
@@ -449,10 +473,12 @@ class Read(Stage):
         if result is None:
             reasons = " ".join(f"{a.reason or ''} {' '.join(p.detail for p in a.problems)}" for a in log).lower()
             if "content filtering" in reasons or "refus" in reasons:
-                doc.note(self.name, f"page {page.index}: the model provider declined to return this page's text "
-                                    f"(content filtering); the page is empty", "error")
-            else:
-                doc.note(self.name, f"page {page.index}: reader {reader.name} gave no usable output", "error")
+                for res in calls:  # refused calls are still billed
+                    if res.usage.input_tokens is not None:
+                        doc.usage.append({"page": page.index, "reader": reader.name, "escalation": "refused",
+                                          **res.usage.model_dump(exclude_none=True)})
+                return self._refused_page(doc, page, reader, ev, tier, image, escalation)
+            doc.note(self.name, f"page {page.index}: reader {reader.name} gave no usable output", "error")
             return None
         strong = tier in ("strong", "expert")
         entry = {"page": page.index, "reader": reader.name, **result.usage.model_dump(exclude_none=True),
@@ -475,6 +501,35 @@ class Read(Stage):
             return pr
         pr = PageRead(reader.name, result, "strong" if strong else "fast")
         pr.problems = check(result) if result.text.strip() else detect_problems(result.text)
+        return pr
+
+    # ---- pages the model provider declines to read (content filtering) ----
+    def _refused_page(self, doc: Document, page: Page, reader: Reader, ev, tier: str, image,
+                      escalation: Optional[str]) -> Optional[PageRead]:
+        """A refused page is not left empty: a second configured model reads it if one is set
+        (``refusal_reader`` option or ``READANYDOC_REFUSAL_READER``), else the page's OCR words are
+        used as plain text. OCR text is marked so Ground gives every block on the page low confidence."""
+        import os
+        if escalation is not None:  # a second read of a page that already has one: the caller keeps the first
+            doc.note(self.name, f"page {page.index}: {reader.name} declined the page (content filtering)", "warning")
+            return None
+        spec = os.environ.get("READANYDOC_REFUSAL_READER") or self.opt("refusal_reader")
+        if spec and spec != reader.name:
+            again = self._read_page(doc, page, self._reader(spec), ev, tier, escalation="refusal")
+            if again is not None and again.text.strip() and again.source != "ocr_fallback":
+                doc.note(self.name, f"page {page.index}: {reader.name} declined the page (content filtering); "
+                                    f"read by {again.source} instead", "warning")
+                return again
+        text = ocr_page_text(page, image)
+        if not text.strip():
+            doc.note(self.name, f"page {page.index}: the model provider declined to return this page's text "
+                                f"(content filtering) and no OCR text was available; the page is empty", "error")
+            return None
+        doc.note(self.name, f"page {page.index}: the model provider declined to return this page's text "
+                            f"(content filtering); plain OCR text used instead, marked low confidence", "warning")
+        page.properties["ocr_fallback"] = True
+        pr = PageRead("ocr_fallback", ReadResult(text=text, format="text", stop_reason="ocr_fallback"), "fast")
+        pr.problems = []
         return pr
 
     # ---- cheap profile: page escalation ----

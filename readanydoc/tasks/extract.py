@@ -17,7 +17,7 @@ from typing import Any, Optional
 
 from rapidfuzz import fuzz
 
-from ..model import BBox
+from ..model import BBox, RegionType
 from ..textnorm import norm_tokens, tokenize
 from . import schema as S
 from .common import (DocView, PageRef, RegionRef, TaskError, bbox_dict, page_images, render_pages,
@@ -31,6 +31,8 @@ DEFAULTS: dict[str, Any] = {
     "segment_chars": 40_000,      # text per segment when segmenting (dense tables: fewer pages per call)
     "max_repairs": 2,             # schema-repair re-asks per segment
     "max_deep_iterations": 2,     # deep_extract check/re-ask rounds
+    "row_check_min_rows": 10,     # list completeness: only segments whose tables have at least this many rows
+    "row_check_ratio": 0.5,       # ... and whose items fall below this share of the expected count
     "max_tokens": 16000,
 }
 
@@ -666,6 +668,76 @@ def _get(value: Any, path: tuple) -> Any:
     return value
 
 
+# ---------------------------------------------------------------- list completeness (rows vs parsed tables)
+
+def _rows_in(content: str) -> int:
+    """Body rows of one parsed table (HTML or markdown); header rows are not counted."""
+    c = content or ""
+    if re.search(r"<tr\b", c, re.I):
+        rows = len(re.findall(r"<tr\b", c, re.I))
+        heads = len(re.findall(r"<tr\b[^>]*>\s*<th\b", c, re.I))
+        return max(rows - heads, 0)
+    lines = [ln for ln in c.splitlines() if ln.strip().startswith("|")]
+    body = [ln for ln in lines if not re.fullmatch(r"\s*\|?[\s:|-]+\|?\s*", ln)]
+    return max(len(body) - 1, 0) if len(body) < len(lines) else len(body)
+
+
+def table_rows(pages: list[PageRef]) -> int:
+    return sum(_rows_in(ref.region.content) for p in pages for ref in p.regions
+               if ref.region.type == RegionType.TABLE)
+
+
+def _main_array(parts: list[tuple[Any, dict]]) -> Optional[tuple]:
+    """The top-level array with the most items over all segments (the list being extracted)."""
+    totals: dict[tuple, int] = {}
+    for value, _ in parts:
+        for ap in _array_paths(value):
+            totals[ap] = totals.get(ap, 0) + len(_get(value, ap) or [])
+    return max(totals, key=totals.get) if totals and max(totals.values()) > 0 else None
+
+
+def short_segments(parts: list[tuple[Any, dict]], rows: list[int], ap: tuple, opts: dict) -> list[int]:
+    """Segments whose item count is far below what their tables suggest. With several segments the
+    expected share of rows is the median of the others (a schema may want only some rows); alone, all rows."""
+    counts = [len(_get(v, ap) or []) for v, _ in parts]
+    min_rows, ratio = int(opts["row_check_min_rows"]), float(opts["row_check_ratio"])
+    shares = sorted(c / r for c, r in zip(counts, rows) if r >= min_rows)
+    if not shares:
+        return []
+    expected = shares[len(shares) // 2] if len(shares) > 1 else 1.0
+    return [i for i, (c, r) in enumerate(zip(counts, rows)) if r >= min_rows and c < ratio * expected * r]
+
+
+def _complete_rows(parts: list[tuple[Any, dict]], segments: list[list[PageRef]], ex: "_Extractor",
+                   opts: dict) -> tuple[list[tuple[Any, dict]], list[str]]:
+    """Long lists: a segment that returned far fewer items than its parsed tables have rows is extracted
+    again in halves (kept only when it finds more); a gap that remains becomes a warning."""
+    ap = _main_array(parts)
+    if ap is None:
+        return parts, []
+    rows = [table_rows(seg) for seg in segments]
+    warnings = []
+    for i in short_segments(parts, rows, ap, opts):
+        seg, before = segments[i], len(_get(parts[i][0], ap) or [])
+        part = (i + 1, len(segments))
+        note = (f"An earlier answer for these pages listed only {before} items in {S.path_str(ap)}, but the pages' "
+                f"tables have about {rows[i]} rows. List every item that belongs there; do not stop early.")
+        if len(seg) > 1:
+            mid = len(seg) // 2
+            a = ex.extract(seg[:mid], part=part, extra=note)
+            b = ex.extract(seg[mid:], part=part, extra=(note + "\n\n" + carry_hint(a[0])).strip())
+            redo = _split_tree(merge_trees(_annotate(a[0], a[1], ex.strict), _annotate(b[0], b[1], ex.strict), []))
+        else:
+            redo = ex.extract(seg, part=part, extra=note)
+        if len(_get(redo[0], ap) or []) > before:
+            parts[i] = redo
+        if i in short_segments(parts, rows, ap, opts):
+            got = len(_get(parts[i][0], ap) or [])
+            warnings.append(f"{S.path_str(ap)}: pages {seg[0].number}-{seg[-1].number} gave {got} items but their "
+                            f"tables have about {rows[i]} rows; some items may be missing")
+    return parts, warnings
+
+
 def _overlap_failures(parts: list[tuple[Any, dict]], segments: list[list[PageRef]], ex: _Extractor) -> list[dict]:
     """Neighbouring segments share pages; both must have found the same number of array items there."""
     failures = []
@@ -951,6 +1023,9 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
             redo = ex.extract(segments[i], part=(i + 1, len(segments)), extra=carry_hint(parts[i - 1][0]))
             if not needs_carry(parts[i - 1][0], redo[0]):
                 parts[i] = redo
+    if (settings.get("array_extract") or len(segments) > 1) and not use_loop and is_obj:
+        parts, gaps = _complete_rows(parts, segments, ex, opts)  # long lists: rows checked against the tables
+        warnings += gaps
     conflicts: list = []
     tree = None
     for i, (v, s) in enumerate(parts):

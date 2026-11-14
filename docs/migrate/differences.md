@@ -30,7 +30,9 @@ What is different from Reducto, so nothing surprises you after switching.
 
 ## Known issues
 
-- A small number of table-heavy documents can take much longer than average; `READANYDOC_DOCUMENT_TIMEOUT_SECONDS`
-  (30 minutes by default) bounds it.
-- On very long list extractions, one run in our tests lost most rows; `array_extract=True` and checking
-  `warnings` are recommended for long tables.
+- Table-heavy documents take longer than plain ones. Table re-reads are capped per page (16 re-reads, 180 seconds,
+  `READANYDOC_TABLE_SECONDS`) and `READANYDOC_DOCUMENT_TIMEOUT_SECONDS` (30 minutes by default) bounds a whole document.
+- Long list extractions are checked against the parsed tables' row counts and a short segment is extracted again; if
+  a gap remains it is listed in `warnings`. Use `array_extract=True` for long tables and check `warnings`.
+- A page the model provider declines to read falls back to plain OCR text with `low` confidence unless
+  `READANYDOC_REFUSAL_READER` names a second model.

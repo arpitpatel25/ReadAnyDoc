@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased (0.1.1)
+
+- A page the model provider declines to read (content filtering) is no longer empty: a second model reads it if
+  `READANYDOC_REFUSAL_READER` (or the read option `refusal_reader`) is set, otherwise the page's local OCR text is
+  used. OCR-text blocks are always `low` confidence and the response keeps a warning.
+- Table re-reads are bounded per page: at most 16 re-reads, and a page waits at most 180 seconds for them
+  (`READANYDOC_TABLE_SECONDS`). Unfinished re-reads keep the page read's table. This stops the rare very slow
+  table-heavy document.
+- Long list extraction checks its rows: a segment that returns far fewer items than its parsed tables have rows is
+  extracted again in halves (kept only when it finds more); a gap that remains is reported in `warnings`.
+- `usage.by_model` names the model used for extract, split, classify and edit calls instead of `task:extract`.
+
 ## 0.1.0 (2026-11-14)
 
 First public release.

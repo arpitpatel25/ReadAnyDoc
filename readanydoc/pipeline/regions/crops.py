@@ -187,16 +187,39 @@ def settle_prefetched(doc: Document) -> int:
 
 
 def read_many(doc: Document, page: Page, jobs: list[tuple[Box, str, str]], reader_spec: str,
-              workers: int = 8, pad: float = 0.012) -> list[Optional[ReadResult]]:
+              workers: int = 8, pad: float = 0.012, deadline: Optional[float] = None) -> list[Optional[ReadResult]]:
     """``jobs``: (box, prompt, tag). All crops of a page are read together. Inside ``shared_reads(page)`` a crop
-    that was already read with the same prompt is not read (or billed) again."""
+    that was already read with the same prompt is not read (or billed) again. With ``deadline`` (a
+    ``time.monotonic()`` value) reads not finished by then come back as None and the page moves on."""
     if not jobs:
         return []
     memo = _SHARED.get(id(page))
     keys = [(tuple(round(float(v), 5) for v in j[0]), j[1], reader_spec, pad) for j in jobs]
     todo = [i for i, k in enumerate(keys) if memo is None or k not in memo]
     out: dict[int, Optional[ReadResult]] = {}
-    if todo:
+    if todo and deadline is not None:
+        import time
+        from concurrent.futures import wait
+        ex = ThreadPoolExecutor(max_workers=max(1, min(workers, len(todo))))
+        futs = {ex.submit(read_crop, doc, page, jobs[i][0], jobs[i][1], reader_spec, jobs[i][2], pad=pad): i
+                for i in todo}
+        done, late = wait(futs, timeout=max(deadline - time.monotonic(), 0.0))
+        ex.shutdown(wait=False, cancel_futures=True)
+        for f in done:
+            i = futs[f]
+            try:
+                out[i] = f.result()
+            except Exception:
+                out[i] = None
+            if memo is not None and out[i] is not None:
+                memo[keys[i]] = out[i]
+        for f in late:
+            out[futs[f]] = None
+        if late:
+            page.properties["region_reads_timed_out"] = page.properties.get("region_reads_timed_out", 0) + len(late)
+            doc.note("tables", f"page {page.index}: {len(late)} region read(s) stopped at the page time budget; "
+                               "the page read is kept for them", "warning")
+    elif todo:
         with ThreadPoolExecutor(max_workers=max(1, min(workers, len(todo)))) as ex:
             for i, res in zip(todo, ex.map(lambda i: read_crop(doc, page, jobs[i][0], jobs[i][1], reader_spec,
                                                                jobs[i][2], pad=pad), todo)):

@@ -186,6 +186,8 @@ class Ground(Stage):
                     st.region.meta["verify_confidence"] = st.region.confidence.score
                 st.region.confidence = Confidence.of(score, high_at)
                 st.region.meta["confidence_parts"] = parts
+                if st.region.meta.get("ocr_fallback"):  # the model declined the page; plain OCR text stands in
+                    st.region.confidence = Confidence(score=min(score, 0.5), label="low")
                 if st.region.meta.get("flagged"):  # an unresolved Verify check (pipeline/checks) keeps the block low
                     st.region.confidence = Confidence(score=min(score, 0.5), label="low")
 
