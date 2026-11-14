@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 
@@ -32,7 +32,8 @@
 <main>
 
 <section class="hero">
-  <div class="container hero-in hero-left">
+  <div class="container hero-grid">
+    <div class="hero-copy">
     <a class="pill" href="https://github.com/arpitpatel25/ReadAnyDoc"><span class="pill-dot"></span>Open source under Apache-2.0</a>
     <h1 class="reveal">The open-source alternative to Reducto.</h1>
     <p class="hero-sub">The document parser built around Claude Haiku, or any model you choose. Turn PDFs, scans and
@@ -41,18 +42,30 @@
       <a class="btn btn-green" href="https://github.com/arpitpatel25/ReadAnyDoc#readme">Get started</a>
       <a class="btn btn-line" href="#benchmarks">See the benchmarks</a>
     </div>
-    <ul class="checks">
+    
+    <dl class="stats">
+      <div><dt>84.2</dt><dd>olmOCR-bench, best of the three</dd></div>
+      <div><dt>½</dt><dd>about half Reducto's price per page</dd></div>
+      <div><dt>1 URL</dt><dd>to switch from Reducto</dd></div>
+    </dl>
+  </div>
+    <div class="hero-side">
+      <div class="live" aria-label="Animated example: fields extracted from documents, each with its citation">
+        <div class="live-tabs" role="presentation"><span data-doc="0">Invoice</span><span data-doc="1">Bank statement</span><span data-doc="2">Form</span></div>
+        <div class="live-page" id="live-page"></div>
+        <div class="live-out">
+          <div class="live-row"><span class="live-key" id="live-key">number</span><span class="live-val" id="live-val">"INV-2041"</span></div>
+          <div class="live-cite" id="live-cite">page 1, line 2, confidence high</div>
+        </div>
+      </div>
+      <ul class="checks checks-side">
       <li>Citations for every value</li>
       <li>Claude Haiku 5.5 by default, any model you like</li>
       <li>Extraction into your own types</li>
       <li>Drop-in Reducto API</li>
       <li>Runs on your own model account</li>
     </ul>
-    <dl class="stats">
-      <div><dt>84.2</dt><dd>olmOCR-bench, best of the three</dd></div>
-      <div><dt>½</dt><dd>about half Reducto's price per page</dd></div>
-      <div><dt>1 URL</dt><dd>to switch from Reducto</dd></div>
-    </dl>
+    </div>
   </div>
 
   <div class="container">
@@ -299,6 +312,6 @@ client = Reducto(api_key=<span class="s">"..."</span>,
   </div>
 </footer>
 
-<script src="site.js?v=6"></script>
+<script src="site.js?v=7"></script>
 </body>
 </html>
