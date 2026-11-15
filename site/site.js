@@ -85,3 +85,29 @@ document.querySelectorAll(".has-menu").forEach((m) => {
   document.addEventListener("click", (e) => { if (!m.contains(e.target)) { m.classList.remove("open"); btn.setAttribute("aria-expanded", false); } });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") { m.classList.remove("open"); btn.setAttribute("aria-expanded", false); } });
 });
+
+// Live GitHub star count on the star buttons (silently skipped if the API is unreachable).
+fetch("https://api.github.com/repos/arpitpatel25/ReadAnyDoc")
+  .then((r) => (r.ok ? r.json() : null))
+  .then((d) => {
+    if (!d || typeof d.stargazers_count !== "number" || d.stargazers_count < 1) return;
+    const n = d.stargazers_count >= 1000 ? (d.stargazers_count / 1000).toFixed(1) + "k" : String(d.stargazers_count);
+    document.querySelectorAll("[data-stars]").forEach((el) => { el.textContent = n; el.hidden = false; });
+  })
+  .catch(() => {});
+
+// One gentle star prompt per visitor: after most of the page is read, never again once closed or clicked.
+(() => {
+  const card = document.getElementById("star-card");
+  if (!card) return;
+  let seen = false;
+  try { seen = localStorage.getItem("rad-star-card") === "1"; } catch (e) {}
+  if (seen) return;
+  const remember = () => { try { localStorage.setItem("rad-star-card", "1"); } catch (e) {} };
+  const onScroll = () => {
+    const read = (window.scrollY + window.innerHeight) / document.documentElement.scrollHeight;
+    if (read > 0.6) { card.hidden = false; remember(); window.removeEventListener("scroll", onScroll); }
+  };
+  window.addEventListener("scroll", onScroll, { passive: true });
+  card.querySelectorAll("[data-star-close]").forEach((el) => el.addEventListener("click", () => { card.hidden = true; }));
+})();

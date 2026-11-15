@@ -19,3 +19,5 @@ Each page has a complete, working example.
 | [Extract clauses and terms from contracts](contracts.md) | Pull parties, dates, terms and clauses out of long contracts and agreements (PDF or Word) into structured data with citations. |
 
 See them on real pages: [Real documents, end to end](../examples/real-documents.md).
+
+> If ReadAnyDoc saved you time, a [star on GitHub](https://github.com/arpitpatel25/ReadAnyDoc) helps other developers find it.

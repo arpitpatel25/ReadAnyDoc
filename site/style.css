@@ -350,3 +350,16 @@ code{font-family:var(--mono)}
 .menu-item b{display:block;font-size:14.5px;font-weight:600}
 .menu-item small{display:block;margin-top:2px;font-size:13px;color:var(--gray);line-height:1.45}
 @media (hover:hover){.has-menu:hover .menu{opacity:1;visibility:visible;transform:translate(-50%,0)}}
+
+/* star asks */
+.star-btn{display:inline-flex;align-items:center;gap:8px}
+.star-ico{width:14px;height:14px;fill:currentColor}
+.star-count{margin-left:2px;padding:1px 8px;border-radius:999px;background:rgba(255,255,255,.18);font-size:12.5px;font-weight:600}
+.btn-line .star-count{background:var(--green-soft);color:var(--green)}
+.star-card{position:fixed;right:20px;bottom:20px;z-index:20;max-width:320px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:#fff;box-shadow:0 20px 50px -20px rgba(10,30,20,.3);font-size:14.5px;color:var(--gray)}
+.star-card b{color:var(--ink)}
+.star-card-actions{margin-top:12px;display:flex;gap:10px;align-items:center}
+.star-card-x{border:0;background:none;font:inherit;font-size:13.5px;color:var(--gray);cursor:pointer;padding:6px}
+.star-card-x:hover{color:var(--ink)}
+@media (prefers-reduced-motion:no-preference){.star-card:not([hidden]){animation:rise .5s cubic-bezier(.2,.7,.2,1) both}}
+@media (max-width:600px){.star-card{left:12px;right:12px;bottom:12px;max-width:none}}

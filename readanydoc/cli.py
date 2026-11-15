@@ -48,6 +48,8 @@ def _parse(args: argparse.Namespace) -> int:
     print(f"{result.pages} pages, {result.usage.calls} model calls, "
           f"${result.usage.cost_usd if result.usage.cost_usd is not None else '?'}, {result.usage.seconds} s",
           file=sys.stderr)
+    from .star import maybe_ask
+    maybe_ask()
     return 0
 
 
@@ -77,6 +79,8 @@ def _extract(args: argparse.Namespace) -> int:
            "usage": result.usage.model_dump()}
     json.dump(out, sys.stdout, indent=2, ensure_ascii=False, default=str)
     sys.stdout.write("\n")
+    from .star import maybe_ask
+    maybe_ask()
     return 0
 
 

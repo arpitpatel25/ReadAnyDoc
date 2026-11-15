@@ -122,3 +122,5 @@ readanydoc extract invoice.pdf --schema invoice.schema.json
 - [Parse](../guides/parse.md), [Extract](../guides/extract.md): every option.
 - [Quickstart (server)](server-quickstart.md): the Reducto-compatible API.
 - [Benchmarks](../resources/benchmarks.md): how it compares with Reducto.
+
+> If ReadAnyDoc saved you time, a [star on GitHub](https://github.com/arpitpatel25/ReadAnyDoc) helps other developers find it.

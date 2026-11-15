@@ -84,3 +84,5 @@ The parsed table, as returned ([invoice_1904.md](https://github.com/arpitpatel25
 
 The cents of the total at the bottom are faded on the paper. ReadAnyDoc writes `[illegible]` rather than guess, and
 `extract` returns `total: null` with a warning. The twelve amounts it did read add up to 292.24.
+
+> If ReadAnyDoc saved you time, a [star on GitHub](https://github.com/arpitpatel25/ReadAnyDoc) helps other developers find it.

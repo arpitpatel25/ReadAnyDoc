@@ -66,3 +66,5 @@ The official [MCP Registry](https://registry.modelcontextprotocol.io) as `io.git
 - Files are read from the local disk only; the server does not fetch URLs.
 - A parse can take from a few seconds to minutes on long documents. `mode="model-only"` is faster.
 - Check `warnings` in every result. Confidence is `high` or `low`, not a probability.
+
+> If ReadAnyDoc saved you time, a [star on GitHub](https://github.com/arpitpatel25/ReadAnyDoc) helps other developers find it.

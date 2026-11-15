@@ -1,6 +1,6 @@
 [project]
 name = "readanydoc"
-version = "0.1.5"
+version = "0.1.6"
 description = "Document parsing and extraction with vision models: an open engine around Claude (or any model), with a Reducto-compatible API"
 readme = "README.md"
 authors = [{ name = "readanydoc contributors" }]

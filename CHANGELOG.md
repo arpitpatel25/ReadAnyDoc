@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.6 (2026-11-15)
+
+- After the first successful `readanydoc parse` or `extract` in a terminal, one line asks for a GitHub star, once
+  ever. Never in scripts, CI, the server, the MCP server or the Python library; `READANYDOC_NO_STAR=1` turns it off.
+
 ## 0.1.5 (2026-11-15)
 
 - The MCP server is part of the base install: `pip install readanydoc` then `readanydoc mcp` (the `mcp` extra still

@@ -50,3 +50,9 @@ readanydoc cleanup [--json]
 ```
 
 Runs the server's clean-up pass by hand: expired uploads, results and caches.
+
+## The star message
+
+After the first successful `parse` or `extract` in a terminal, the command prints one line asking for a GitHub
+star, once ever. It never appears in pipes, scripts, CI, the server, the MCP server or the Python library. Set
+`READANYDOC_NO_STAR=1` to turn it off.

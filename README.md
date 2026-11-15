@@ -2,7 +2,7 @@
 
 <!-- mcp-name: io.github.arpitpatel25/readanydoc -->
 
-[![PyPI](https://img.shields.io/pypi/v/readanydoc)](https://pypi.org/project/readanydoc/) [![Downloads](https://img.shields.io/pypi/dm/readanydoc)](https://pepy.tech/project/readanydoc) [![Tests](https://github.com/arpitpatel25/ReadAnyDoc/actions/workflows/ci.yml/badge.svg)](https://github.com/arpitpatel25/ReadAnyDoc/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/LICENSE) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/arpitpatel25/ReadAnyDoc/blob/main/examples/quickstart.ipynb)
+[![GitHub stars](https://img.shields.io/github/stars/arpitpatel25/ReadAnyDoc?style=social)](https://github.com/arpitpatel25/ReadAnyDoc) [![PyPI](https://img.shields.io/pypi/v/readanydoc)](https://pypi.org/project/readanydoc/) [![Downloads](https://img.shields.io/pypi/dm/readanydoc)](https://pepy.tech/project/readanydoc) [![Tests](https://github.com/arpitpatel25/ReadAnyDoc/actions/workflows/ci.yml/badge.svg)](https://github.com/arpitpatel25/ReadAnyDoc/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/LICENSE) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/arpitpatel25/ReadAnyDoc/blob/main/examples/quickstart.ipynb)
 
 Parse and extract documents with vision models, on your own machine and your own model account.
 Open source, Reducto-compatible, built by Unmute. Website: https://arpitpatel25.github.io/ReadAnyDoc/
@@ -25,7 +25,7 @@ print(result.markdown)
 **A real document, unedited**: the US government's sample Loan Estimate, extracted in one call for about 1 cent.
 All 11 fields are right, and every box is a citation ReadAnyDoc returned. A yes/no answer that is not printed as one
 word is marked low confidence instead of pretending. A faded 1904 invoice is in the same folder:
-[examples/showcase](https://github.com/arpitpatel25/ReadAnyDoc/tree/main/examples/showcase/).
+[examples/showcase](https://github.com/arpitpatel25/ReadAnyDoc/tree/main/examples/showcase/). If it looks useful, ⭐ star the repo.
 
 ## Results
 
@@ -203,6 +203,8 @@ independent evidence. Design decisions and their reasons: [docs/decisions.md](ht
 | [AGENTS.md](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/AGENTS.md), [llms.txt](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/llms.txt) | a map of the repo for AI agents; point your agent at it to ask questions |
 
 ## Community
+> If ReadAnyDoc saved you time, a [star on GitHub](https://github.com/arpitpatel25/ReadAnyDoc) helps other developers find it.
+
 
 Questions, ideas and what you built: [GitHub Discussions](https://github.com/arpitpatel25/ReadAnyDoc/discussions).
 Bugs: [open an issue](https://github.com/arpitpatel25/ReadAnyDoc/issues/new/choose). Release news: watch the
