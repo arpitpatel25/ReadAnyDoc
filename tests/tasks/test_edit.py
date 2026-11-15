@@ -237,7 +237,11 @@ def _red_pixels(path, box, forms=True):
     w, h = im.size
     crop = im.crop((int(box["left"] * w), int(box["top"] * h), int((box["left"] + box["width"]) * w),
                     int((box["top"] + box["height"]) * h)))
-    return sum(1 for r, g, b in crop.getdata() if r > 180 and g < 90 and b < 90)
+    if hasattr(crop, "get_flattened_data"):
+        pixels = crop.get_flattened_data()
+    else:
+        pixels = crop.getdata()
+    return sum(1 for r, g, b in pixels if r > 180 and g < 90 and b < 90)
 
 
 def test_flat_pdf_gets_real_form_fields_at_the_schema_boxes(flat_pdf, tmp_path):
