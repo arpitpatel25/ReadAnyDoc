@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.5 (2026-11-15)
+
+- The MCP server is part of the base install: `pip install readanydoc` then `readanydoc mcp` (the `mcp` extra still
+  works and installs nothing more).
+- Claude Code plugin pinned to an exact commit, as the Claude plugin directory requires; submitted to the directory.
+- Privacy page in the docs.
+
 ## 0.1.4 (2026-11-15)
 
 - The PyPI page now shows the showcase image and working links (README links are absolute).
