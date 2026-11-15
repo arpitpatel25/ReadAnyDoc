@@ -9,7 +9,8 @@ right inside Claude Code.
 ```
 
 Needs [uv](https://docs.astral.sh/uv/) (the server runs with `uvx`, nothing else to install) and `ANTHROPIC_API_KEY`
-in the environment you start Claude Code from. The first run downloads the package and the layout model once.
+in the environment you start Claude Code from; the server reads it from there and sends it only to Anthropic.
+The plugin pins ReadAnyDoc to an exact commit of this repository. The first run downloads the package and the layout model once.
 
 Then ask, for example: *"Extract the invoice number, date and total from ~/Downloads/invoice.pdf with citations"*.
 
