@@ -24,7 +24,7 @@ Check it is up:
 
 ```bash
 curl http://localhost:8000/version
-# "readanydoc-0.1.3"
+# "readanydoc-0.1.4"
 ```
 
 ## 2. Upload and parse

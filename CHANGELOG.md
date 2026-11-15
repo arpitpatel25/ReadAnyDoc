@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4 (2026-11-15)
+
+- The PyPI page now shows the showcase image and working links (README links are absolute).
+
 ## 0.1.3 (2026-11-15)
 
 - LangChain loader and LlamaIndex reader: `readanydoc.integrations.langchain.ReadAnyDocLoader`,

@@ -2,7 +2,7 @@
 
 <!-- mcp-name: io.github.arpitpatel25/readanydoc -->
 
-[![PyPI](https://img.shields.io/pypi/v/readanydoc)](https://pypi.org/project/readanydoc/) [![Downloads](https://img.shields.io/pypi/dm/readanydoc)](https://pepy.tech/project/readanydoc) [![Tests](https://github.com/arpitpatel25/ReadAnyDoc/actions/workflows/ci.yml/badge.svg)](https://github.com/arpitpatel25/ReadAnyDoc/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/arpitpatel25/ReadAnyDoc/blob/main/examples/quickstart.ipynb)
+[![PyPI](https://img.shields.io/pypi/v/readanydoc)](https://pypi.org/project/readanydoc/) [![Downloads](https://img.shields.io/pypi/dm/readanydoc)](https://pepy.tech/project/readanydoc) [![Tests](https://github.com/arpitpatel25/ReadAnyDoc/actions/workflows/ci.yml/badge.svg)](https://github.com/arpitpatel25/ReadAnyDoc/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/LICENSE) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/arpitpatel25/ReadAnyDoc/blob/main/examples/quickstart.ipynb)
 
 Parse and extract documents with vision models, on your own machine and your own model account.
 Open source, Reducto-compatible, built by Unmute. Website: https://arpitpatel25.github.io/ReadAnyDoc/
@@ -20,17 +20,17 @@ result = readanydoc.parse("invoice.pdf")
 print(result.markdown)
 ```
 
-<p align="center"><img src="examples/showcase/loan-estimate-citations.jpg" width="560" alt="A Loan Estimate with a citation box around every value ReadAnyDoc extracted"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/arpitpatel25/ReadAnyDoc/main/examples/showcase/loan-estimate-citations.jpg" width="560" alt="A Loan Estimate with a citation box around every value ReadAnyDoc extracted"></p>
 
 **A real document, unedited**: the US government's sample Loan Estimate, extracted in one call for about 1 cent.
 All 11 fields are right, and every box is a citation ReadAnyDoc returned. A yes/no answer that is not printed as one
 word is marked low confidence instead of pretending. A faded 1904 invoice is in the same folder:
-[examples/showcase](examples/showcase/).
+[examples/showcase](https://github.com/arpitpatel25/ReadAnyDoc/tree/main/examples/showcase/).
 
 ## Results
 
 Five public benchmarks (about 4,250 pages and 10 long documents), each scored with the benchmark's own grader (no AI judge). Same
-documents and same requests for all three systems. Details and caveats: [BENCHMARKS.md](BENCHMARKS.md).
+documents and same requests for all three systems. Details and caveats: [BENCHMARKS.md](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/BENCHMARKS.md).
 
 | Benchmark | Reducto r-1 | Model only (Haiku 5.5) | ReadAnyDoc engine (Haiku 5.5) |
 |---|---|---|---|
@@ -60,7 +60,7 @@ Set your model provider's key: `export ANTHROPIC_API_KEY=...` (or `OPENAI_API_KE
 ### Or let your coding agent set it up
 
 Paste this into Claude Code, Codex or Cursor. It installs ReadAnyDoc, tests it on one of your files and wires it
-into your project the way you choose ([what it follows](AGENT_SETUP.md)):
+into your project the way you choose ([what it follows](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/AGENT_SETUP.md)):
 
 ```text
 Set up ReadAnyDoc in this project. Follow the instructions at
@@ -180,7 +180,7 @@ Each page goes through a fixed sequence of stages (`readanydoc/pipeline/`): inta
 scanned pages where two reads must agree before a character changes; handwritten pages to a stronger model),
 verify (table grids and printed totals checked without a model), ground (word and cell positions, block types,
 form fields), assemble and shape (the requested output format). Nothing the model wrote is changed without
-independent evidence. Design decisions and their reasons: [docs/decisions.md](docs/decisions.md).
+independent evidence. Design decisions and their reasons: [docs/decisions.md](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/decisions.md).
 
 ## Limits
 
@@ -194,13 +194,13 @@ independent evidence. Design decisions and their reasons: [docs/decisions.md](do
 
 | | |
 |---|---|
-| [BENCHMARKS.md](BENCHMARKS.md) | full results against Reducto, cost, method, caveats; per-document scores in [results/](results/) |
-| [docs/story.md](docs/story.md) | why this exists, the bet behind it, what we learned |
-| [docs/research/journey.md](docs/research/journey.md) | the full research record: every stage, every experiment, what was kept and dropped and why |
-| [docs/decisions.md](docs/decisions.md) | every design decision with its reason |
+| [BENCHMARKS.md](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/BENCHMARKS.md) | full results against Reducto, cost, method, caveats; per-document scores in [results/](https://github.com/arpitpatel25/ReadAnyDoc/tree/main/results/) |
+| [docs/story.md](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/story.md) | why this exists, the bet behind it, what we learned |
+| [docs/research/journey.md](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/research/journey.md) | the full research record: every stage, every experiment, what was kept and dropped and why |
+| [docs/decisions.md](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/decisions.md) | every design decision with its reason |
 | [Documentation](https://arpitpatel25.github.io/ReadAnyDoc/docs/) | guides, API reference, configuration, migrating from Reducto |
-| [examples/](examples/) | runnable scripts |
-| [AGENTS.md](AGENTS.md), [llms.txt](llms.txt) | a map of the repo for AI agents; point your agent at it to ask questions |
+| [examples/](https://github.com/arpitpatel25/ReadAnyDoc/tree/main/examples/) | runnable scripts |
+| [AGENTS.md](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/AGENTS.md), [llms.txt](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/llms.txt) | a map of the repo for AI agents; point your agent at it to ask questions |
 
 ## Community
 
@@ -210,7 +210,7 @@ repository (*Watch, Custom, Releases*).
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Security reports: [SECURITY.md](SECURITY.md).
+See [CONTRIBUTING.md](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/CONTRIBUTING.md). Security reports: [SECURITY.md](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/SECURITY.md).
 
 ## License
 
