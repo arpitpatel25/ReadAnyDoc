@@ -2,7 +2,7 @@
   "mcpServers": {
     "readanydoc": {
       "command": "uvx",
-      "args": ["--from", "readanydoc[engine] @ git+https://github.com/arpitpatel25/ReadAnyDoc@da045884237750635a0184db10c0c8e0f4838dd8", "readanydoc", "mcp"]
+      "args": ["--from", "git+https://github.com/arpitpatel25/ReadAnyDoc@da045884237750635a0184db10c0c8e0f4838dd8", "readanydoc", "mcp"]
     }
   }
 }
