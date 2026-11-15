@@ -1,0 +1,168 @@
+{
+  "data": {
+    "lender": "FICUS BANK",
+    "applicants": [
+      "Michael Jones and Mary Stone"
+    ],
+    "property_address": "456 Somewhere Avenue, Anytown, ST 12345",
+    "sale_price": 180000.0,
+    "loan_amount": 162000.0,
+    "interest_rate_percent": 3.875,
+    "monthly_principal_and_interest": 761.78,
+    "loan_term": "30 years",
+    "has_prepayment_penalty": true,
+    "estimated_closing_costs": 8054.0,
+    "estimated_cash_to_close": 16054.0
+  },
+  "citations": {
+    "lender": [
+      {
+        "content": "FICUS BANK",
+        "bbox": {
+          "left": 0.0693,
+          "top": 0.0434,
+          "width": 0.1859,
+          "height": 0.029,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "applicants[0]": [
+      {
+        "content": "Michael Jones and Mary Stone",
+        "bbox": {
+          "left": 0.1667,
+          "top": 0.1513,
+          "width": 0.2063,
+          "height": 0.0126,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "property_address": [
+      {
+        "content": "456 Somewhere Avenue Anytown, ST 12345",
+        "bbox": {
+          "left": 0.1667,
+          "top": 0.1967,
+          "width": 0.1655,
+          "height": 0.0278,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "sale_price": [
+      {
+        "content": "180,000",
+        "bbox": {
+          "left": 0.1667,
+          "top": 0.227,
+          "width": 0.0609,
+          "height": 0.0126,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "loan_amount": [
+      {
+        "content": "162,000",
+        "bbox": {
+          "left": 0.3235,
+          "top": 0.2879,
+          "width": 0.0869,
+          "height": 0.0177,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "interest_rate_percent": [
+      {
+        "content": "3.875",
+        "bbox": {
+          "left": 0.3235,
+          "top": 0.3201,
+          "width": 0.0698,
+          "height": 0.0177,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "monthly_principal_and_interest": [
+      {
+        "content": "761.78",
+        "bbox": {
+          "left": 0.3235,
+          "top": 0.3561,
+          "width": 0.0751,
+          "height": 0.0177,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "loan_term": [
+      {
+        "content": "30 years",
+        "bbox": {
+          "left": 0.5784,
+          "top": 0.1053,
+          "width": 0.0545,
+          "height": 0.0126,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "has_prepayment_penalty": [
+      {
+        "content": "Loan Terms Can this amount increase after closing? Loan Amount $162,000 NO Interest Rate 3.875% NO Monthly Principal &amp; Interest See Projected Payments below for your Estimated Total Monthly Payment $761.78 NO Prepayment Penalty Does the loan have these features? YES \u2022 As high as $3,240 if you pa",
+        "bbox": {
+          "left": 0.0667,
+          "top": 0.256,
+          "width": 0.8658,
+          "height": 0.2498,
+          "page": 1
+        },
+        "confidence": "low"
+      }
+    ],
+    "estimated_closing_costs": [
+      {
+        "content": "8,054",
+        "bbox": {
+          "left": 0.3216,
+          "top": 0.8624,
+          "width": 0.0606,
+          "height": 0.0177,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "estimated_cash_to_close": [
+      {
+        "content": "16,054",
+        "bbox": {
+          "left": 0.3216,
+          "top": 0.9066,
+          "width": 0.0779,
+          "height": 0.0177,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ]
+  },
+  "warnings": [],
+  "cost_usd": 0.014099,
+  "seconds": 48.9,
+  "models": [
+    "claude-haiku-5-5"
+  ]
+}

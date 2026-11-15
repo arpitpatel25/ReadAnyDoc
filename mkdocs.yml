@@ -10,6 +10,7 @@ site_dir: build/docs
 
 theme:
   name: material
+  custom_dir: docs/overrides
   logo: assets/logo.svg
   favicon: assets/favicon.svg
   font:
@@ -68,6 +69,9 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.snippets: {base_path: ["."], check_paths: true}
 
+exclude_docs: |
+  overrides/
+
 not_in_nav: |
   /research/README.md
 
@@ -93,7 +97,20 @@ nav:
       - Edit: guides/edit.md
       - Async jobs and webhooks: guides/jobs-webhooks.md
       - File types: guides/file-types.md
+      - LangChain and LlamaIndex: guides/integrations.md
+  - Use cases:
+    - Overview: use-cases/index.md
+    - Real documents, end to end: examples/real-documents.md
+    - Invoices: use-cases/invoices.md
+    - Bank statements: use-cases/bank-statements.md
+    - Receipts: use-cases/receipts.md
+    - Tax forms: use-cases/tax-forms.md
+    - Tables from PDFs: use-cases/tables-from-pdf.md
+    - PDF to Markdown for RAG: use-cases/pdf-to-markdown.md
+    - Scanned documents and handwriting: use-cases/scanned-documents.md
+    - Contracts: use-cases/contracts.md
   - Migrate from Reducto:
+    - Reducto alternatives compared: compare/alternatives.md
     - Switch in one URL: migrate/from-reducto.md
     - Compatibility, route by route: migrate/compatibility.md
     - Differences and limits: migrate/differences.md

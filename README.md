@@ -1,6 +1,8 @@
 # ReadAnyDoc
 
-[![PyPI](https://img.shields.io/pypi/v/readanydoc)](https://pypi.org/project/readanydoc/) [![Downloads](https://img.shields.io/pypi/dm/readanydoc)](https://pepy.tech/project/readanydoc) [![Tests](https://github.com/arpitpatel25/ReadAnyDoc/actions/workflows/ci.yml/badge.svg)](https://github.com/arpitpatel25/ReadAnyDoc/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+<!-- mcp-name: io.github.arpitpatel25/readanydoc -->
+
+[![PyPI](https://img.shields.io/pypi/v/readanydoc)](https://pypi.org/project/readanydoc/) [![Downloads](https://img.shields.io/pypi/dm/readanydoc)](https://pepy.tech/project/readanydoc) [![Tests](https://github.com/arpitpatel25/ReadAnyDoc/actions/workflows/ci.yml/badge.svg)](https://github.com/arpitpatel25/ReadAnyDoc/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE) [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/arpitpatel25/ReadAnyDoc/blob/main/examples/quickstart.ipynb)
 
 Parse and extract documents with vision models, on your own machine and your own model account.
 Open source, Reducto-compatible, built by Unmute. Website: https://arpitpatel25.github.io/ReadAnyDoc/
@@ -17,6 +19,13 @@ import readanydoc
 result = readanydoc.parse("invoice.pdf")
 print(result.markdown)
 ```
+
+<p align="center"><img src="examples/showcase/loan-estimate-citations.jpg" width="560" alt="A Loan Estimate with a citation box around every value ReadAnyDoc extracted"></p>
+
+**A real document, unedited**: the US government's sample Loan Estimate, extracted in one call for about 1 cent.
+All 11 fields are right, and every box is a citation ReadAnyDoc returned. A yes/no answer that is not printed as one
+word is marked low confidence instead of pretending. A faded 1904 invoice is in the same folder:
+[examples/showcase](examples/showcase/).
 
 ## Results
 
@@ -149,8 +158,20 @@ pip install "readanydoc[engine,mcp]"
 claude mcp add readanydoc -e ANTHROPIC_API_KEY=your-key -- readanydoc mcp
 ```
 
+In Claude Code you can install the plugin instead (server plus a skill): `/plugin marketplace add arpitpatel25/ReadAnyDoc`,
+then `/plugin install readanydoc@readanydoc`.
+
 Gives the assistant two tools, `parse_document` and `extract_fields` (with citations), on files on your computer.
 Setup for Claude Desktop, Cursor and others: [MCP guide](https://arpitpatel25.github.io/ReadAnyDoc/docs/get-started/mcp/).
+
+### LangChain and LlamaIndex
+
+```python
+from readanydoc.integrations.langchain import ReadAnyDocLoader     # pip install "readanydoc[engine,langchain]"
+from readanydoc.integrations.llamaindex import ReadAnyDocReader    # pip install "readanydoc[engine,llamaindex]"
+```
+
+One Markdown document per page with its page number. [Guide](https://arpitpatel25.github.io/ReadAnyDoc/docs/guides/integrations/).
 
 ## How it works
 

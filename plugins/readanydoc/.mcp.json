@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "readanydoc": {
+      "command": "uvx",
+      "args": ["--from", "readanydoc[engine,mcp]", "readanydoc", "mcp"],
+      "env": {"ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"}
+    }
+  }
+}

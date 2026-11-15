@@ -1,6 +1,6 @@
 [project]
 name = "readanydoc"
-version = "0.1.2"
+version = "0.1.3"
 description = "Document parsing and extraction with vision models: an open engine around Claude (or any model), with a Reducto-compatible API"
 readme = "README.md"
 authors = [{ name = "readanydoc contributors" }]
@@ -45,6 +45,9 @@ Changelog = "https://github.com/arpitpatel25/ReadAnyDoc/blob/main/CHANGELOG.md"
 engine = ["onnxruntime>=1.18", "numpy>=1.26", "rapidocr>=3.10"]
 # `readanydoc mcp`: parse and extract as tools for Claude, Cursor and other MCP clients
 mcp = ["mcp>=2.3"]
+# document loaders for LangChain and LlamaIndex (readanydoc/integrations/)
+langchain = ["langchain-core>=0.3"]
+llamaindex = ["llama-index-core>=0.12"]
 
 [project.scripts]
 readanydoc = "readanydoc.cli:main"

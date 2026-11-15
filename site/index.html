@@ -7,11 +7,24 @@
 <meta name="description" content="Parse and extract PDFs, scans and forms with Claude or any vision model. Same API as Reducto, runs on your own model account, open source.">
 <meta property="og:title" content="ReadAnyDoc: the open-source alternative to Reducto">
 <meta property="og:description" content="Parse and extract PDFs, scans and forms with Claude or any vision model. Same API as Reducto. Open source.">
+<link rel="canonical" href="https://arpitpatel25.github.io/ReadAnyDoc/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://arpitpatel25.github.io/ReadAnyDoc/">
+<meta property="og:site_name" content="ReadAnyDoc">
+<meta property="og:image" content="https://arpitpatel25.github.io/ReadAnyDoc/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="ReadAnyDoc: the open-source alternative to Reducto. A Loan Estimate with a citation box on every extracted value.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ReadAnyDoc: the open-source alternative to Reducto">
+<meta name="twitter:description" content="Parse and extract PDFs, scans and forms with Claude or any vision model, with a citation for every value. Same API as Reducto. Open source.">
+<meta name="twitter:image" content="https://arpitpatel25.github.io/ReadAnyDoc/og.png">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "ReadAnyDoc", "applicationCategory": "DeveloperApplication", "operatingSystem": "macOS, Linux, Windows", "description": "Open-source document parsing and extraction: PDFs, scans and forms to Markdown, tables and typed data with a citation for every value. Claude Haiku or any vision model. Reducto-compatible API.", "url": "https://arpitpatel25.github.io/ReadAnyDoc/", "downloadUrl": "https://pypi.org/project/readanydoc/", "codeRepository": "https://github.com/arpitpatel25/ReadAnyDoc", "license": "https://www.apache.org/licenses/LICENSE-2.0", "softwareVersion": "0.1.2", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "image": "https://arpitpatel25.github.io/ReadAnyDoc/og.png"}</script>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 
@@ -191,6 +204,38 @@
   </div>
 </section>
 
+<section class="section section-line" id="real">
+  <div class="container">
+    <h2 class="display">A real document, unedited.</h2>
+    <p class="lead">The US government's sample mortgage Loan Estimate, run through ReadAnyDoc once. All eleven fields came
+      back right, and every box below is a citation it returned. The one yes or no answer that is not printed as a
+      single word is marked low confidence instead of pretending.</p>
+    <div class="real">
+      <figure class="real-page">
+        <img src="showcase/loan-estimate-citations.jpg" width="1100" height="1424" loading="lazy"
+             alt="The Loan Estimate page with a green box around each extracted value: lender, applicants, property, sale price, loan amount, interest rate, monthly payment, closing costs and cash to close">
+      </figure>
+      <div class="real-side">
+<pre class="code"><code><span class="c"># about 1 cent, one call</span>
+out = readanydoc.extract(<span class="s">"loan_estimate.pdf"</span>,
+                         schema=LoanEstimate)
+
+out.data.loan_amount          <span class="c"># 162000.0</span>
+out.data.interest_rate_percent <span class="c"># 3.875</span>
+out.citations[<span class="s">"loan_amount"</span>]
+<span class="c"># text "162,000", page 1,</span>
+<span class="c"># box left .32 top .29, confidence high</span></code></pre>
+        <figure class="real-old">
+          <img src="showcase/invoice-1904.jpg" width="900" height="1497" loading="lazy" alt="A faded typewritten printer's invoice from 1904">
+          <figcaption><b>Also: a printer's invoice from 1904.</b> The faded scan comes back as a clean table. The cents of
+            the total have faded away, so it says <code>[illegible]</code> rather than guess.</figcaption>
+        </figure>
+        <p class="links-row"><a href="docs/examples/real-documents/">Both documents, every output</a><a href="https://github.com/arpitpatel25/ReadAnyDoc/tree/main/examples/showcase">Run it yourself</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="section section-warm" id="benchmarks">
   <div class="container">
     <h2 class="display">Measured against Reducto, in public.</h2>
@@ -352,7 +397,7 @@ client = Reducto(api_key=<span class="s">"..."</span>,
   </div>
 </footer>
 
-<script src="site.js?v=9"></script>
+<script src="site.js?v=10"></script>
 <script data-goatcounter="https://readanydoc.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </body>
 </html>

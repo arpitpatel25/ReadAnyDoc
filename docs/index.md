@@ -11,7 +11,14 @@ You can use it two ways:
 - **As a server with Reducto's API.** Run `readanydoc serve` or the Docker image and call it over HTTP from any
   language, or point Reducto's own SDK at it.
 
-Either way it runs on your machine and calls the model provider with your own key. Nothing is sent to us.
+Either way it runs on your machine and calls the model provider with your own key. Nothing is sent to us. You can
+also use it from Claude, Cursor and other assistants as an [MCP server](get-started/mcp.md), or let your coding agent
+[set it up for you](get-started/agent-setup.md).
+
+![A Loan Estimate with a citation box around every extracted value](assets/showcase/loan-estimate-citations.jpg){ width="520" }
+
+*A real document, unedited: every box is a citation ReadAnyDoc returned. [See both showcase documents](examples/real-documents.md)
+or browse the [use cases](use-cases/index.md).*
 
 <div class="grid cards" markdown>
 

@@ -1,0 +1,10 @@
+{
+  "name": "readanydoc",
+  "version": "0.1.3",
+  "description": "Parse PDFs, scans, photos and Office files into Markdown, and extract typed fields with a citation for every value. Open-source alternative to Reducto, on your own Anthropic key.",
+  "author": {"name": "Unmute"},
+  "homepage": "https://arpitpatel25.github.io/ReadAnyDoc/",
+  "repository": "https://github.com/arpitpatel25/ReadAnyDoc",
+  "license": "Apache-2.0",
+  "keywords": ["pdf", "ocr", "document-parsing", "extraction", "citations", "mcp"]
+}

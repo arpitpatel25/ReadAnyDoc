@@ -1,0 +1,46 @@
+"""LangChain and LlamaIndex adapters: chunking by page, block and document, metadata, no model calls."""
+import pytest
+
+import readanydoc
+from readanydoc.integrations import chunks
+from readanydoc.library import Block, BoundingBox, ParseResult, Usage
+
+
+def fake_parse(path, **kw):
+    box = lambda p, t: BoundingBox(left=0.1, top=t, width=0.5, height=0.05, page=p)
+    blocks = [Block(type="Title", content="# Report", bbox=box(1, 0.1), confidence="high"),
+              Block(type="Text", content="Revenue grew.", bbox=box(1, 0.3), confidence="high"),
+              Block(type="Table", content="<table><tr><td>1</td></tr></table>", bbox=box(2, 0.2), confidence="low")]
+    return ParseResult(blocks=blocks, pages=2, usage=Usage(calls=0, input_tokens=0, output_tokens=0, seconds=0),
+                       warnings=["page 2: check"])
+
+
+@pytest.fixture(autouse=True)
+def _no_model(monkeypatch):
+    monkeypatch.setattr(readanydoc, "parse", fake_parse)
+
+
+def test_split_by_page_block_and_document():
+    pages = list(chunks("r.pdf"))
+    assert [m["page"] for _, m in pages] == [1, 2] and pages[0][0] == "# Report\n\nRevenue grew."
+    assert pages[0][1]["warnings"] == ["page 2: check"] and "warnings" not in pages[1][1]
+    blocks = list(chunks("r.pdf", "block"))
+    assert len(blocks) == 3 and blocks[2][1]["block_type"] == "Table" and blocks[2][1]["confidence"] == "low"
+    (doc, meta), = chunks("r.pdf", "document")
+    assert meta["pages"] == 2 and "Revenue grew." in doc
+    with pytest.raises(ValueError):
+        list(chunks("r.pdf", "line"))
+
+
+def test_langchain_loader():
+    pytest.importorskip("langchain_core")
+    from readanydoc.integrations.langchain import ReadAnyDocLoader
+    docs = ReadAnyDocLoader("r.pdf").load()
+    assert len(docs) == 2 and docs[1].metadata == {"source": "r.pdf", "page": 2}
+
+
+def test_llamaindex_reader():
+    pytest.importorskip("llama_index.core")
+    from readanydoc.integrations.llamaindex import ReadAnyDocReader
+    docs = ReadAnyDocReader(split="block").load_data("r.pdf", extra_info={"team": "finance"})
+    assert len(docs) == 3 and docs[0].metadata["team"] == "finance" and docs[0].text == "# Report"

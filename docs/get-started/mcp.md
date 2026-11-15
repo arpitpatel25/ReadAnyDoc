@@ -20,21 +20,32 @@ The server uses your own `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY` for OpenAI mod
 
 ## Claude Code
 
+The plugin adds the server and a skill that tells Claude when to use it. It needs [uv](https://docs.astral.sh/uv/) and
+`ANTHROPIC_API_KEY` in the environment you start Claude Code from:
+
+```text
+/plugin marketplace add arpitpatel25/ReadAnyDoc
+/plugin install readanydoc@readanydoc
+```
+
+Or add only the server:
+
 ```bash
 claude mcp add readanydoc -e ANTHROPIC_API_KEY=your-key -- readanydoc mcp
 ```
 
 ## Claude Desktop, Cursor, Windsurf and other clients
 
-Add this to the client's MCP configuration (`claude_desktop_config.json`, `.cursor/mcp.json`, ...). Use the full path
-of `readanydoc` (`which readanydoc`) if the client does not see your virtual environment.
+Add this to the client's MCP configuration (`claude_desktop_config.json`, `.cursor/mcp.json`, ...). With [uv](https://docs.astral.sh/uv/) installed nothing else is needed; or `pip install "readanydoc[engine,mcp]"` and use
+`"command": "readanydoc", "args": ["mcp"]` (the full path from `which readanydoc` if the client does not see your
+virtual environment).
 
 ```json
 {
   "mcpServers": {
     "readanydoc": {
-      "command": "readanydoc",
-      "args": ["mcp"],
+      "command": "uvx",
+      "args": ["--from", "readanydoc[engine,mcp]", "readanydoc", "mcp"],
       "env": {"ANTHROPIC_API_KEY": "your-key"}
     }
   }
@@ -45,6 +56,10 @@ of `readanydoc` (`which readanydoc`) if the client does not see your virtual env
 
 Ask the assistant, for example: *"Extract the invoice number, date and total from ~/Downloads/invoice.pdf with
 citations"* or *"Parse ~/Documents/report.pdf and summarise the tables on page 3"*.
+
+## Also listed in
+
+The official [MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.arpitpatel25/readanydoc`.
 
 ## Notes
 

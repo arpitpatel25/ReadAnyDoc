@@ -1,5 +1,7 @@
 # Quickstart (Python)
 
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/arpitpatel25/ReadAnyDoc/blob/main/examples/quickstart.ipynb) Try it in the browser first, no install.
+
 Parse your first document and extract structured data with ReadAnyDoc in about five minutes. No server is needed.
 
 ## Prerequisites

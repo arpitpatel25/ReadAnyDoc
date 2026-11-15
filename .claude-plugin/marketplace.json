@@ -1,0 +1,14 @@
+{
+  "name": "readanydoc",
+  "owner": {"name": "Unmute"},
+  "description": "ReadAnyDoc for Claude Code: parse and extract PDFs, scans and forms with citations.",
+  "plugins": [
+    {
+      "name": "readanydoc",
+      "source": "./plugins/readanydoc",
+      "description": "Parse PDFs, scans, photos and Office files into Markdown, and extract typed fields with a citation for every value. Open source, runs on your own Anthropic key.",
+      "category": "productivity",
+      "homepage": "https://arpitpatel25.github.io/ReadAnyDoc/"
+    }
+  ]
+}

@@ -44,7 +44,8 @@ https://arpitpatel25.github.io/ReadAnyDoc/docs/resources/faq/.
 
 ## 5. Ask how they want to use it
 
-Ask the user which one fits, then do only that one:
+Ask the user which one fits, then do only that one. For a quick look first, they can also try the Colab notebook:
+https://colab.research.google.com/github/arpitpatel25/ReadAnyDoc/blob/main/examples/quickstart.ipynb
 
 1. **In Python code**: write a small example in their project.
 
@@ -76,7 +77,13 @@ Ask the user which one fits, then do only that one:
     claude mcp add readanydoc -e ANTHROPIC_API_KEY=... -- readanydoc mcp
     ```
 
-    Guide (Claude Desktop, Cursor and others): https://arpitpatel25.github.io/ReadAnyDoc/docs/get-started/mcp/
+    In Claude Code the plugin is simpler (needs `uv`): `/plugin marketplace add arpitpatel25/ReadAnyDoc`, then
+    `/plugin install readanydoc@readanydoc`. Guide (Claude Desktop, Cursor and others):
+    https://arpitpatel25.github.io/ReadAnyDoc/docs/get-started/mcp/
+
+5. **In a LangChain or LlamaIndex pipeline**: `pip install "readanydoc[engine,langchain]"` (or `llamaindex`) and use
+   `readanydoc.integrations.langchain.ReadAnyDocLoader` / `readanydoc.integrations.llamaindex.ReadAnyDocReader`.
+   Guide: https://arpitpatel25.github.io/ReadAnyDoc/docs/guides/integrations/
 
 ## 6. Finish
 

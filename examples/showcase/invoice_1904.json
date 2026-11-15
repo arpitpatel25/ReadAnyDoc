@@ -1,0 +1,423 @@
+{
+  "data": {
+    "city": "Philadelphia",
+    "date": "May 1st",
+    "line_items": [
+      {
+        "description": "550 copies Pamphlet-Prices Realized at Sale John G. Mills Esq. 8 pages,7 printed tabular Matter, bound in back of catalogues",
+        "amount": 28.5
+      },
+      {
+        "description": "600 copies coin Catalogues, 104 pages, 9 1/4 X 12-",
+        "amount": null
+      },
+      {
+        "description": "Composition 104 pages, \u20ac",
+        "amount": 159.12
+      },
+      {
+        "description": "Press Work, 14 forms,",
+        "amount": 35.0
+      },
+      {
+        "description": "Press Work, Cover (Went to Press twice as per order)",
+        "amount": 4.5
+      },
+      {
+        "description": "Time work, alterations, Machine 30 hrs.",
+        "amount": 21.0
+      },
+      {
+        "description": "\" \" \" Hand 13 1/2 \"",
+        "amount": 8.1
+      },
+      {
+        "description": "Binding based on 500 copies",
+        "amount": 21.6
+      },
+      {
+        "description": "Extra putting plates, 96 copies,",
+        "amount": 4.8
+      },
+      {
+        "description": "\" for paper charged to our account 8/20 ream,",
+        "amount": 2.5
+      },
+      {
+        "description": "45 #15 Binders Boards",
+        "amount": 4.0
+      },
+      {
+        "description": "12 #15 \" \"",
+        "amount": 1.04
+      },
+      {
+        "description": "23 #15 \" \"",
+        "amount": 2.08
+      }
+    ],
+    "total": null
+  },
+  "citations": {
+    "city": [
+      {
+        "content": "Philadelphia",
+        "bbox": {
+          "left": 0.5469,
+          "top": 0.0284,
+          "width": 0.151,
+          "height": 0.0158,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "date": [
+      {
+        "content": "May 1st",
+        "bbox": {
+          "left": 0.7538,
+          "top": 0.0316,
+          "width": 0.0801,
+          "height": 0.0103,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[0].description": [
+      {
+        "content": "550 copies Pamphlet-Prices Realized at Sale John G. Mills Esq. 8 pages,7 printed tabular Matter, bound in back of catalogues",
+        "bbox": {
+          "left": 0.1779,
+          "top": 0.2222,
+          "width": 0.5187,
+          "height": 0.0533,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[0].amount": [
+      {
+        "content": "28 50",
+        "bbox": {
+          "left": 0.8884,
+          "top": 0.2648,
+          "width": 0.0558,
+          "height": 0.0083,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[1].description": [
+      {
+        "content": "600 copies coin Catalogues, 104 pages, 9 1/4 X 12-",
+        "bbox": {
+          "left": 0.1773,
+          "top": 0.2853,
+          "width": 0.4445,
+          "height": 0.0304,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[2].description": [
+      {
+        "content": "Composition 104 pages",
+        "bbox": {
+          "left": 0.1766,
+          "top": 0.3252,
+          "width": 0.2548,
+          "height": 0.0107,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[2].amount": [
+      {
+        "content": "159 12",
+        "bbox": {
+          "left": 0.8759,
+          "top": 0.3268,
+          "width": 0.0683,
+          "height": 0.0083,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[3].description": [
+      {
+        "content": "Press Work, 14 forms,",
+        "bbox": {
+          "left": 0.1753,
+          "top": 0.3481,
+          "width": 0.2449,
+          "height": 0.0103,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[3].amount": [
+      {
+        "content": "35",
+        "bbox": {
+          "left": 0.8884,
+          "top": 0.3493,
+          "width": 0.021,
+          "height": 0.0083,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[4].description": [
+      {
+        "content": "Press Work, Cover (Went to Press twice as per order)",
+        "bbox": {
+          "left": 0.1753,
+          "top": 0.3658,
+          "width": 0.5213,
+          "height": 0.0304,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[4].amount": [
+      {
+        "content": "4 50",
+        "bbox": {
+          "left": 0.8995,
+          "top": 0.3891,
+          "width": 0.0446,
+          "height": 0.0083,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[5].description": [
+      {
+        "content": "Time work, alterations, Machine 30 hrs.",
+        "bbox": {
+          "left": 0.1766,
+          "top": 0.4096,
+          "width": 0.457,
+          "height": 0.011,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[5].amount": [
+      {
+        "content": "21",
+        "bbox": {
+          "left": 0.8871,
+          "top": 0.4081,
+          "width": 0.023,
+          "height": 0.0146,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[6].description": [
+      {
+        "content": "Hand 13 1/2",
+        "bbox": {
+          "left": 0.4596,
+          "top": 0.4294,
+          "width": 0.1648,
+          "height": 0.013,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[6].amount": [
+      {
+        "content": "8 10",
+        "bbox": {
+          "left": 0.9002,
+          "top": 0.4317,
+          "width": 0.044,
+          "height": 0.0083,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[7].description": [
+      {
+        "content": "Binding based on 500 copies",
+        "bbox": {
+          "left": 0.1753,
+          "top": 0.4507,
+          "width": 0.3185,
+          "height": 0.0118,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[7].amount": [
+      {
+        "content": "21 60",
+        "bbox": {
+          "left": 0.889,
+          "top": 0.453,
+          "width": 0.0204,
+          "height": 0.0079,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[8].description": [
+      {
+        "content": "Extra putting plates, 96 copies,",
+        "bbox": {
+          "left": 0.1747,
+          "top": 0.4736,
+          "width": 0.3769,
+          "height": 0.0114,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[8].amount": [
+      {
+        "content": "4 80",
+        "bbox": {
+          "left": 0.9002,
+          "top": 0.4755,
+          "width": 0.0446,
+          "height": 0.0083,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[9].description": [
+      {
+        "content": "for paper charged to our account 8/20 ream,",
+        "bbox": {
+          "left": 0.258,
+          "top": 0.4901,
+          "width": 0.438,
+          "height": 0.0154,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[9].amount": [
+      {
+        "content": "2 50",
+        "bbox": {
+          "left": 0.9002,
+          "top": 0.5154,
+          "width": 0.0433,
+          "height": 0.0083,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[10].description": [
+      {
+        "content": "45 #15 Binders Boards",
+        "bbox": {
+          "left": 0.1753,
+          "top": 0.5331,
+          "width": 0.2462,
+          "height": 0.0118,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[10].amount": [
+      {
+        "content": "4",
+        "bbox": {
+          "left": 0.9002,
+          "top": 0.5375,
+          "width": 0.0079,
+          "height": 0.0079,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[11].description": [
+      {
+        "content": "12 #15",
+        "bbox": {
+          "left": 0.1733,
+          "top": 0.5521,
+          "width": 0.0703,
+          "height": 0.0166,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[11].amount": [
+      {
+        "content": "1 04",
+        "bbox": {
+          "left": 0.8989,
+          "top": 0.5588,
+          "width": 0.0433,
+          "height": 0.0083,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[12].description": [
+      {
+        "content": "23 #15",
+        "bbox": {
+          "left": 0.1753,
+          "top": 0.571,
+          "width": 0.0689,
+          "height": 0.0178,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ],
+    "line_items[12].amount": [
+      {
+        "content": "2 08",
+        "bbox": {
+          "left": 0.8976,
+          "top": 0.5734,
+          "width": 0.0085,
+          "height": 0.0166,
+          "page": 1
+        },
+        "confidence": "high"
+      }
+    ]
+  },
+  "warnings": [
+    "required field 'total' was not found in the document",
+    "required field 'line_items[].amount' was not found in 1 of 13 items"
+  ],
+  "cost_usd": 0.005204,
+  "seconds": 39.5,
+  "models": [
+    "claude-haiku-5-5"
+  ]
+}

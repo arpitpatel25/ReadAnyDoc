@@ -1,0 +1,33 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.arpitpatel25/readanydoc",
+  "title": "ReadAnyDoc",
+  "description": "Parse PDFs, scans and Office files to Markdown; extract typed fields with page citations.",
+  "websiteUrl": "https://arpitpatel25.github.io/ReadAnyDoc/",
+  "repository": {"url": "https://github.com/arpitpatel25/ReadAnyDoc", "source": "github"},
+  "version": "0.1.3",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "readanydoc",
+      "version": "0.1.3",
+      "runtimeHint": "uvx",
+      "runtimeArguments": [
+        {"type": "named", "name": "--from", "value": "readanydoc[engine,mcp]==0.1.3"}
+      ],
+      "packageArguments": [
+        {"type": "positional", "value": "mcp"}
+      ],
+      "transport": {"type": "stdio"},
+      "environmentVariables": [
+        {
+          "name": "ANTHROPIC_API_KEY",
+          "description": "Your Anthropic API key; documents are read with Claude Haiku 5.5 on your own account",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.3 (2026-11-15)
+
+- LangChain loader and LlamaIndex reader: `readanydoc.integrations.langchain.ReadAnyDocLoader`,
+  `readanydoc.integrations.llamaindex.ReadAnyDocReader` (extras `langchain`, `llamaindex`).
+- Claude Code plugin: `/plugin marketplace add arpitpatel25/ReadAnyDoc`, then `/plugin install readanydoc@readanydoc`
+  (the MCP server through `uvx`, plus a skill for reading documents).
+- Listed in the official MCP Registry as `io.github.arpitpatel25/readanydoc`, published from each release.
+- Showcase of two real public-domain documents with every output (`examples/showcase/`), a Colab notebook, use-case
+  pages and a comparison of alternatives in the docs, and link previews for the website and docs.
+
 ## 0.1.2 (2026-11-15)
 
 - `readanydoc mcp`: an MCP server with two tools, `parse_document` and `extract_fields` (with citations), for Claude

@@ -109,7 +109,9 @@ def _mcp(args) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="readanydoc", description="Parse and extract documents with vision models.")
+    ap = argparse.ArgumentParser(prog="readanydoc", description="Parse and extract documents with vision models.",
+                                 epilog="Docs: https://arpitpatel25.github.io/ReadAnyDoc/docs/  Questions: "
+                                        "https://github.com/arpitpatel25/ReadAnyDoc/discussions")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("parse", help="parse a document; prints Reducto-shaped JSON (or Markdown)")
