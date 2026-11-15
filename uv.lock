@@ -1651,12 +1651,13 @@ wheels = [
 
 [[package]]
 name = "readanydoc"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
     { name = "jsonschema" },
+    { name = "mcp" },
     { name = "olefile" },
     { name = "openpyxl" },
     { name = "pdfplumber" },
@@ -1683,9 +1684,6 @@ langchain = [
 llamaindex = [
     { name = "llama-index-core" },
 ]
-mcp = [
-    { name = "mcp" },
-]
 
 [package.dev-dependencies]
 dev = [
@@ -1705,7 +1703,7 @@ requires-dist = [
     { name = "jsonschema", specifier = ">=4.21" },
     { name = "langchain-core", marker = "extra == 'langchain'", specifier = ">=0.3" },
     { name = "llama-index-core", marker = "extra == 'llamaindex'", specifier = ">=0.12" },
-    { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2.3" },
+    { name = "mcp", specifier = ">=2.3" },
     { name = "numpy", marker = "extra == 'engine'", specifier = ">=1.26" },
     { name = "olefile", specifier = ">=0.47" },
     { name = "onnxruntime", marker = "extra == 'engine'", specifier = ">=1.18" },
