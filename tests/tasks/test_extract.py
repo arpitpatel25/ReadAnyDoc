@@ -439,9 +439,12 @@ def test_deep_extract_is_bounded_and_reports_low_confidence_when_it_cannot_fix(i
     llm = FakeLLM([bad])  # the model never improves
     out = extract.run(invoice_doc, cfg(system_prompt=SUM_PROMPT, deep_extract=True), llm=llm,
                       options={"max_deep_iterations": 2})
-    assert len(llm.calls) == 2   # one re-ask; it did not help, so the loop stops instead of burning calls
+    # one deep re-ask (it did not help, so the loop stops instead of burning calls), and one ask for the list,
+    # which has 2 items while its table has 3 rows
+    assert len(llm.calls) == 3
     assert out["confidence"] == "low" and "does not hold" in out["confidence_reason"]
     assert len(out["result"][0]["line_items"]) == 2  # the original answer is kept, not replaced by a guess
+    assert any("2 items, but the table they come from has 3 rows" in w for w in out["warnings"])
 
 
 def test_deep_extract_flags_values_that_are_not_in_their_cited_block(invoice_doc):

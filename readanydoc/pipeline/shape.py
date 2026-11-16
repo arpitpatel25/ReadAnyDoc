@@ -189,8 +189,12 @@ class Shape(Stage):
                                         and enhance.get("summarize_figures", True) is not False)
                 doc.meta["figures"] = stats
                 if stats["figures"] and stats["located"] < stats["figures"]:
+                    # a warning only when the request asked for figure images, descriptions or chart data: an
+                    # unboxed logo in a plain parse changes nothing, and warnings that do not matter teach
+                    # people to ignore warnings
                     doc.note(self.name, f"figures: {stats['located']} of {stats['figures']} figure blocks could be "
-                                        "located on the page; the others have no image", "warning")
+                                        "located on the page; the others have no image",
+                             "warning" if stats.get("boxes_needed") else "info")
             except Exception as e:  # images and chart data are extras: never fail the parse for them
                 doc.note(self.name, f"figures not processed ({type(e).__name__}: {e})", "warning")
         # custom table / text prompts (one text call per table, one per page; only when asked)

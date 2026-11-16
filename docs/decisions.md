@@ -363,3 +363,32 @@ whole answer. Changes, each with tests in `tests/tasks/test_extract_robust.py`:
   explained. Live on Haiku 5.5: one call for the 20-type schema, every value with a citation; one call with
   structured outputs on a small invoice schema. Not run on the benchmarks (cost); parse output is unchanged.
 
+## Field report (2026-11-17)
+After the Zenskar report (an order form with $4,500 in the price table and "$4,200 for the first year" in special
+terms), a review of what a bare value hides, for any document type. Each extracted field now has a status in
+`field_report` (`readanydoc/tasks/field_report.py`, tests in `tests/tasks/test_field_report.py`):
+- Conflicts: the model lists other values the document gives for a field; each is checked on the page in code and
+  dropped when it is not there. Values found differently on overlapping pages of long documents are added too.
+  Numbers written differently ("$4,500" and 4500) are the same value.
+- Inferred: a number or text that is on no page is `inferred`, even when a block is cited; a choice from an enum needs
+  a cited block; a yes/no trusts a cited block unless the model says it inferred it. Schema constants
+  (discriminators) are not checked.
+- Kinds of empty: `blank` and `not_applicable` come from the model; an empty string or a line of underscores is
+  `blank`; `unreadable` comes from the reply handling; anything else null is `not_in_document`.
+- Conversions: day/month order when both are 12 or less, parentheses on a positive number, "in thousands" on the page,
+  a percentage returned as a fraction, a currency in the printed text. Flags and notes only; values are never changed.
+- Crossed-out words: found on the page image (a near-solid line through the middle band of the word box; not an
+  underline, not a filled box; single characters only next to a struck neighbour), shown to the model as `~~text~~`,
+  and a chosen value that is crossed out is a conflict. Pages whose only text in a block is VOID, CANCELLED and
+  similar are reported. Parse output is unchanged: this is read from the page image at extract time, so no benchmark
+  is affected.
+- Lists: a top-level list (not one nested in a row) with fewer items than the item rows of the table its items cite
+  (headers, total, tax and near-empty rows excluded) is asked for once more and kept only when it finds more; a
+  remaining gap is reported. A schema may want only some rows, so it is a warning, not an error.
+- The report is on by default, also with citations off (sources are asked for internally). It adds output tokens for
+  the source list and no calls except the list re-ask. `settings.field_report: false` restores the old behaviour.
+- Live on Haiku 5.5: the order form came back as a conflict (4,500 page 1, 4,200 page 2), the date 03/04/2026 flagged,
+  a blank PO line as blank, an unstated status as not in the document; the 20-type billing schema in one call.
+Also in this release: Python 3.13 (CI tests 3.12 and 3.13), `--instructions @file`, and the "figure blocks could not
+be located" note is a warning only when the request asked for figure images, descriptions or chart data.
+

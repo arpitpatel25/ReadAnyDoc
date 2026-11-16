@@ -408,6 +408,8 @@ def process(doc: Document, request: Optional[dict[str, Any]], reader_spec: Optio
 def _process(doc: Document, want: dict[str, Any], stats: dict[str, Any], reader_spec: Optional[str], llm,
              out_dir: Optional[Path]) -> dict[str, Any]:
     out_dir = Path(out_dir) if out_dir else paths.cache_dir() / "figures" / doc.id
+    # whether a figure without a box loses anything the request asked for (an image, a description, chart data)
+    stats["boxes_needed"] = bool(want.get("figure_images") or want.get("prompt") or want.get("chart"))
     jobs: list[tuple[Region, str]] = []
     describe_jobs: list[tuple[Region, str]] = []
     for page in doc.pages:

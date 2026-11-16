@@ -105,6 +105,11 @@ class ExtractResult(BaseModel):
                                                  description="by field path, e.g. 'lines[0].amount'")
     usage: Usage
     warnings: list[str] = Field(default_factory=list)
+    report: dict[str, Any] = Field(default_factory=dict,
+                                   description="how each field was found: 'fields' by path, each with a status "
+                                               "(found, conflict, inferred, not_in_document, blank, not_applicable, "
+                                               "unreadable), printed_as, candidates, flags and notes; 'lists' whose "
+                                               "table has more rows than items; 'pages' stamped VOID or similar")
     raw: dict[str, Any] = Field(default_factory=dict, description="the Reducto-shaped extract response", repr=False)
 
 
@@ -175,7 +180,8 @@ def extract(source: Source, schema: Union[dict[str, Any], type[BaseModel]], *, i
             data = schema_class.model_validate(data)
         except Exception as e:  # keep the extracted values; say why they are not an instance
             warnings.append(f"result does not validate against {schema_class.__name__}: {e}")
-    return ExtractResult(data=data, citations=cites, usage=_usage(doc, time.time() - t0), warnings=warnings, raw=raw)
+    return ExtractResult(data=data, citations=cites, usage=_usage(doc, time.time() - t0), warnings=warnings,
+                         report=raw.get("field_report") or {}, raw=raw)
 
 
 # ---------------------------------------------------------------- internals

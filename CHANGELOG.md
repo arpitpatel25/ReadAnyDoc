@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.8 (2026-11-17)
+
+- Field report: every extracted field says how it was found. `conflict` when the document gives two values (every
+  candidate with its page), `inferred` when the document never states it, and `blank`, `not_applicable`,
+  `not_in_document` or `unreadable` instead of a bare null. Flags for conversions to check (day/month order,
+  parentheses, "in thousands", percentages, currency), crossed-out values and pages stamped VOID. Lists with fewer
+  items than their table are asked for again, then reported. In `field_report` (HTTP), `report` (Python),
+  `fields_to_check` (MCP), and in `warnings`. On by default; `settings.field_report: false` turns it off.
+- Python 3.13 is supported.
+- `readanydoc extract --instructions @rules.md` reads long instructions from a file.
+- The "figure blocks could not be located" warning only appears when figure images, descriptions or chart data were
+  asked for.
+
 ## 0.1.7 (2026-11-17)
 
 - Extract on deep schemas with citations on no longer comes back empty. A broken model reply is never read as a

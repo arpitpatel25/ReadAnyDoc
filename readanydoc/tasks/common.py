@@ -148,16 +148,33 @@ def truncate_table(html: str, keep_rows: int = 4) -> str:
     return "<table>" + "".join(rows[:keep_rows]) + f"</table> [table truncated: {len(rows) - keep_rows} more rows]"
 
 
+def _mark(content: str, spans: Sequence[tuple[int, int]]) -> str:
+    """``content`` with each (start, end) span written as ~~text~~ (crossed out on the page)."""
+    out, last = [], 0
+    for a, b in sorted(spans):
+        if a < last or b > len(content):
+            continue
+        out += [content[last:a], "~~", content[a:b], "~~"]
+        last = b
+    return "".join(out) + content[last:]
+
+
 def render_pages(pages: Sequence[PageRef], *, labels: bool = True, truncate_tables: bool = False,
-                 max_chars_per_page: Optional[int] = None) -> str:
-    """Document text for a prompt: page markers and one line block per region (optionally labelled)."""
+                 max_chars_per_page: Optional[int] = None, marks: Optional[dict] = None) -> str:
+    """Document text for a prompt: page markers and one line block per region (optionally labelled).
+
+    ``marks``: {region label: [(start, end), ...]} of crossed-out text, written as ~~text~~.
+    """
     out: list[str] = []
     for p in pages:
         out.append(f"=== Page {p.number} ===")
         blocks: list[str] = []
         for ref in p.regions:
             r = ref.region
-            content = r.content.strip()
+            content = r.content
+            if marks and marks.get(ref.label):
+                content = _mark(content, marks[ref.label])
+            content = content.strip()
             if not content:
                 continue
             if truncate_tables and r.type == RegionType.TABLE:

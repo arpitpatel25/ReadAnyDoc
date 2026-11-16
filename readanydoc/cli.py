@@ -72,11 +72,15 @@ def _extract(args: argparse.Namespace) -> int:
     from .library import extract
     with open(args.schema) as f:
         schema = json.load(f)
-    result = extract(args.input, schema, instructions=args.instructions, citations=not args.no_citations,
+    instructions = args.instructions
+    if instructions and instructions.startswith("@"):  # long rubrics live in a file: --instructions @rules.md
+        with open(instructions[1:], encoding="utf-8") as f:
+            instructions = f.read()
+    result = extract(args.input, schema, instructions=instructions, citations=not args.no_citations,
                      extract_model=args.extract_model, **_common(args))
     _warn(result.warnings)
     out = {"data": result.data, "citations": {k: [c.model_dump() for c in v] for k, v in result.citations.items()},
-           "usage": result.usage.model_dump()}
+           "field_report": result.report, "usage": result.usage.model_dump()}
     json.dump(out, sys.stdout, indent=2, ensure_ascii=False, default=str)
     sys.stdout.write("\n")
     from .star import maybe_ask
@@ -129,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
     x = sub.add_parser("extract", help="extract fields described by a JSON Schema; prints values and citations")
     x.add_argument("input")
     x.add_argument("--schema", required=True, help="path to a JSON Schema file")
-    x.add_argument("--instructions", help="system prompt for the extraction model")
+    x.add_argument("--instructions", help="system prompt for the extraction model, or @file to read it from a file")
     x.add_argument("--extract-model", help="model that fills the schema (default: --model)")
     x.add_argument("--no-citations", action="store_true")
     _model_args(x)

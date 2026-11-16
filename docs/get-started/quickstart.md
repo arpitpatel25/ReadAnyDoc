@@ -6,7 +6,7 @@ Parse your first document and extract structured data with ReadAnyDoc in about f
 
 ## Prerequisites
 
-- Python 3.12
+- Python 3.12 or 3.13
 - An Anthropic API key ([console.anthropic.com](https://console.anthropic.com)). For OpenAI models, an OpenAI key.
 - Optional: [Tesseract](https://github.com/tesseract-ocr/tesseract) (`brew install tesseract` or
   `apt install tesseract-ocr`). The engine uses it for word positions on scanned pages when it is installed.
