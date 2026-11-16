@@ -151,11 +151,11 @@ Files touched outside the API package
 - Added `pikepdf` and `python-docx` to runtime deps: both are on the spec's allowed list and Edit needs them.
 - Task LLM is a separate text interface (`tasks/llm.py`), not `Reader`: readers take one image and return a transcription; tasks need system + user text and JSON back.
 - `claude_cli` sends the prompt on stdin and the system prompt with `--system-prompt`: long documents exceed argv limits, and the default Claude Code system prompt is wasted tokens.
-- `json_schema` is advisory in every adapter and structured outputs are opt-in on the API adapter: user schemas use keywords the API's structured-output mode rejects, and we validate every reply ourselves anyway.
+- `json_schema` is advisory in every adapter and structured outputs are opt-in on the API adapter: user schemas use keywords the API's structured-output mode rejects, and we validate every reply ourselves anyway. *(Changed 2026-11-17: structured outputs are now on when the schema fits the API's limits; see "Extract replies that cannot be read".)*
 - Enforcement = deterministic conform, then bounded repair re-asks, then null out what still fails: the guarantee must hold even when the model never complies.
 - Scalar conversion is limited to unambiguous spellings ("$1,575.00" -> 1575.0, "yes" -> true, 2041 -> "2041"): format change, not a guess; anything else becomes null.
 - Missing arrays are null, not []: Reducto's rule is "null when missing".
-- Citations use short region labels (`r1`, `r2`, ...) and wrapped leaves `{"v", "r"}`: fewer tokens and fewer mistakes than uuid ids or a separate path map.
+- Citations use short region labels (`r1`, `r2`, ...) and wrapped leaves `{"v", "r"}`: fewer tokens and fewer mistakes than uuid ids or a separate path map. *(Changed 2026-11-17: a flat source list, because the wrapping broke on deep schemas; see "Extract replies that cannot be read".)*
 - A cited block that does not contain the value yields a block-level citation marked `low`; a value with no locatable source yields `[]`: never fabricate, and never hide the model's claim.
 - An unlabelled value is cited only when it occurs exactly once in the selected pages: an ambiguous position would be a guess.
 - Array de-duplication needs equal content AND a shared cited block (or neighbouring segments when labels are missing), and one earlier item absorbs at most one later item: identical rows are real in statements.
@@ -331,3 +331,35 @@ Reading-quality additions after benchmark priorities changed (Parse Judge error 
 - A refused page (content filtering) used to come back empty. Now: a second reader if `READANYDOC_REFUSAL_READER` / `refusal_reader` is set (off by default, because a second provider is the user's choice), else the page's OCR words as plain lines (`ocr_page_text` in `readanydoc/pipeline/read.py`). Every block from OCR text is `low` confidence (`ocr_fallback` in region meta, applied in Ground). Only the primary page read falls back; a refused handwriting, form or escalation read still keeps the first read. Never changes a page the model did read.
 - Table re-reads per page: at most 16 (`max_rereads`; the old limits allowed 6 tables plus 30 dropped-table reads) and a 180-second page budget (`max_seconds`, `READANYDOC_TABLE_SECONDS`). A re-read that does not finish keeps the page read's table, which is what happens when a re-read fails. Not benchmarked (cost): output changes only on a page with more than 16 table re-reads or re-reads slower than 180 seconds; the cached test suite is unchanged.
 - Long lists: a segment whose item count is below half of the expected count (median items-per-table-row of the other segments; all rows when there is one segment) and whose tables have at least 10 rows is extracted again in halves; kept only when it finds more items; a remaining gap is a warning. Not run on the long-document benchmark (cost); unit-tested with a fake model.
+
+## Extract replies that cannot be read (2026-11-17)
+Reported by a user (Zenskar): two order forms extracted into a 22 KB billing schema with 20 nested types came back
+as all nulls with "not found in the document" warnings, with citations on. Haiku had read everything; its reply had
+one `}` too many inside a list, and `parse_json` kept the longest piece that parsed (the customer block) as the
+whole answer. Changes, each with tests in `tests/tasks/test_extract_robust.py`:
+- `parse_json` never returns a fragment: a piece of JSON is used only when nothing around it is part of the answer
+  (an object key, an unclosed bracket before it, a stray closer after it), and an object with a repeated key is
+  broken JSON. Broken JSON is never repaired there.
+- `repair_brackets` removes a closer of the wrong kind (the Zenskar mistake). Extract uses it only when the repaired
+  value has exactly the schema's shape with nothing moved, dropped or invalid, because the same text can come from a
+  missing opener. Otherwise the model is asked again.
+- A reply that parses but lacks the schema's top-level fields is asked for again once, never used. A reply that keeps
+  breaking (or is cut off) is asked for in two halves of the top-level fields. Fields that still cannot be read get
+  the warning "could not be read ... may be in the document", not "not found"; nothing readable at all is a 502.
+- Sources: the reply is `{"data": <plain value>, "sources": [{"path": "a.b[0].c", "block": "r12"}]}` instead of
+  wrapping every value. The wrapping put an object around every value (nearly three times the brackets on that
+  schema). A source given for an object or a row applies to the values inside it; values with no usable source are
+  still found by searching the blocks (`build_citations`), never invented. The old wrapped format is still read.
+- Fields written one level off (seen live from Haiku 5.5: `line_items` next to `contract` instead of inside it) are
+  moved back when exactly one place fits (`schema.relocate`); otherwise they are reported, never dropped silently.
+- Structured outputs on the Anthropic API adapter are on when the schema fits the published limits (24 optional
+  fields, 16 union types) and uses only features the API supports (`api_schema`): every object closed, nothing made
+  required that the user did not mark required, unsupported constraints dropped (validated by us anyway). A schema
+  the API refuses is remembered and sent without a format. Large schemas like Zenskar's do not fit; the changes above
+  cover them.
+- Checked with a property test (hypothesis: any JSON with one bracket added or removed, or a stray comma: the reader
+  returns the whole original answer or nothing) and a seeded test of 14 kinds of model mistakes in three reply
+  formats, with and without recovery on the next try: every value returned is correct, and every empty field is
+  explained. Live on Haiku 5.5: one call for the 20-type schema, every value with a citation; one call with
+  structured outputs on a small invoice schema. Not run on the benchmarks (cost); parse output is unchanged.
+

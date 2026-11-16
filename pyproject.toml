@@ -54,7 +54,13 @@ llamaindex = ["llama-index-core>=0.12"]
 readanydoc = "readanydoc.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8", "fuzzysearch>=0.7", "beautifulsoup4>=4.12", "tqdm>=4"]
+dev = [
+    "pytest>=8",
+    "fuzzysearch>=0.7",
+    "beautifulsoup4>=4.12",
+    "tqdm>=4",
+    "hypothesis>=6",
+]
 docs = ["mkdocs-material>=9.5"]
 
 [build-system]

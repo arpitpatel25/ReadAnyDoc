@@ -210,8 +210,11 @@ def drop_copied_examples(value: Any, schema: Any, examples: list[Any], found_in_
 
 
 # ---------------------------------------------------------------- (c) warnings
-def required_warnings(value: Any, schema: Any) -> list[str]:
-    """One line per required field that came back empty; rows of a list are counted together."""
+def required_warnings(value: Any, schema: Any, skip: Any = ()) -> list[str]:
+    """One line per required field that came back empty; rows of a list are counted together.
+
+    ``skip``: top-level fields whose reply could not be read; they get their own warning, not "not found".
+    """
     counts: dict[str, list[int]] = {}
 
     def walk(v: Any, s: Any, path: str) -> None:
@@ -236,7 +239,7 @@ def required_warnings(value: Any, schema: Any) -> list[str]:
     walk(value, schema, "")
     out = []
     for p, (missing, total) in counts.items():
-        if not missing:
+        if not missing or re.split(r"[.\[]", p, maxsplit=1)[0] in skip:
             continue
         if "[]" in p:
             out.append(f"required field '{p}' was not found in {missing} of {total} items")
@@ -318,6 +321,9 @@ def loop_extract(ex, pages: list[PageRef], start: list[PageRef], opts: dict) -> 
             rounds = step + 1
         have |= new
     info["pages_used"] = sorted(have)
+    from .extract import root_ok
+    if answer is not None and not root_ok(answer, ex.strict):
+        answer = None  # a fragment or another shape is not an answer
     if answer is None:
         ex.notes.append("page-request loop ended without an answer")
         return S.empty_instance(ex.strict), {}, info
