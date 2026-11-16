@@ -55,8 +55,10 @@ def extract_fields(path: str, schema: dict[str, Any], instructions: Optional[str
     res = readanydoc.extract(_path(path), schema, instructions=instructions, array_extract=array_extract, mode=mode)
     data = res.data.model_dump() if hasattr(res.data, "model_dump") else res.data
     cites = {k: [c.model_dump(exclude_none=True) for c in v] for k, v in res.citations.items()}
-    return {"data": data, "citations": cites, "warnings": res.warnings, "cost_usd": res.usage.cost_usd,
-            "seconds": res.usage.seconds}
+    flagged = {k: v for k, v in (res.report.get("fields") or {}).items() if v.get("status") != "found" or v.get("flags")}
+    return {"data": data, "citations": cites, "warnings": res.warnings,
+            "fields_to_check": flagged,  # conflicts, inferred values, kinds of empty, conversions to check
+            "cost_usd": res.usage.cost_usd, "seconds": res.usage.seconds}
 
 
 def build_server():

@@ -47,7 +47,14 @@ RULES = """You extract structured data from a parsed document.
 TRACK = """Source labels: every block of the document starts with a label such as [r12|Table].
 Reply with one JSON object with exactly two keys, in this order:
 - "data": the extracted value, following the JSON Schema exactly (plain values, nothing wrapped).
-- "sources": a list with one entry for every non-null value in "data": {"path": "<where the value is in data>", "block": "<label>"}. Write the path with dots and [index], for example "buyer.name" or "line_items[0].amount"; "block" is the label of the block the value was read from, for example "r12"."""
+- "sources": a list with one entry for every non-null value in "data": {"path": "<where the value is in data>", "block": "<label>"}. Write the path with dots and [index], for example "buyer.name" or "line_items[0].amount"; "block" is the label of the block the value was read from, for example "r12".
+Add these keys to an entry only when they apply:
+- "printed": the text exactly as printed, when your value is written differently (a converted date, a number with symbols or in parentheses, a percentage, a word for yes or no).
+- "inferred": true, when the document does not state the value and you worked it out or assumed it.
+- "note": a condition that limits the value, in a few words (for example "first year only").
+- "alternatives": when the document itself gives a different value for the same field somewhere else (a special term, an amendment, a second total, a crossed-out value): [{"value": <that value>, "block": "<label>", "note": "<why it differs>"}].
+For a null value, add an entry {"path": ..., "empty": "blank"} when the form has the field but it is left empty, or {"path": ..., "empty": "not_applicable"} when the field does not apply to this document; write no entry when the document simply does not mention it.
+Text between ~~ and ~~ is crossed out on the page."""
 
 
 def _field_names(schema: Any, seen: Optional[set] = None) -> set[str]:
@@ -75,8 +82,13 @@ def envelope_schema(schema: dict) -> dict:
     nested object; on a 20-type billing schema the model miscounted them once and the reply could not be
     read. Here "data" has only the brackets of the user's own schema and "sources" is one level deep.
     """
-    item = {"type": "object", "properties": {"path": {"type": "string"}, "block": {"type": "string"}},
-            "required": ["path", "block"]}
+    scalar = {"type": ["string", "number", "boolean"]}
+    alt = {"type": "object", "properties": {"value": scalar, "block": {"type": "string"}, "note": {"type": "string"}},
+           "required": ["value", "block"]}
+    item = {"type": "object", "properties": {
+        "path": {"type": "string"}, "block": {"type": "string"}, "printed": {"type": "string"},
+        "inferred": {"type": "boolean"}, "note": {"type": "string"}, "alternatives": {"type": "array", "items": alt},
+        "empty": {"type": "string", "enum": ["blank", "not_applicable"]}}, "required": ["path"]}
     return {"type": "object", "properties": {"data": schema, "sources": {"type": "array", "items": item}},
             "required": ["data", "sources"]}
 
@@ -112,6 +124,37 @@ def flat_sources(entries: Any) -> dict:
         if path and labels:
             out.setdefault(path, [])
             out[path] += [l for l in labels if l not in out[path]]
+    return out
+
+
+def source_meta(entries: Any) -> dict:
+    """The optional notes of an enveloped reply's sources -> {path tuple: {printed, inferred, note, alternatives, empty}}."""
+    out: dict = {}
+    for e in entries if isinstance(entries, list) else []:
+        if not isinstance(e, dict):
+            continue
+        path = parse_path(e.get("path"))
+        if not path:
+            continue
+        m: dict = {}
+        if isinstance(e.get("printed"), (str, int, float)) and str(e["printed"]).strip():
+            m["printed"] = str(e["printed"]).strip()
+        if e.get("inferred") is True:
+            m["inferred"] = True
+        if isinstance(e.get("note"), str) and e["note"].strip():
+            m["note"] = e["note"].strip()
+        if e.get("empty") in ("blank", "not_applicable"):
+            m["empty"] = e["empty"]
+        alts = []
+        for a in e.get("alternatives") or [] if isinstance(e.get("alternatives"), list) else []:
+            if isinstance(a, dict) and a.get("value") is not None and not isinstance(a.get("value"), (dict, list)):
+                lab = _LABEL.findall(str(a.get("block") or ""))
+                alts.append({"value": a["value"], "block": lab[0] if lab else None,
+                             **({"note": str(a["note"])} if a.get("note") else {})})
+        if alts:
+            m["alternatives"] = alts
+        if m:
+            out.setdefault(path, {}).update(m)
     return out
 
 
@@ -611,6 +654,8 @@ class _Extractor:
         self.results: list[LLMResult] = []
         self.notes: list[str] = []
         self.unreadable: set[str] = set()  # top-level fields whose reply could not be read, even after retries
+        self.leaf_meta: dict = {}  # (path pattern, value key) -> the model's notes on that value (field report)
+        self.struck: dict = {}  # region label -> crossed-out char spans, shown to the model as ~~text~~
         self._lock = threading.Lock()
         self.label_page = {ref.label: p.number for p in view.pages for ref in p.regions}
         self.track_text = TRACK
@@ -619,7 +664,7 @@ class _Extractor:
     # -- prompts
     def _prompt(self, pages: list[PageRef], schema: dict, part: Optional[tuple[int, int]] = None,
                 extra: str = "") -> str:
-        out = ["Document:", render_pages(pages, labels=self.track), "",
+        out = ["Document:", render_pages(pages, labels=self.track, marks=self.struck), "",
                "JSON Schema:", json.dumps(schema, ensure_ascii=False), ""]
         if self.track:
             out += [TRACK, ""]
@@ -696,10 +741,12 @@ class _Extractor:
 
     def _digest(self, data: Any, strict: dict) -> tuple[Any, dict, list]:
         flat: dict = {}
+        notes: dict = {}
         if isinstance(data, list) and len(data) == 1 and S.is_object(strict) and is_envelope(data[0], strict):
             data = data[0]
         if is_envelope(data, strict):
             flat = flat_sources(data.get("sources"))
+            notes = source_meta(data.get("sources"))
             data = data.get("data")
         if isinstance(data, list) and len(data) == 1 and S.is_object(strict):
             data = data[0]
@@ -707,6 +754,7 @@ class _Extractor:
         value, moved, stray = S.relocate(value, strict)
         for src, dst in moved:  # sources follow the values they describe
             flat = {(dst + p[len(src):] if p[:len(src)] == src else p): l for p, l in flat.items()}
+            notes = {(dst + p[len(src):] if p[:len(src)] == src else p): m for p, m in notes.items()}
             sources = {(dst + p[len(src):] if p[:len(src)] == src else p): l for p, l in sources.items()}
         lost = [p for p in stray if isinstance(p[-1], str) and p[-1] in _field_names(strict)]
         if lost:  # a declared field written in a place it could not be moved back from: say so, never drop silently
@@ -725,6 +773,16 @@ class _Extractor:
                     if path[:k] in sources:
                         sources[path] = list(sources[path[:k]])
                         break
+        if notes:
+            from .field_report import pattern, value_key
+            with self._lock:
+                for path, m in notes.items():
+                    key = (pattern(path), value_key(_get(value, path)))
+                    prev = self.leaf_meta.setdefault(key, {})
+                    alts = prev.get("alternatives", []) + m.get("alternatives", [])
+                    prev.update(m)
+                    if alts:
+                        prev["alternatives"] = alts
         return value, sources, S.find_errors(value, strict)
 
     # -- one segment (with schema repair re-asks)
@@ -1186,8 +1244,12 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
     warnings += ex_warnings
 
     segments = _segments(pages, opts, force=deep or bool(settings.get("array_extract")))
-    track = citations_on or deep or len(segments) > 1
+    report_on = settings.get("field_report", True) is not False  # on unless the request turns it off
+    track = citations_on or deep or len(segments) > 1 or report_on
     ex = _Extractor(view, pages, user_schema, system_prompt, llm, opts, track, bool(settings.get("include_images")))
+    from . import field_report as FR
+    if report_on:
+        ex.struck = FR.struck_spans(all_pages)  # crossed-out words: shown to the model as ~~text~~
     ex.results.extend(pre_results)
     ex.extra_text = X.examples_prompt(examples)
     is_obj = S.is_object(ex.strict)
@@ -1291,10 +1353,40 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
         reason = ("; ".join(f["message"] for f in remaining[:8]) if remaining
                   else "schema valid; cited values found in their source blocks; cross-segment and arithmetic checks passed")
 
+    gaps: list[dict] = []
+    if report_on and is_obj and not use_loop:
+        # lists with fewer items than the rows of the table they were read from: ask once more for that field
+        asked: set = set()
+        for gap in FR.list_gaps(value, ex.strict, sources, ex):
+            top = gap["path"][0]
+            if not isinstance(top, str) or top in asked or len(asked) >= 2:
+                continue
+            asked.add(top)
+            note = (f"An earlier answer listed only {gap['items']} items in {S.path_str(gap['path'])}, but the table "
+                    f"they come from ({gap['block']}) has {gap['rows']} rows. List every item that belongs there.")
+            nv, ns = ex.extract(pages, _sub_schema(ex.prompt_schema, [top]), _sub_schema(ex.strict, [top]), extra=note)
+            if isinstance(nv, dict) and len(_get(nv, gap["path"]) or []) > gap["items"]:
+                value, sources = _replace_fields(value, sources, nv, ns, [top])
+                value = S.conform(value, ex.strict)
+        gaps = FR.list_gaps(value, ex.strict, sources, ex)
+
     shadow = _annotate(value, sources, ex.strict)  # mirrors every removal so source paths stay aligned
     value, _unresolved = S.null_out(value, ex.strict, shadow=shadow)
     warnings = X.required_warnings(value, S.resolve_refs(user_schema), skip=ex.unreadable) + warnings + list(ex.notes)
     sources = _split_tree(shadow)[1] if isinstance(shadow, (dict, list)) and value is not None else {}
+    report = None
+    if report_on:
+        void = FR.void_pages(all_pages)
+        fields, report_warnings = FR.build(value, ex.prompt_schema, sources, ex, meta=ex.leaf_meta, conflicts=conflicts,
+                                           unreadable=ex.unreadable, struck=ex.struck, void=void, pages=all_pages)
+        lists = [{"path": S.path_str(g["path"]), "items": g["items"], "table_rows": g["rows"], "block": g["block"]}
+                 for g in gaps]
+        report = {"fields": fields, "lists": lists,
+                  "pages": {"stamped": {str(k): v for k, v in void.items()}} if void else {}}
+        warnings += report_warnings
+        warnings += [f"{g['path']}: {g['items']} items, but the table they come from has {g['table_rows']} rows; "
+                     "some may be missing" for g in lists]
+        warnings += [f"page {k} is stamped {v}" for k, v in void.items()]
     if citations_on:
         anchors = row_anchors(value, sources, ex)
         cited = S.map_leaves(value, ex.strict, lambda path, v, s: {
@@ -1311,4 +1403,4 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
         usage["extract_pages"] = extras
     return {"response_type": "v3_extract", "result": result, "usage": usage,
             "studio_link": None, "confidence": confidence, "confidence_reason": reason,
-            "warnings": warnings}
+            "warnings": warnings, **({"field_report": report} if report is not None else {})}
