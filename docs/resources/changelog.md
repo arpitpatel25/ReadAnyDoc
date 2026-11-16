@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.7 (2026-11-17)
 
 - Extract on deep schemas with citations on no longer comes back empty. A broken model reply is never read as a
   fragment: it is repaired only when the result fits the schema exactly, otherwise asked for again, then in halves.
