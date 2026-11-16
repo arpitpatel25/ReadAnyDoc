@@ -14,9 +14,10 @@
 Specs: ``anthropic_api:<model>[#effort]``, ``openai:<model>[#effort]``, ``openai_compatible:<model>@<base_url>``,
 ``fake``, ``claude_cli:<model>``, each optionally followed by ``?<json options>`` (``readanydoc.modelspec``).
 
-``json_schema`` is advisory for the CLI adapter (it is described in the prompt by the caller); the API
-adapter can pass it as a structured-output format when ``structured_outputs=True``. Callers always
-validate the reply themselves, so no adapter is trusted to enforce the schema.
+``json_schema`` is advisory for the CLI and OpenAI adapters (it is described in the prompt by the caller). The
+Anthropic API adapter sends it as a structured-output format whenever it fits the API's limits
+(``api_schema``; ``structured_outputs=False`` turns this off) and falls back to no format when the API cannot
+compile it. Callers always validate the reply themselves, so no adapter is trusted to enforce the schema.
 """
 
 from __future__ import annotations
@@ -103,38 +104,136 @@ class LLM(ABC):
 _FENCE = re.compile(r"```(?:json|JSON)?\s*\n(.*?)```", re.S)
 
 
+_KEY = re.compile(r'"[^"\n]{0,200}"\s*:')  # a JSON object key: its presence outside a value means JSON was cut
+
+
+def _unique_keys(pairs: list) -> dict:
+    """``object_pairs_hook``: a key written twice in one object means a value landed in the wrong object (a
+    bracket closed it early), and plain JSON parsing would silently keep only the last one."""
+    out: dict = {}
+    for k, v in pairs:
+        if k in out:
+            raise ValueError(f"duplicate key {k!r} in one object")
+        out[k] = v
+    return out
+
+
+_DECODER = json.JSONDecoder(object_pairs_hook=_unique_keys)
+
+
+def _loads(text: str) -> Any:
+    return _DECODER.decode(text)
+
+
+def _scan_brackets(t: str) -> list[tuple[int, str]]:
+    """Positions of the structural brackets of ``t`` (outside JSON strings)."""
+    out, in_str, esc = [], False, False
+    for i, c in enumerate(t):
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+        elif c == '"':
+            in_str = True
+        elif c in "{}[]":
+            out.append((i, c))
+    return out
+
+
+def repair_brackets(t: str) -> Optional[Any]:
+    """Repair the mistake models make in long nested JSON: a closing bracket of the wrong kind, such as an
+    extra ``}`` inside a list (``[{...}}, ...]``).
+
+    Only a closer that cannot close the open bracket is removed, and only when the whole remaining text is one
+    valid JSON value. An extra closer that does match (``{"a": {"b": 1}}, "c": 2}``) is not repaired: which
+    object ``"c"`` belonged to is a guess. Even so, the same text can come from a missing opening bracket
+    (``[[], null]]``), where the repair reshapes the answer: callers must check the result against the schema
+    they asked for before using it. ``parse_json`` never repairs.
+    """
+    starts = [i for i, c in _scan_brackets(t) if c in "{["]
+    if not starts:
+        return None
+    span = t[starts[0]:]
+    drop, stack = set(), []
+    for i, c in _scan_brackets(span):
+        if c in "{[":
+            stack.append(c)
+        elif not stack:
+            return None  # closes more than was opened: ambiguous
+        elif stack[-1] == ("{" if c == "}" else "["):
+            stack.pop()
+        else:
+            drop.add(i)
+    if not drop or stack:
+        return None
+    fixed = "".join(ch for i, ch in enumerate(span) if i not in drop).rstrip()
+    try:
+        val, end = _DECODER.raw_decode(fixed)
+    except ValueError:
+        return None
+    rest = fixed[end:]
+    return val if not _KEY.search(rest) and not any(c in rest for c in "{}[]") else None
+
+
+def _debris(before: str, after: str) -> bool:
+    """Whether the text around a parsed JSON value holds pieces of the answer: an object key, an opening
+    bracket before the value that is never closed (the value sits inside a larger, broken one), or a closing
+    bracket after it with no opening one (the value was closed early by a bracket too many)."""
+    if _KEY.search(before) or _KEY.search(after):
+        return True
+    depth = 0
+    for _, c in _scan_brackets(before):  # brackets inside quoted strings do not count
+        depth += 1 if c in "{[" else -1
+    if depth > 0:
+        return True
+    depth = 0
+    for _, c in _scan_brackets(after):
+        depth += 1 if c in "{[" else -1
+        if depth < 0:
+            return True
+    return False
+
+
 def parse_json(text: str) -> Any:
     """Parse a model reply as JSON. Accepts bare JSON, fenced JSON, or JSON surrounded by prose.
 
-    Raises ``ValueError`` when no JSON value can be found.
+    Never returns a fragment of a broken reply: a piece of JSON is accepted only when nothing around it is
+    part of the answer (``_debris``), and an object with the same key twice is broken JSON too (``_unique_keys``).
+    Broken JSON is never repaired here (see ``repair_brackets``).
+    Raises ``ValueError`` when no complete JSON value can be found.
     """
     t = (text or "").strip()
     if not t:
         raise ValueError("empty reply")
     try:
-        return json.loads(t)
-    except json.JSONDecodeError:
+        return _loads(t)
+    except ValueError:
         pass
     for m in _FENCE.finditer(t):
         try:
-            return json.loads(m.group(1).strip())
-        except json.JSONDecodeError:
+            return _loads(m.group(1).strip())
+        except ValueError:
             continue
-    dec = json.JSONDecoder()
+    dec = _DECODER
     best: Any = None
-    best_len = -1
+    best_span = (-1, -1)
     for m in re.finditer(r"[\[{]", t):
         try:
             val, end = dec.raw_decode(t, m.start())
-        except json.JSONDecodeError:
+        except ValueError:
             continue
-        if end - m.start() > best_len:
-            best, best_len = val, end - m.start()
+        if end - m.start() > best_span[1] - best_span[0]:
+            best, best_span = val, (m.start(), end)
         if end >= len(t) - 1:
             break
-    if best_len < 0:
-        raise ValueError("no JSON found in reply")
-    return best
+    if best_span[0] >= 0 and not _debris(t[:best_span[0]], t[best_span[1]:]):
+        return best
+    if best_span[0] >= 0:
+        raise ValueError("reply is broken JSON: only a fragment parses")
+    raise ValueError("no JSON found in reply")
 
 
 def _try_json(text: str) -> Any:
@@ -221,6 +320,90 @@ class ClaudeCLILLM(LLM):
                          usage=usage, raw=j)
 
 
+# ---------------------------------------------------------------- structured outputs (JSON schema -> API format)
+
+# Anthropic's published limits for one request with output_config.format (docs: structured outputs,
+# "Schema complexity limits"). A schema over them is sent without a format instead of failing.
+SO_MAX_OPTIONAL = 24
+SO_MAX_UNIONS = 16
+_SO_FORMATS = {"date-time", "time", "date", "duration", "email", "hostname", "uri", "ipv4", "ipv6", "uuid"}
+_SO_DROP = {"minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minLength", "maxLength",
+            "maxItems", "uniqueItems", "pattern", "default", "examples", "discriminator", "$schema", "$id",
+            "$comment", "readOnly", "writeOnly", "deprecated", "contentMediaType", "contentEncoding"}
+_SO_REFUSE = {"not", "if", "then", "else", "patternProperties", "dependentSchemas", "dependentRequired",
+              "propertyNames", "prefixItems", "contains", "unevaluatedProperties", "unevaluatedItems", "$ref",
+              "$defs", "definitions", "$dynamicRef"}
+
+
+class _Unsupported(Exception):
+    pass
+
+
+def api_schema(schema: Any) -> Optional[dict]:
+    """The structured-output version of a (``$ref``-free) JSON Schema, or None when it cannot be one.
+
+    Every object is closed (``additionalProperties: false``) and nothing is required except what the caller
+    marked required, so the model can always leave out a value the document does not have instead of being
+    forced to invent one. Constraints the API does not support are dropped (callers validate the reply
+    anyway). None when the schema uses a feature the API cannot express, has an object without declared
+    properties, or exceeds the published limits on optional fields and union types.
+    """
+    counts = {"optional": 0, "unions": 0}
+
+    def go(s: Any) -> Any:
+        if not isinstance(s, dict):
+            raise _Unsupported("non-object schema node")
+        if _SO_REFUSE & set(s):
+            raise _Unsupported(f"unsupported keyword: {sorted(_SO_REFUSE & set(s))[0]}")
+        out: dict = {}
+        for k, v in s.items():
+            if k in _SO_DROP:
+                continue
+            if k == "format":
+                if v in _SO_FORMATS:
+                    out[k] = v
+            elif k in ("anyOf", "oneOf"):
+                counts["unions"] += 1
+                out["anyOf"] = [go(x) for x in v]
+            elif k == "allOf":
+                out[k] = [go(x) for x in v]
+            elif k == "properties":
+                out[k] = {name: go(sub) for name, sub in v.items()}
+            elif k == "items":
+                out[k] = go(v)
+            elif k == "additionalProperties":
+                continue  # always closed below: undeclared fields are dropped by the caller anyway
+            elif k == "minItems":
+                if v in (0, 1):
+                    out[k] = v
+            elif k == "type" and isinstance(v, list):
+                if len(v) > 1:
+                    counts["unions"] += 1
+                out[k] = v
+            else:
+                out[k] = v
+        types = out.get("type") if isinstance(out.get("type"), list) else [out.get("type")]
+        if "object" in types:
+            props = out.get("properties")
+            if not props:
+                raise _Unsupported("object without declared properties")
+            out["additionalProperties"] = False
+            req = [r for r in out.get("required", []) if r in props]
+            out["required"] = req
+            counts["optional"] += len(props) - len(req)
+        if "array" in types and "items" not in out:
+            raise _Unsupported("array without items")
+        return out
+
+    try:
+        res = go(schema)
+    except _Unsupported:
+        return None
+    if counts["optional"] > SO_MAX_OPTIONAL or counts["unions"] > SO_MAX_UNIONS:
+        return None
+    return res
+
+
 # ---------------------------------------------------------------- Anthropic Messages API
 
 class AnthropicAPILLM(LLM):
@@ -230,7 +413,7 @@ class AnthropicAPILLM(LLM):
     def __init__(self, model: str = "haiku", base_url: str = "https://api.anthropic.com",
                  effort: Optional[str] = None, timeout: float = 600.0, max_retries: int = 2,
                  api_version: str = "2023-06-01", client: Optional[httpx.Client] = None,
-                 api_key_env: str = "ANTHROPIC_API_KEY", structured_outputs: bool = False,
+                 api_key_env: str = "ANTHROPIC_API_KEY", structured_outputs: Union[bool, str] = "auto",
                  extra: Optional[dict] = None):
         self.model = MODELS.get(model, model)
         self.extra = dict(extra or {})
@@ -240,8 +423,18 @@ class AnthropicAPILLM(LLM):
         self.max_retries = max_retries
         self.api_version = api_version
         self.api_key_env = api_key_env
+        # "auto": use structured outputs when the schema fits the API's limits; False: never; True: same as auto
         self.structured_outputs = structured_outputs
+        self._rejected_formats: set[str] = set()  # schemas the API refused to compile: sent without a format
         self._client = client or httpx.Client(timeout=timeout)
+
+    def output_format(self, json_schema: Optional[dict]) -> Optional[dict]:
+        if json_schema is None or not self.structured_outputs:
+            return None
+        if json.dumps(json_schema, sort_keys=True) in self._rejected_formats:
+            return None
+        schema = api_schema(json_schema)
+        return {"type": "json_schema", "schema": schema} if schema is not None else None
 
     def build_request(self, system: str, user: str, images: Optional[Sequence[ImageInput]],
                       json_schema: Optional[dict], max_tokens: int) -> dict:
@@ -258,8 +451,9 @@ class AnthropicAPILLM(LLM):
         out_cfg: dict = {}
         if self.effort and self.effort != "none":
             out_cfg["effort"] = self.effort
-        if json_schema is not None and self.structured_outputs:
-            out_cfg["format"] = {"type": "json_schema", "schema": json_schema}
+        fmt = self.output_format(json_schema)
+        if fmt is not None:
+            out_cfg["format"] = fmt
         if out_cfg:
             body["output_config"] = out_cfg
         for key, value in self.extra.items():
@@ -293,6 +487,13 @@ class AnthropicAPILLM(LLM):
                 continue
             break
         assert resp is not None
+        if resp.status_code == 400 and "format" in (body.get("output_config") or {}):
+            # the API would not compile this schema (too complex, or a feature it does not take): remember it
+            # and ask again without a format; the reply is checked against the schema by the caller anyway
+            self._rejected_formats.add(json.dumps(json_schema, sort_keys=True))
+            _log_usage({"t": round(time.time(), 2), "model": self.model, "event": "format_rejected",
+                        "detail": resp.text[:200]})
+            return self.complete(system, user, images=images, json_schema=json_schema, max_tokens=max_tokens)
         if resp.status_code != 200:
             raise LLMError(f"Anthropic API error {resp.status_code}: {resp.text[:300]}")
         j = resp.json()
@@ -329,6 +530,14 @@ class OpenAILLM(LLM):
         self.token_field = token_field
         self.extra = dict(extra or {})
         self._client = client or httpx.Client(timeout=timeout)
+
+    def output_format(self, json_schema: Optional[dict]) -> Optional[dict]:
+        if json_schema is None or not self.structured_outputs:
+            return None
+        if json.dumps(json_schema, sort_keys=True) in self._rejected_formats:
+            return None
+        schema = api_schema(json_schema)
+        return {"type": "json_schema", "schema": schema} if schema is not None else None
 
     def build_request(self, system: str, user: str, images: Optional[Sequence[ImageInput]],
                       json_schema: Optional[dict], max_tokens: int) -> dict:
@@ -456,11 +665,13 @@ def get_llm(spec: str = DEFAULT_LLM, **kwargs: Any) -> LLM:
 
 
 def ask_json(llm: LLM, system: str, user: str, *, images: Optional[Sequence[ImageInput]] = None,
-             json_schema: Optional[dict] = None, max_tokens: int = 16000, retries: int = 1) -> tuple[Any, list[LLMResult]]:
+             json_schema: Optional[dict] = None, max_tokens: int = 16000, retries: int = 1,
+             repair: Optional[Callable[[str], Any]] = None) -> tuple[Any, list[LLMResult]]:
     """Call the model until the reply parses as JSON (at most ``retries`` extra calls).
 
-    Returns ``(data, results)``; ``data`` is ``None`` when every attempt failed to parse or the reply
-    was truncated.
+    ``repair(text)`` is tried on a reply that does not parse (and was not cut off) before asking again; it
+    returns the repaired value, or None. Returns ``(data, results)``; ``data`` is ``None`` when every attempt
+    failed to parse or the reply was truncated.
     """
     results: list[LLMResult] = []
     prompt = user
@@ -473,5 +684,9 @@ def ask_json(llm: LLM, system: str, user: str, *, images: Optional[Sequence[Imag
             return None, results
         if res.data is not None:
             return res.data, results
+        if repair is not None and not res.refused:
+            fixed = repair(res.text or "")
+            if fixed is not None:
+                return fixed, results
         prompt = user + "\n\nYour previous reply was not valid JSON. Reply with one JSON value only, no prose, no code fences."
     return None, results

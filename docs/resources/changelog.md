@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.7 (2026-11-17)
+
+- Extract on deep schemas with citations on no longer comes back empty. A broken model reply is never read as a
+  fragment: it is repaired only when the result fits the schema exactly, otherwise asked for again, then in halves.
+  A field that still cannot be read says so ("could not be read") instead of "not found in the document".
+- Citations are asked for as a flat source list next to the data, not by wrapping every value: less for the model to
+  get wrong on deep schemas. Fields the model writes one level off are put back.
+- Structured outputs are used on the Anthropic API whenever the schema fits the API's limits.
+
 ## 0.1.6 (2026-11-15)
 
 - After the first successful `readanydoc parse` or `extract` in a terminal, one line asks for a GitHub star, once

@@ -93,7 +93,7 @@ def test_anthropic_api_request_and_response(monkeypatch):
     assert len(body["messages"]) == 1
 
 
-def test_anthropic_api_structured_output_is_opt_in(monkeypatch):
+def test_anthropic_api_structured_output_is_on_when_the_schema_fits(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-not-real")
     bodies = []
 
@@ -101,11 +101,41 @@ def test_anthropic_api_structured_output_is_opt_in(monkeypatch):
         bodies.append(json.loads(request.content))
         return httpx.Response(200, json={"stop_reason": "end_turn", "content": [{"type": "text", "text": "{}"}], "usage": {}})
 
-    schema = {"type": "object", "properties": {"a": {"type": "string"}}}
+    schema = {"type": "object", "properties": {"a": {"type": "string", "maxLength": 9}}}
     api(handler).complete("s", "u", json_schema=schema)
-    api(handler, structured_outputs=True, effort="low").complete("s", "u", json_schema=schema)
-    assert bodies[0]["output_config"] == {"effort": "high"}
-    assert bodies[1]["output_config"] == {"effort": "low", "format": {"type": "json_schema", "schema": schema}}
+    api(handler, structured_outputs=False, effort="low").complete("s", "u", json_schema=schema)
+    api(handler).complete("s", "u")  # no schema: no format
+    closed = {"type": "object", "properties": {"a": {"type": "string"}}, "additionalProperties": False, "required": []}
+    assert bodies[0]["output_config"] == {"effort": "high", "format": {"type": "json_schema", "schema": closed}}
+    assert bodies[1]["output_config"] == {"effort": "low"}
+    assert bodies[2]["output_config"] == {"effort": "high"}
+
+
+def test_anthropic_api_falls_back_to_no_format_when_the_api_rejects_the_schema(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-not-real")
+    bodies = []
+
+    def handler(request):
+        body = json.loads(request.content)
+        bodies.append(body)
+        if "format" in body["output_config"]:
+            return httpx.Response(400, json={"type": "error", "error": {
+                "type": "invalid_request_error", "message": "Schema is too complex for compilation."}})
+        return httpx.Response(200, json={"stop_reason": "end_turn", "content": [{"type": "text", "text": '{"a": "x"}'}],
+                                         "usage": {}})
+
+    llm = api(handler)
+    schema = {"type": "object", "properties": {"a": {"type": "string"}}}
+    assert llm.complete("s", "u", json_schema=schema).data == {"a": "x"}
+    assert llm.complete("s", "u", json_schema=schema).data == {"a": "x"}  # remembered: no second rejected call
+    assert ["format" in b["output_config"] for b in bodies] == [True, False, False]
+
+
+def test_anthropic_api_400_without_a_format_is_still_an_error(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-not-real")
+    llm = api(lambda r: httpx.Response(400, json={"error": {"message": "bad"}}))
+    with pytest.raises(L.LLMError):
+        llm.complete("s", "u")
 
 
 def test_anthropic_api_refusal_truncation_retry_and_errors(monkeypatch):

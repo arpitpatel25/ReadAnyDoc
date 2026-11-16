@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -22,7 +23,7 @@ from ..textnorm import norm_tokens, tokenize
 from . import schema as S
 from .common import (DocView, PageRef, RegionRef, TaskError, bbox_dict, page_images, render_pages,
                      select_pages, sum_usage)
-from .llm import LLM, LLMError, LLMResult, ask_json
+from .llm import LLM, LLMError, LLMResult, ask_json, repair_brackets
 
 DEFAULTS: dict[str, Any] = {
     "segment_pages": 8,           # pages per segment for long documents
@@ -44,7 +45,104 @@ RULES = """You extract structured data from a parsed document.
 - Reply with the JSON only: no prose, no code fences."""
 
 TRACK = """Source labels: every block of the document starts with a label such as [r12|Table].
-Write every leaf value (string, number, boolean or null, including each item of an array of scalars) as {"v": <value>, "r": ["r12"]}, where "r" lists the labels of the blocks the value was read from (usually exactly one). Use {"v": null, "r": []} when the value is missing. Objects and arrays keep their normal shape; only the leaves are wrapped."""
+Reply with one JSON object with exactly two keys, in this order:
+- "data": the extracted value, following the JSON Schema exactly (plain values, nothing wrapped).
+- "sources": a list with one entry for every non-null value in "data": {"path": "<where the value is in data>", "block": "<label>"}. Write the path with dots and [index], for example "buyer.name" or "line_items[0].amount"; "block" is the label of the block the value was read from, for example "r12"."""
+
+
+def _field_names(schema: Any, seen: Optional[set] = None) -> set[str]:
+    """Every property name declared anywhere in a ($ref-free) schema."""
+    seen = set() if seen is None else seen
+    if isinstance(schema, dict):
+        for k, v in schema.items():
+            if k == "properties" and isinstance(v, dict):
+                seen |= set(v)
+                for sub in v.values():
+                    _field_names(sub, seen)
+            elif isinstance(v, (dict, list)):
+                _field_names(v, seen)
+    elif isinstance(schema, list):
+        for v in schema:
+            _field_names(v, seen)
+    return seen
+
+
+def envelope_schema(schema: dict) -> dict:
+    """The reply shape asked for when sources are tracked: the user's schema under "data", sources as a flat list.
+
+    Sources used to be asked for by wrapping every value as {"v": value, "r": [labels]}. That put an object
+    around every value (nearly three times the brackets) and long runs of closing brackets at the end of each
+    nested object; on a 20-type billing schema the model miscounted them once and the reply could not be
+    read. Here "data" has only the brackets of the user's own schema and "sources" is one level deep.
+    """
+    item = {"type": "object", "properties": {"path": {"type": "string"}, "block": {"type": "string"}},
+            "required": ["path", "block"]}
+    return {"type": "object", "properties": {"data": schema, "sources": {"type": "array", "items": item}},
+            "required": ["data", "sources"]}
+
+
+_PATH_TOKEN = re.compile(r"\[(\d+)\]|([^.\[\]/]+)")
+_LABEL = re.compile(r"r\d+")
+
+
+def parse_path(text: str) -> Optional[tuple]:
+    """``"line_items[0].amount"`` (or ``line_items.0.amount``, ``/line_items/0/amount``) -> ("line_items", 0, "amount")."""
+    if not isinstance(text, str) or not text.strip():
+        return None
+    out: list = []
+    for idx, key in _PATH_TOKEN.findall(text.strip().removeprefix("data.").removeprefix("$.")):
+        if idx:
+            out.append(int(idx))
+        elif key.isdigit():
+            out.append(int(key))
+        else:
+            out.append(key.strip().strip('"\''))
+    return tuple(out) or None
+
+
+def flat_sources(entries: Any) -> dict:
+    """The "sources" list of an enveloped reply -> {path tuple: [labels]}. Malformed entries are skipped."""
+    out: dict = {}
+    for e in entries if isinstance(entries, list) else []:
+        if not isinstance(e, dict):
+            continue
+        path = parse_path(e.get("path"))
+        raw = e.get("block", e.get("blocks", e.get("r")))
+        labels = _LABEL.findall(" ".join(map(str, raw)) if isinstance(raw, list) else str(raw or ""))
+        if path and labels:
+            out.setdefault(path, [])
+            out[path] += [l for l in labels if l not in out[path]]
+    return out
+
+
+def is_envelope(data: Any, schema: Any) -> bool:
+    if not isinstance(data, dict) or "data" not in data or not set(data) <= {"data", "sources"}:
+        return False
+    declared = set(schema.get("properties", {})) if S.is_object(schema) else set()
+    if "data" in declared:  # the user's own schema has a "data" field: only a reply with "sources" is an envelope
+        return "sources" in data and "sources" not in declared
+    return True
+
+
+def root_ok(data: Any, schema: Any) -> bool:
+    """Whether a reply has the requested shape at the top. A fragment of a broken reply does not.
+
+    For an object schema the reply must be an object that is empty or shares at least one top-level field
+    with the schema (also inside an envelope, or as the only item of a list).
+    """
+    if data is None:
+        return False
+    if isinstance(data, list) and len(data) == 1 and S.is_object(schema):
+        data = data[0]
+    if is_envelope(data, schema):
+        data = data["data"]
+    if not S.is_object(schema):
+        return True
+    if isinstance(data, list) and len(data) == 1:
+        data = data[0]
+    if not isinstance(data, dict):
+        return False
+    return not data or bool(set(data) & set(schema["properties"]))
 
 
 # ---------------------------------------------------------------- annotated trees (value + source labels)
@@ -512,6 +610,8 @@ class _Extractor:
         self.include_images = include_images
         self.results: list[LLMResult] = []
         self.notes: list[str] = []
+        self.unreadable: set[str] = set()  # top-level fields whose reply could not be read, even after retries
+        self._lock = threading.Lock()
         self.label_page = {ref.label: p.number for p in view.pages for ref in p.regions}
         self.track_text = TRACK
         self.extra_text = ""  # example outputs (instructions.examples), shown with every prompt
@@ -535,31 +635,106 @@ class _Extractor:
         return "\n".join(out)
 
     def _ask(self, pages: list[PageRef], prompt: str, schema: dict) -> Any:
+        return self._ask_why(pages, prompt, schema)[0]
+
+    def _ask_why(self, pages: list[PageRef], prompt: str, schema: dict) -> tuple[Any, str]:
+        """One answer for ``prompt``: a reply that parses and has the schema's top-level shape, or None.
+
+        A reply that parses but is not in the requested shape (a fragment, another object) is asked for again
+        once, saying what was wrong; it is never used as the answer. The second value says why there is no
+        answer: "truncated", "broken" (JSON with an error in it) or "no_json".
+        """
         images = page_images(pages) if self.include_images and self.llm.supports_images else None
+        reply_schema = envelope_schema(schema) if self.track else schema
+        want = '"data" and "sources"' if self.track else (
+            ", ".join(f'"{k}"' for k in schema["properties"]) if S.is_object(schema) else "")
+        got: list[LLMResult] = []
+        strict = S.enforced(schema)
+
+        def repair(text: str) -> Any:
+            # the bracket repair can reshape an answer (a missing opener looks like an extra closer): use it
+            # only when the result has exactly the shape of the schema, with nothing moved, dropped or invalid
+            fixed = repair_brackets(text)
+            if fixed is None or not root_ok(fixed, schema):
+                return None
+            plain = fixed
+            if isinstance(plain, list) and len(plain) == 1 and S.is_object(strict):
+                plain = plain[0]
+            if is_envelope(plain, strict):
+                plain = plain["data"]
+            plain, _ = S.unwrap(plain, strict)
+            _, moved, stray = S.relocate(plain, strict)
+            if moved or stray or S.find_errors(S.conform(plain, strict), strict):
+                return None
+            return fixed
+
         try:
-            data, results = ask_json(self.llm, self.system, prompt, images=images or None, json_schema=schema,
-                                     max_tokens=self.opts["max_tokens"], retries=1)
+            data, results = ask_json(self.llm, self.system, prompt, images=images or None, json_schema=reply_schema,
+                                     max_tokens=self.opts["max_tokens"], retries=1, repair=repair)
+            got += results
+            if data is not None and not root_ok(data, schema):
+                again = (prompt + "\n\nYour previous reply was not one complete JSON value in the requested shape"
+                         + (f" (a JSON object with the top-level keys {want})" if want else "")
+                         + ". Reply again with the complete JSON only.")
+                data, results = ask_json(self.llm, self.system, again, images=images or None,
+                                         json_schema=reply_schema, max_tokens=self.opts["max_tokens"], retries=0,
+                                         repair=repair)
+                got += results
+                if not root_ok(data, schema):
+                    data = None
         except LLMError as e:
             raise TaskError(502, f"model call failed: {e}") from e
-        self.results.extend(results)
-        return data
+        finally:
+            self.results.extend(got)
+        why = ""
+        if data is None:
+            last = got[-1] if got else None
+            text = (last.text if last else "") or ""
+            why = ("truncated" if last is not None and last.truncated else
+                   "broken" if ("{" in text or "[" in text) and '":' in text else "no_json")
+        return data, why
 
     def _digest(self, data: Any, strict: dict) -> tuple[Any, dict, list]:
+        flat: dict = {}
+        if isinstance(data, list) and len(data) == 1 and S.is_object(strict) and is_envelope(data[0], strict):
+            data = data[0]
+        if is_envelope(data, strict):
+            flat = flat_sources(data.get("sources"))
+            data = data.get("data")
         if isinstance(data, list) and len(data) == 1 and S.is_object(strict):
             data = data[0]
-        value, sources = S.unwrap(data, strict)  # tolerant: also when labels were not asked for
+        value, sources = S.unwrap(data, strict)  # tolerant: also when a reply wraps values as {"v", "r"}
+        value, moved, stray = S.relocate(value, strict)
+        for src, dst in moved:  # sources follow the values they describe
+            flat = {(dst + p[len(src):] if p[:len(src)] == src else p): l for p, l in flat.items()}
+            sources = {(dst + p[len(src):] if p[:len(src)] == src else p): l for p, l in sources.items()}
+        lost = [p for p in stray if isinstance(p[-1], str) and p[-1] in _field_names(strict)]
+        if lost:  # a declared field written in a place it could not be moved back from: say so, never drop silently
+            with self._lock:
+                self.notes.append("the model's reply put these fields where the schema does not have them, so "
+                                  "they were left out: " + ", ".join(S.path_str(p) for p in lost[:5]))
         value = S.conform(value, strict)
         if value is None and S.is_object(strict):
             value = S.empty_instance(strict)
+        sources = {**flat, **sources}
+        if flat:  # a source given for an object or a row applies to the values inside it that have none
+            for path, v, _ in S.iter_leaves(value, strict):
+                if path in sources or v is None:
+                    continue
+                for k in range(len(path) - 1, 0, -1):
+                    if path[:k] in sources:
+                        sources[path] = list(sources[path[:k]])
+                        break
         return value, sources, S.find_errors(value, strict)
 
     # -- one segment (with schema repair re-asks)
     def extract(self, pages: list[PageRef], prompt_schema: Optional[dict] = None, strict: Optional[dict] = None,
-                part: Optional[tuple[int, int]] = None, extra: str = "", depth: int = 0) -> tuple[Any, dict]:
+                part: Optional[tuple[int, int]] = None, extra: str = "", depth: int = 0,
+                field_depth: int = 0) -> tuple[Any, dict]:
         prompt_schema = prompt_schema or self.prompt_schema
         strict = strict or self.strict
         base = self._prompt(pages, prompt_schema, part, extra)
-        data = self._ask(pages, base, prompt_schema)
+        data, why = self._ask_why(pages, base, prompt_schema)
         if data is None:
             if len(pages) > 1 and depth < 2:  # likely truncated output: halve the segment
                 mid = len(pages) // 2
@@ -568,7 +743,22 @@ class _Extractor:
                 b = self.extract(pages[mid:], prompt_schema, strict, part, (extra + "\n\n" + hint).strip(), depth + 1)
                 tree = merge_trees(_annotate(a[0], a[1], strict), _annotate(b[0], b[1], strict), [])
                 return _split_tree(tree)
-            self.notes.append(f"no parseable answer for pages {pages[0].number}-{pages[-1].number}")
+            fields = list(strict["properties"]) if S.is_object(strict) else []
+            if len(fields) > 1 and field_depth < 1 and why in ("broken", "truncated"):
+                # a long reply that keeps breaking: ask for half of the top-level fields at a time (once)
+                half = (len(fields) + 1) // 2
+                out_v: dict = {}
+                out_s: dict = {}
+                for group in (fields[:half], fields[half:]):
+                    v, s_ = self.extract(pages, _sub_schema(prompt_schema, group), _sub_schema(strict, group),
+                                         part, extra, depth, field_depth + 1)
+                    out_v.update(v if isinstance(v, dict) else {})
+                    out_s.update(s_)
+                return S.conform(out_v, strict), out_s
+            self.unreadable.update(fields)
+            what = f" (fields: {', '.join(fields)})" if fields else ""
+            self.notes.append(f"the model's reply could not be read for pages {pages[0].number}-{pages[-1].number}"
+                              f"{what}; those values are empty, but they may be in the document")
             return S.empty_instance(strict), {}
         value, sources, errors = self._digest(data, strict)
         for _ in range(self.opts["max_repairs"]):
@@ -1103,7 +1293,7 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
 
     shadow = _annotate(value, sources, ex.strict)  # mirrors every removal so source paths stay aligned
     value, _unresolved = S.null_out(value, ex.strict, shadow=shadow)
-    warnings = X.required_warnings(value, S.resolve_refs(user_schema)) + warnings + list(ex.notes)
+    warnings = X.required_warnings(value, S.resolve_refs(user_schema), skip=ex.unreadable) + warnings + list(ex.notes)
     sources = _split_tree(shadow)[1] if isinstance(shadow, (dict, list)) and value is not None else {}
     if citations_on:
         anchors = row_anchors(value, sources, ex)

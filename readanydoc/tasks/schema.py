@@ -227,6 +227,66 @@ def _coerce_scalar(value: Any, schema: dict) -> Any:
     return value
 
 
+def _blank(v: Any) -> bool:
+    return v is None or v == {} or v == []
+
+
+def relocate(value: Any, schema: Any, path: Path = ()) -> tuple[Any, list[tuple[Path, Path]], list[Path]]:
+    """Put fields the model wrote one level off back where the schema declares them.
+
+    Models writing long nested JSON sometimes close an object early, so a field lands next to its parent
+    (``{"contract": {...}, "line_items": [...]}`` for ``contract.line_items``), or open one late, so it lands
+    inside a sibling. ``conform`` would drop such a field as undeclared, and its values would silently become
+    null. A field is moved only when there is exactly one place one level off where the schema declares it
+    and that place is empty. Returns (value, moves as (from, to) paths, paths of fields still undeclared).
+    """
+    moved: list[tuple[Path, Path]] = []
+    stray: list[Path] = []
+    s = branch_for(schema, value) if isinstance(schema, dict) else schema
+    if isinstance(value, list) and is_array(s):
+        out = []
+        for i, item in enumerate(value):
+            v, m, st = relocate(item, s.get("items", {}), path + (i,))
+            out.append(v)
+            moved += m
+            stray += st
+        return out, moved, stray
+    if not (isinstance(value, dict) and is_object(s)):
+        return value, moved, stray
+    props = s["properties"]
+    value = dict(value)
+    # a child object holding a field of this level (opened late)
+    for k in list(props):
+        child, sub = value.get(k), branch_for(props[k], value.get(k))
+        if not (isinstance(child, dict) and is_object(sub)):
+            continue
+        for ck in [c for c in child if c not in sub["properties"] and c in props and c != k]:
+            if _blank(value.get(ck)):
+                value[ck] = child[ck]
+                child = {x: y for x, y in child.items() if x != ck}
+                moved.append((path + (k, ck), path + (ck,)))
+        value[k] = child
+    # a field of a child object written at this level (closed early)
+    for k in [k for k in value if k not in props]:
+        homes = [c for c in props if c != k and is_object(branch_for(props[c], value.get(c) or {}))
+                 and k in branch_for(props[c], value.get(c) or {})["properties"]
+                 and (value.get(c) is None or isinstance(value.get(c), dict))
+                 and _blank((value.get(c) or {}).get(k))]
+        if len(homes) == 1 and not _blank(value[k]):
+            c = homes[0]
+            value[c] = {**(value.get(c) or {}), k: value.pop(k)}
+            moved.append((path + (k,), path + (c, k)))
+        elif not _blank(value[k]):
+            stray.append(path + (k,))
+    for k in props:
+        if k in value:
+            v, m, st = relocate(value[k], props[k], path + (k,))
+            value[k] = v
+            moved += m
+            stray += st
+    return value, moved, stray
+
+
 def conform(value: Any, schema: Any) -> Any:
     """Shape repair that needs no judgement: add missing fields as null, drop undeclared fields,
     convert unambiguous scalar spellings ("1,575.00" for a number field). Never invents a value."""
@@ -416,13 +476,24 @@ def _is_wrapped(value: Any) -> bool:
     return isinstance(value, dict) and "v" in value and set(value) <= {"v", "r"}
 
 
+def _strip_wrapped(value: Any) -> Any:
+    if _is_wrapped(value):
+        return _strip_wrapped(value["v"])
+    if isinstance(value, dict):
+        return {k: _strip_wrapped(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_strip_wrapped(v) for v in value]
+    return value
+
+
 def unwrap(value: Any, schema: Any, path: Path = (), sources: Optional[dict] = None) -> tuple[Any, dict[Path, list[str]]]:
     """Turn ``{"v": value, "r": [labels]}`` leaves back into plain values; collect labels per leaf path.
 
-    Tolerant: a leaf the model did not wrap is kept as is with no sources.
+    Tolerant: a leaf the model did not wrap is kept as is with no sources. The branch of an ``anyOf`` is chosen
+    from the unwrapped value (a wrapped discriminator such as {"type": {"v": "tiered"}} matches no branch).
     """
     sources = {} if sources is None else sources
-    s0 = branch_for(schema, value) if isinstance(schema, dict) else schema
+    s0 = branch_for(schema, _strip_wrapped(value)) if isinstance(schema, dict) else schema
     if _is_wrapped(value) and not (is_object(s0) and "v" in s0["properties"]):
         inner = value["v"]
         s = branch_for(schema, inner) if isinstance(schema, dict) else schema
@@ -433,7 +504,7 @@ def unwrap(value: Any, schema: Any, path: Path = (), sources: Optional[dict] = N
                 sources[path] = labels
             return inner, sources
         value = inner
-    s = branch_for(schema, value) if isinstance(schema, dict) else schema
+    s = branch_for(schema, _strip_wrapped(value)) if isinstance(schema, dict) else schema
     if isinstance(value, dict) and is_object(s):
         props = s["properties"]
         return {k: unwrap(v, props.get(k, {}), path + (k,), sources)[0] for k, v in value.items()}, sources
