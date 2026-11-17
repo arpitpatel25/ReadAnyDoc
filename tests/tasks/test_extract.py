@@ -56,7 +56,12 @@ def test_plain_extract_shape_and_usage(invoice_doc):
     assert "job_id" not in out and "duration" not in out
     assert len(llm.calls) == 1
     call = llm.calls[0]
-    assert "Total Due: $1,575.00" in call["user"] and json.dumps(INVOICE_SCHEMA) in call["user"]
+    from readanydoc.tasks import reply_schema as RS
+    reply = RS.to_reply(S.resolve_refs(INVOICE_SCHEMA))
+    # the model answers in the reply schema (every field required, "" when absent), which the API can enforce
+    assert "Total Due: $1,575.00" in call["user"] and json.dumps(reply, ensure_ascii=False) in call["user"]
+    assert call["json_schema"] == reply and RS.NOTE in call["user"]
+    assert '"(a number; minimum 0)"' in json.dumps(reply)  # constraints the reply schema cannot carry, in words
     assert call["system"].startswith("Be precise and thorough.")
     assert call["images"] == []  # never from raw images unless include_images
 
@@ -77,16 +82,17 @@ def test_schema_violation_triggers_a_repair_reask_with_the_errors(invoice_doc):
     assert out["result"] == [GOOD]
     assert len(llm.calls) == 2
     fix = llm.calls[1]["user"]
-    assert "- status:" in fix and "- invoice_number:" in fix and "'PAID' is not one of" in fix
+    # checked against the user's schema (the pattern); an enum value that differs only in case is matched
+    assert "- invoice_number:" in fix and "does not match" in fix and "- status:" not in fix
 
 
 def test_repairs_are_bounded_and_a_still_invalid_value_becomes_null(invoice_doc):
     bad = dict(GOOD, status="PAID", total=-5)
     llm = FakeLLM([bad])  # repeats the same bad answer forever
     out = extract.run(invoice_doc, cfg(), llm=llm, options={"max_repairs": 2})
-    assert len(llm.calls) == 3  # 1 + 2 repairs, then stop
+    assert len(llm.calls) == 2  # a re-ask that does not help stops the repairs
     res = out["result"][0]
-    assert res["status"] is None and res["total"] is None
+    assert res["status"] == "paid" and res["total"] is None  # "PAID" matched to the enum; -5 breaks minimum 0
     assert res["invoice_number"] == "INV-2041" and len(res["line_items"]) == 3
     Draft202012Validator(S.enforced(INVOICE_SCHEMA)).validate(res)
 
@@ -96,7 +102,7 @@ def test_a_repair_that_makes_things_worse_is_not_accepted(invoice_doc):
     worse = dict(GOOD, status="PAID", total=-1, invoice_number="x")
     llm = FakeLLM([first, worse, worse])
     res = extract.run(invoice_doc, cfg(), llm=llm)["result"][0]
-    assert res["total"] == 1575.0 and res["invoice_number"] == "INV-2041" and res["status"] is None
+    assert res["total"] == 1575.0 and res["invoice_number"] == "INV-2041" and res["status"] == "paid"
 
 
 def test_unparseable_answer_is_an_error_not_a_silent_all_null_object(invoice_doc):
@@ -216,16 +222,15 @@ def test_citations_wrap_every_leaf_and_result_is_an_object(invoice_doc):
     assert res["po_number"] == {"value": None, "citations": []}
 
 
-def test_value_not_in_the_cited_block_is_marked_low_never_high(invoice_doc):
-    lab = labels_of(invoice_doc)
-    answer = wrap(dict(GOOD, line_items=[]), None)
-    answer["total"] = {"v": 9999.0, "r": [lab["Total Due: $1,575.00"]]}       # wrong value, real block
-    answer["customer"] = {"v": "Acme Robotics Ltd", "r": [lab["Status: PAID"]]}  # right value, wrong block
-    res = extract.run(invoice_doc, cfg(citations={"enabled": True}), llm=FakeLLM([answer]))["result"]
-    for key in ("total", "customer"):
-        (c,) = res[key]["citations"]
-        assert c["confidence"] == "low" and c["granular_confidence"]["extract_confidence"] == 0.3
-        assert c["bbox"] == c["parentBlock"]["bbox"]  # block-level box only: no word box is claimed
+def test_citations_are_found_by_code_a_value_not_in_the_document_gets_none(invoice_doc):
+    answer = dict(GOOD, line_items=[], total=9999.0)  # a value the document does not have
+    llm = FakeLLM([answer])
+    res = extract.run(invoice_doc, cfg(citations={"enabled": True}), llm=llm)["result"]
+    assert res["total"]["citations"] == []
+    (c,) = res["customer"]["citations"]  # found where it is printed, with its word box
+    assert c["content"] == "Acme Robotics Ltd" and c["confidence"] == "high" and c["bbox"] != c["parentBlock"]["bbox"]
+    # the model wrote only the fields (no per-value source list); block labels are shown for the "_block" fields
+    assert '"sources"' not in json.dumps(llm.calls[0]["json_schema"]) and "[r1|" in llm.calls[0]["user"]
 
 
 def test_no_citation_is_ever_fabricated(invoice_doc):
@@ -235,10 +240,11 @@ def test_no_citation_is_ever_fabricated(invoice_doc):
     answer["po_number"] = {"v": "Invoice", "r": ["nonsense"]}         # occurs in two blocks: ambiguous
     res = extract.run(invoice_doc, cfg(citations={"enabled": True}), llm=FakeLLM([answer]))["result"]
     assert res["customer"] == {"value": "Globex Corporation", "citations": []}
-    assert res["po_number"] == {"value": "Invoice", "citations": []}
+    # printed in two blocks with nothing to tell them apart: the first place, marked low (never "high")
+    assert [c["confidence"] for c in res["po_number"]["citations"]] == ["low"]
     (c,) = res["invoice_number"]["citations"]
     assert c["content"] == "INV-2041"
-    assert c["confidence"] == "high" and c["granular_confidence"]["extract_confidence"] == 0.7
+    assert c["confidence"] == "high" and c["granular_confidence"]["extract_confidence"] == 0.95  # printed once
 
 
 def test_citation_options_bbox_only_and_no_numeric_confidence(invoice_doc):
@@ -294,7 +300,7 @@ TXN_SCHEMA = {"type": "object", "properties": {
         "date": {"type": "string"}, "what": {"type": "string"}, "amount": {"type": "number"}}}},
     "closing_balance": {"type": "number"}}}
 
-LINE = re.compile(r"\[(r\d+)\|Text\] Txn (\S+) (\w+) ([\d.]+)")
+LINE = re.compile(r"(?:\[(r\d+)\|Text\] )?Txn (\S+) (\w+) ([\d.]+)")  # labels are shown only when citing
 
 
 def statement(n_pages=5, per_page=3):
@@ -316,8 +322,8 @@ def reader(skip=()):
         doc_part = user.split("JSON Schema:")[0]
         items = [{"date": {"v": d, "r": [lab]}, "what": {"v": w, "r": [lab]}, "amount": {"v": float(a), "r": [lab]}}
                  for lab, d, w, a in LINE.findall(doc_part) if w not in skip]
-        acct = re.search(r"\[(r\d+)\|Text\] Account: (\S+)", doc_part)
-        bal = re.search(r"\[(r\d+)\|Text\] Closing balance: ([\d.]+)", doc_part)
+        acct = re.search(r"(?:\[(r\d+)\|Text\] )?Account: (\S+)", doc_part)
+        bal = re.search(r"(?:\[(r\d+)\|Text\] )?Closing balance: ([\d.]+)", doc_part)
         return {"account": {"v": acct.group(2), "r": [acct.group(1)]} if acct else {"v": None, "r": []},
                 "transactions": items,
                 "closing_balance": {"v": float(bal.group(2)), "r": [bal.group(1)]} if bal else {"v": None, "r": []}}
@@ -439,12 +445,10 @@ def test_deep_extract_is_bounded_and_reports_low_confidence_when_it_cannot_fix(i
     llm = FakeLLM([bad])  # the model never improves
     out = extract.run(invoice_doc, cfg(system_prompt=SUM_PROMPT, deep_extract=True), llm=llm,
                       options={"max_deep_iterations": 2})
-    # one deep re-ask (it did not help, so the loop stops instead of burning calls), and one ask for the list,
-    # which has 2 items while its table has 3 rows
-    assert len(llm.calls) == 3
+    # one deep re-ask; it did not help, so the loop stops instead of burning calls
+    assert len(llm.calls) == 2
     assert out["confidence"] == "low" and "does not hold" in out["confidence_reason"]
     assert len(out["result"][0]["line_items"]) == 2  # the original answer is kept, not replaced by a guess
-    assert any("2 items, but the table they come from has 3 rows" in w for w in out["warnings"])
 
 
 def test_deep_extract_flags_values_that_are_not_in_their_cited_block(invoice_doc):
@@ -523,7 +527,7 @@ def test_repeated_values_in_a_table_are_cited_in_their_own_row():
                             if abs(w.bbox.left - c["bbox"]["left"]) < 1e-3)
     assert starts(ann["dept"]["citations"][0]) < table.index("Bob") < starts(bob["dept"]["citations"][0])
     assert starts(ann["bonus"]["citations"][0]) < table.index("Bob") < starts(bob["bonus"]["citations"][0])
-    assert bob["dept"]["citations"][0]["granular_confidence"]["extract_confidence"] == 0.95
+    assert bob["dept"]["citations"][0]["granular_confidence"]["extract_confidence"] == 0.9  # placed by its row
 
 
 def test_page_range_refers_to_source_pages_even_on_a_pre_filtered_document():
@@ -571,14 +575,17 @@ def test_truncated_answer_is_never_salvaged_the_segment_is_halved_instead():
     good = reader()
 
     def handler(system, user, i):
-        if "=== Page 1 ===" in user and "=== Page 4 ===" in user:   # all four pages at once: too long, cut off
+        asks_list = '"transactions"' in user.split("JSON Schema:")[1]
+        if "=== Page 1 ===" in user and "=== Page 4 ===" in user and asks_list:  # the list over four pages: cut off
             return LLMResult(text='{"account": {"v": "0012-3456", "r": ["r1"]}, "transactions": [{"date": {"v": "2025-01-01", "r": ["r2"]}',
                              data={"v": "2025-01-01", "r": ["r2"]}, stop_reason="max_tokens", model="fake")
         return good(system, user, i)
 
     llm = FakeLLM(handler)
     out = extract.run(doc, cfg(TXN_SCHEMA, citations={"enabled": True}), llm=llm)
-    assert len(llm.calls) == 3                                      # the whole document, then its two halves
+    # the whole document; then the other fields (all pages, no list) and the list alone, which is cut off again;
+    # then the list over the two halves of the pages
+    assert len(llm.calls) == 5
     res = out["result"]
     assert [t["what"]["value"] for t in res["transactions"]] == [f"item{k}" for k in range(1, 13)]
     assert res["account"]["value"] == "0012-3456" and res["closing_balance"]["value"] == 120.0
@@ -591,7 +598,7 @@ GROUP_SCHEMA = {"type": "object", "properties": {"rows": {"type": "array", "item
 def test_group_heading_from_an_earlier_segment_is_carried_into_the_next():
     # the state heading is printed once, on page 1; pages 3-4 belong to the next segment
     doc = make_doc([["State: Bavaria", "Area A 10"], ["Area B 20"], ["Area C 30"], ["State: Hesse", "Area D 40"]])
-    row = re.compile(r"\[(r\d+)\|Text\] Area (\w) (\d+)")
+    row = re.compile(r"(?:\[(r\d+)\|Text\] )?Area (\w) (\d+)")
 
     def handler(system, user, i):
         text = user.split("JSON Schema:")[0]

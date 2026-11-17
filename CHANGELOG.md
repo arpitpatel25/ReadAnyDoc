@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.2.0 (2026-11-18)
+
+Extraction costs what the answer costs again, and stays reliable on schemas of any size. Breaking: the
+`field_report` response key (`report` in Python, `fields_to_check` in MCP) is gone; its useful parts are opt-in.
+
+- The model writes only your schema's fields. 0.1.8 asked for a source, a printed form and notes for every value in
+  the same reply, also with citations off; on large schemas that reply ran past the length limit, and the recovery
+  (pages and fields in halves) multiplied the calls. That is removed.
+- Structured outputs for any schema size: your schema is rewritten in code (every field required, "" for a value
+  the document does not have, numbers and yes/no as text), the API enforces it, and the answer is turned back into
+  your types and checked against your schema, patterns and ranges included. Schemas over 40 fields are asked in
+  groups before any call, in parallel, each seeing the whole document; a group the API will not compile is split
+  further (a one-token check, remembered on disk per schema).
+- Citations are found by code: each value is looked up on the parsed pages, including dates and numbers printed
+  another way (`03/04/2025`, `$4,200.00`); a value printed in several places is cited next to the rest of its object
+  (one short `_block` label per object, removed from the result). A value whose words were not placed by the parser
+  is found in the page's own words (form amounts printed apart from their labels).
+- A reply that is cut off is split by fields, lists apart from the rest, with all pages in view; only a single long
+  list is split by pages. A field is reported as unreadable only if it is still empty at the end.
+- Opt-in: `review=True` (`settings.review`) lists values to check, found by code with no model call
+  (`not_found_on_page`, `ambiguous_date`, `struck_through`, `void_page`, `list_may_be_incomplete` counted on rows
+  with an amount, ...); `alternatives=True` or a list of fields (`settings.alternatives`) returns other values the
+  document gives for a field, with where they are printed; `derived_values=False` asks for printed values only.
+  CLI: `--review`, `--alternatives [FIELD ...]`, `--printed-only`.
+- No more "inferred" lines in `warnings`, and no automatic re-ask for lists that look short.
+- Enum values that differ only in case are matched ("PAID" to "paid").
+
 ## 0.1.8 (2026-11-17)
 
 - Field report: every extracted field says how it was found. `conflict` when the document gives two values (every

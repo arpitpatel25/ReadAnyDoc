@@ -33,7 +33,7 @@ body:
     attributes:
       label: ReadAnyDoc version
       description: python -c "import readanydoc; print(readanydoc.__version__)"
-      placeholder: "0.1.8"
+      placeholder: "0.2.0"
     validations:
       required: true
   - type: dropdown

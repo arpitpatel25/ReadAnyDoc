@@ -176,6 +176,14 @@ def branch_for(schema: Any, value: Any) -> Any:
     cand = cand or live
     if len(cand) == 1:
         return branch_for(cand[0], value)
+    if isinstance(value, dict) and value:
+        # objects: the branch whose field names fit the value's keys (a tiered price has "tiers", a flat one an
+        # "amount"), whatever the types of the values inside; errors only break ties
+        def fit(b: Any) -> tuple:
+            props = (branch_for(b, value).get("properties") or {}) if isinstance(b, dict) else {}
+            keys = set(value)
+            return (len(keys & set(props)) - len(keys - set(props)), -len(find_errors(value, branch_for(b, value))))
+        return branch_for(max(cand, key=fit), value)
     for b in cand:
         b2 = branch_for(b, value)
         if not find_errors(value, b2):

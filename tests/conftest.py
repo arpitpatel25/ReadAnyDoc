@@ -30,3 +30,11 @@ def haiku_docs(five_pages):
     from readanydoc.profiles import get_profile
     pipe = Pipeline(get_profile("cached-haiku"))
     return {s: pipe.run(s) for s in five_pages}
+
+
+@pytest.fixture(autouse=True)
+def _isolated_format_cache(tmp_path, monkeypatch):
+    """Structured-output schema checks are cached on disk; tests use a fresh folder each time."""
+    from readanydoc.tasks import llm as _llm
+    monkeypatch.setenv("READANYDOC_CACHE_DIR", str(tmp_path / "readanydoc-cache"))
+    monkeypatch.setattr(_llm, "_FORMAT_VERDICTS", None)

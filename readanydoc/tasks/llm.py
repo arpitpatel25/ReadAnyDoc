@@ -28,6 +28,7 @@ import os
 import re
 import subprocess
 import tempfile
+import threading
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -406,6 +407,46 @@ def api_schema(schema: Any) -> Optional[dict]:
 
 # ---------------------------------------------------------------- Anthropic Messages API
 
+_FORMAT_LOCK = threading.Lock()
+_FORMAT_VERDICTS: Optional[dict] = None
+
+
+def _format_cache_path() -> Path:
+    base = os.environ.get("READANYDOC_CACHE_DIR") or os.path.join(os.path.expanduser("~"), ".cache", "readanydoc")
+    return Path(base) / "structured_formats.json"
+
+
+def _format_key(model: str, schema_key: str) -> str:
+    import hashlib
+    return hashlib.sha256(f"{model}\n{schema_key}".encode()).hexdigest()[:32]
+
+
+def _format_verdicts() -> dict:
+    """Whether the API compiled a schema, kept on disk: {hash of model and schema: true/false}."""
+    global _FORMAT_VERDICTS
+    with _FORMAT_LOCK:
+        if _FORMAT_VERDICTS is None:
+            try:
+                _FORMAT_VERDICTS = json.loads(_format_cache_path().read_text())
+            except (OSError, ValueError):
+                _FORMAT_VERDICTS = {}
+        return _FORMAT_VERDICTS
+
+
+def _save_format_verdict(key: str, ok: bool) -> None:
+    verdicts = _format_verdicts()
+    with _FORMAT_LOCK:
+        verdicts[key] = ok
+        try:
+            path = _format_cache_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(f".{os.getpid()}.tmp")
+            tmp.write_text(json.dumps(verdicts))
+            tmp.replace(path)
+        except OSError:
+            pass  # a cache only
+
+
 class AnthropicAPILLM(LLM):
     supports_images = True
     parallel_safe = True  # stateless HTTP calls: callers may run several at once
@@ -426,6 +467,7 @@ class AnthropicAPILLM(LLM):
         # "auto": use structured outputs when the schema fits the API's limits; False: never; True: same as auto
         self.structured_outputs = structured_outputs
         self._rejected_formats: set[str] = set()  # schemas the API refused to compile: sent without a format
+        self._accepted_formats: set[str] = set()  # schemas the API compiled (format_ok)
         self._client = client or httpx.Client(timeout=timeout)
 
     def output_format(self, json_schema: Optional[dict]) -> Optional[dict]:
@@ -435,6 +477,47 @@ class AnthropicAPILLM(LLM):
             return None
         schema = api_schema(json_schema)
         return {"type": "json_schema", "schema": schema} if schema is not None else None
+
+    def format_ok(self, json_schema: dict) -> bool:
+        """Whether the API compiles ``json_schema`` as a structured output. Besides its published limits the API
+        caps the compiled grammar's size, which depends on nesting and enums and is not published, so a schema is
+        tried once with a one-token request (the API then keeps the grammar for 24 hours; the answer is kept here
+        for this process). False when the schema is over the published limits. A network error counts as "yes":
+        the real call falls back to no format on a refusal anyway."""
+        if not self.structured_outputs or api_schema(json_schema) is None:
+            return False
+        key = json.dumps(json_schema, sort_keys=True)
+        if key in self._rejected_formats:
+            return False
+        if key in self._accepted_formats:
+            return True
+        known = _format_verdicts().get(_format_key(self.model, key))
+        if known is not None:  # checked before, in this or an earlier run (the same schema on many documents)
+            (self._accepted_formats if known else self._rejected_formats).add(key)
+            return known
+        api_key = os.environ.get(self.api_key_env)
+        if not api_key:
+            return True
+        body = {"model": self.model, "max_tokens": 1, "messages": [{"role": "user", "content": "{}"}],
+                "output_config": {"format": {"type": "json_schema", "schema": api_schema(json_schema)}}}
+        try:
+            resp = self._client.post(f"{self.base_url}/v1/messages", json=body,
+                                     headers={"x-api-key": api_key, "anthropic-version": self.api_version,
+                                              "content-type": "application/json"})
+        except httpx.HTTPError:
+            return True
+        if resp.status_code == 400:
+            self._rejected_formats.add(key)
+            _save_format_verdict(_format_key(self.model, key), False)
+            return False
+        if resp.status_code == 200:
+            self._accepted_formats.add(key)
+            _save_format_verdict(_format_key(self.model, key), True)
+            u = resp.json().get("usage") or {}
+            _log_usage({"t": round(time.time(), 2), "model": self.model, "event": "format_check",
+                        "input_tokens": u.get("input_tokens"), "output_tokens": u.get("output_tokens"),
+                        "cost_usd": api_cost(self.model, u)})
+        return True
 
     def build_request(self, system: str, user: str, images: Optional[Sequence[ImageInput]],
                       json_schema: Optional[dict], max_tokens: int) -> dict:

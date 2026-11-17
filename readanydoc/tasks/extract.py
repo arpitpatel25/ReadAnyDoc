@@ -10,6 +10,7 @@ Nothing here reads page images unless ``settings.include_images`` is set.
 
 from __future__ import annotations
 
+import copy
 import json
 import re
 import threading
@@ -23,6 +24,7 @@ from ..textnorm import norm_tokens, tokenize
 from . import schema as S
 from .common import (DocView, PageRef, RegionRef, TaskError, bbox_dict, page_images, render_pages,
                      select_pages, sum_usage)
+from . import reply_schema as RS
 from .llm import LLM, LLMError, LLMResult, ask_json, repair_brackets
 
 DEFAULTS: dict[str, Any] = {
@@ -39,7 +41,7 @@ DEFAULTS: dict[str, Any] = {
 
 RULES = """You extract structured data from a parsed document.
 - Use only what the document text says. Never invent values and never use outside knowledge.
-- Return one JSON value that follows the JSON Schema exactly: include every declared property, use null when the document does not contain the value, never add properties that are not declared, and respect enum, pattern, minimum/maximum and array item rules.
+- Return one JSON value that follows the JSON Schema exactly: include every declared property, use null when the document does not contain the value (or "" where the schema does not allow null), never add properties that are not declared, and respect enum, pattern, minimum/maximum and array item rules.
 - Copy values as written (names, numbers, identifiers, dates) unless the schema or the instructions ask for another format.
 - For arrays, include every matching item found in the pages you are given, in document order. Do not stop early and do not summarise.
 - Reply with the JSON only: no prose, no code fences."""
@@ -47,14 +49,7 @@ RULES = """You extract structured data from a parsed document.
 TRACK = """Source labels: every block of the document starts with a label such as [r12|Table].
 Reply with one JSON object with exactly two keys, in this order:
 - "data": the extracted value, following the JSON Schema exactly (plain values, nothing wrapped).
-- "sources": a list with one entry for every non-null value in "data": {"path": "<where the value is in data>", "block": "<label>"}. Write the path with dots and [index], for example "buyer.name" or "line_items[0].amount"; "block" is the label of the block the value was read from, for example "r12".
-Add these keys to an entry only when they apply:
-- "printed": the text exactly as printed, when your value is written differently (a converted date, a number with symbols or in parentheses, a percentage, a word for yes or no).
-- "inferred": true, when the document does not state the value and you worked it out or assumed it.
-- "note": a condition that limits the value, in a few words (for example "first year only").
-- "alternatives": when the document itself gives a different value for the same field somewhere else (a special term, an amendment, a second total, a crossed-out value): [{"value": <that value>, "block": "<label>", "note": "<why it differs>"}].
-For a null value, add an entry {"path": ..., "empty": "blank"} when the form has the field but it is left empty, or {"path": ..., "empty": "not_applicable"} when the field does not apply to this document; write no entry when the document simply does not mention it.
-Text between ~~ and ~~ is crossed out on the page."""
+- "sources": a list with one entry for every non-null value in "data": {"path": "<where the value is in data>", "block": "<label>"}. Write the path with dots and [index], for example "buyer.name" or "line_items[0].amount"; "block" is the label of the block the value was read from, for example "r12"."""
 
 
 def _field_names(schema: Any, seen: Optional[set] = None) -> set[str]:
@@ -344,6 +339,48 @@ def _find_number_alt(masked: str, target: float) -> list[tuple[int, int]]:
     return out
 
 
+_MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+_ISO_DATE = re.compile(r"^\s*(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ].*)?\s*$")
+_NUM_DATE = re.compile(r"(?<![\w])(\d{1,4})\s?([/.\-])\s?(\d{1,2})\s?\2\s?(\d{2,4})(?![\w])")
+_SPACED_DATE = re.compile(r"(?<![\w])(\d{1,2})\s+(\d{1,2})\s+(\d{2,4})(?![\w])")
+_NAME_DATE = re.compile(r"(?<![\w])(?:(\d{1,2})(?:st|nd|rd|th)?\s+([a-z]{3,9})\.?,?\s+(\d{2,4})"
+                        r"|([a-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{2,4}))(?![\w])", re.I)
+
+
+def _year(y: str) -> int:
+    v = int(y)
+    return v + (2000 if v < 50 else 1900) if len(y) <= 2 else v
+
+
+def _find_date(masked: str, value: str) -> list[tuple[int, int]]:
+    """Where an ISO date ("2025-03-31") is printed another way: 03/31/2025, 31.03.25, 3 31 2025, March 31, 2025,
+    31 Mar 2025. Day and month order is not known from the text, so either order counts as the same date."""
+    m = _ISO_DATE.match(str(value))
+    if not m:
+        return []
+    want = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    out = []
+    for mm in _NUM_DATE.finditer(masked):
+        a, _, b, c = mm.groups()
+        if len(a) == 4:  # 2025/03/31
+            cands = [(int(a), int(b), int(c))]
+        else:
+            y = _year(c)
+            cands = [(y, int(a), int(b)), (y, int(b), int(a))]
+        if want in cands:
+            out.append((mm.start(), mm.end()))
+    for mm in _SPACED_DATE.finditer(masked):  # boxes on forms: "03 31 2025"
+        a, b, c = mm.groups()
+        if want in [(_year(c), int(a), int(b)), (_year(c), int(b), int(a))]:
+            out.append((mm.start(), mm.end()))
+    for mm in _NAME_DATE.finditer(masked):
+        d, mon, y = (mm.group(1), mm.group(2), mm.group(3)) if mm.group(1) else (mm.group(5), mm.group(4), mm.group(6))
+        mon = mon.lower()[:3]
+        if mon in _MONTHS and (_year(y), _MONTHS.index(mon) + 1, int(d)) == want:
+            out.append((mm.start(), mm.end()))
+    return sorted(set(out))
+
+
 def _find_tokens(tokens: list, want: list[str]) -> list[tuple[int, int]]:
     n = len(want)
     if not n or n > len(tokens):
@@ -383,6 +420,8 @@ def spans(value: Any, ref: RegionRef) -> tuple[list[tuple[int, int]], bool]:
     if not want:
         return [], True
     found = _find_tokens(tokenize(content), want)
+    if not found and _ISO_DATE.match(str(value)):
+        found = _find_date(masked, str(value))
     if not found and len(want) >= 4:
         needle = " ".join(str(value).lower().split())
         al = fuzz.partial_ratio_alignment(needle, masked.lower())
@@ -440,6 +479,54 @@ def _settle_boxes(words: list, content: str, region: Any) -> list:
     return out
 
 
+_WORD_SOURCES = ("pdf", "native", "ocr", "tesseract", "rapidocr")
+
+
+def _page_word_box(value: Any, ref: RegionRef) -> Optional[BBox]:
+    """The value's box from the page's own word layer (PDF text or OCR words), for a value the region holds
+    but whose words have no position (a form label and its amount printed apart). Of several places, the one
+    nearest the region is used."""
+    page = getattr(ref.page, "page", None)
+    sources = getattr(page, "words", None) or {}
+    if not isinstance(sources, dict) or ref.region.bbox is None:
+        return None
+    order = [k for k in _WORD_SOURCES if sources.get(k)] + [k for k in sources if k not in _WORD_SOURCES and sources[k]]
+    rb = ref.region.bbox
+    for key in order:
+        words = [w for w in sources[key] if w.bbox is not None and w.text]
+        if not words:
+            continue
+        parts, offs, pos = [], [], 0
+        for w in words:
+            offs.append((pos, pos + len(w.text)))
+            parts.append(w.text)
+            pos += len(w.text) + 1
+        text = " ".join(parts)
+        as_num = float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else S._to_number(str(value))
+        if as_num is not None:
+            found = _find_number(text, as_num)
+        elif _ISO_DATE.match(str(value)):
+            found = _find_date(text, str(value))
+        else:
+            want = norm_tokens(str(value))
+            found = _find_tokens(tokenize(text), want) if want else []
+        best, best_d = None, None
+        for a, b in found:
+            hit = [w for w, (x, y) in zip(words, offs) if x < b and y > a]
+            if not hit:
+                continue
+            box = BBox.union([w.bbox for w in hit])
+            cx, cy = box.left + box.width / 2, box.top + box.height / 2
+            dx = max(rb.left - cx, 0, cx - (rb.left + rb.width))
+            dy = max(rb.top - cy, 0, cy - (rb.top + rb.height))
+            d = (dx * dx + dy * dy) ** 0.5
+            if best_d is None or d < best_d:
+                best, best_d = box, d
+        if best is not None and best_d is not None and best_d <= 0.15:
+            return best
+    return None
+
+
 def locate(value: Any, ref: RegionRef, near: Optional[int] = None) -> Optional[Match]:
     """Find the value's text inside the region; None when it is not there.
 
@@ -464,6 +551,8 @@ def locate(value: Any, ref: RegionRef, near: Optional[int] = None) -> Optional[M
                  and c.char_start <= start < c.char_end), None)
     boxes = _settle_boxes(words, content, region)
     bbox = BBox.union(boxes) if boxes else (cell.bbox if cell and cell.bbox else None)
+    if bbox is None:  # the region has the value but its words were not placed: look on the page itself
+        bbox = _page_word_box(value, ref)
     # the cited text is the matched text itself (as in Reducto's citations), not the cell or line around it
     lo, hi = start, end   # a match ends at its last word: take back punctuation the value itself carries ("Inc.")
     v = str(value).strip()
@@ -650,6 +739,10 @@ class _Extractor:
         self.strict = S.enforced(self.prompt_schema)
         self.system = (system_prompt.strip() + "\n\n" if system_prompt.strip() else "") + RULES
         self.track = track
+        self.labels = track  # block labels in the rendered pages (also for "_block" fields when citing)
+        self.reply: Optional[dict] = None  # the schema the model answers in (reply_schema), when used
+        self.reply_note = ""  # how to answer in the reply schema (reply_schema.NOTE and request options)
+        self.failed: list[tuple[int, int, list[str]]] = []  # (first page, last page, fields) whose reply failed
         self.include_images = include_images
         self.results: list[LLMResult] = []
         self.notes: list[str] = []
@@ -664,10 +757,12 @@ class _Extractor:
     # -- prompts
     def _prompt(self, pages: list[PageRef], schema: dict, part: Optional[tuple[int, int]] = None,
                 extra: str = "") -> str:
-        out = ["Document:", render_pages(pages, labels=self.track, marks=self.struck), "",
+        out = ["Document:", render_pages(pages, labels=self.labels or self.track, marks=self.struck), "",
                "JSON Schema:", json.dumps(schema, ensure_ascii=False), ""]
         if self.track:
             out += [TRACK, ""]
+        if self.reply_note:
+            out += [self.reply_note, ""]
         if part and part[1] > 1:
             out += [f"This is part {part[0]} of {part[1]} of a longer document (pages {pages[0].number}-"
                     f"{pages[-1].number}). Extract only what appears in these pages; a field that is not in "
@@ -708,8 +803,17 @@ class _Extractor:
             if is_envelope(plain, strict):
                 plain = plain["data"]
             plain, _ = S.unwrap(plain, strict)
-            _, moved, stray = S.relocate(plain, strict)
-            if moved or stray or S.find_errors(S.conform(plain, strict), strict):
+            check = strict
+            if getattr(self, "reply", None) is not None and isinstance(plain, dict):
+                # a reply-schema answer is judged as the user's values (a model without structured outputs may
+                # write 4200 for "4200"): converted back, then checked against the user's schema
+                plain = copy.deepcopy(plain)
+                RS.take_blocks(plain)
+                plain.pop(RS.ALT_FIELD, None)
+                plain = RS.from_reply(plain, self.prompt_schema)
+                check = S.enforced(self.prompt_schema)
+            _, moved, stray = S.relocate(plain, check)
+            if moved or stray or S.find_errors(S.conform(plain, check), check):
                 return None
             return fixed
 
@@ -788,38 +892,45 @@ class _Extractor:
     # -- one segment (with schema repair re-asks)
     def extract(self, pages: list[PageRef], prompt_schema: Optional[dict] = None, strict: Optional[dict] = None,
                 part: Optional[tuple[int, int]] = None, extra: str = "", depth: int = 0,
-                field_depth: int = 0) -> tuple[Any, dict]:
+                field_depth: int = 0, repairs: Optional[int] = None) -> tuple[Any, dict]:
         prompt_schema = prompt_schema or self.prompt_schema
         strict = strict or self.strict
         base = self._prompt(pages, prompt_schema, part, extra)
         data, why = self._ask_why(pages, base, prompt_schema)
         if data is None:
-            if len(pages) > 1 and depth < 2:  # likely truncated output: halve the segment
-                mid = len(pages) // 2
-                a = self.extract(pages[:mid], prompt_schema, strict, part, extra, depth + 1)
-                hint = carry_hint(a[0])  # the halves do not overlap: tell the second where the first ended
-                b = self.extract(pages[mid:], prompt_schema, strict, part, (extra + "\n\n" + hint).strip(), depth + 1)
-                tree = merge_trees(_annotate(a[0], a[1], strict), _annotate(b[0], b[1], strict), [])
-                return _split_tree(tree)
             fields = list(strict["properties"]) if S.is_object(strict) else []
-            if len(fields) > 1 and field_depth < 1 and why in ("broken", "truncated"):
-                # a long reply that keeps breaking: ask for half of the top-level fields at a time (once)
-                half = (len(fields) + 1) // 2
+            if len(fields) > 1 and field_depth < 3 and why in ("broken", "truncated"):
+                # a reply that keeps breaking or is cut off: ask for part of the fields at a time, the lists apart
+                # from the rest first (a list grows with the pages, the other fields do not). The pages stay
+                # together, so a value on one page is still read against a special term on another.
+                lists = [f for f in fields if S.is_array(S.branch_for(prompt_schema["properties"].get(f, {}), []))]
+                if lists and len(lists) < len(fields):
+                    split = [[f for f in fields if f not in lists], lists]
+                else:
+                    half = (len(fields) + 1) // 2
+                    split = [fields[:half], fields[half:]]
                 out_v: dict = {}
                 out_s: dict = {}
-                for group in (fields[:half], fields[half:]):
+                for group in split:
                     v, s_ = self.extract(pages, _sub_schema(prompt_schema, group), _sub_schema(strict, group),
-                                         part, extra, depth, field_depth + 1)
+                                         part, extra, depth, field_depth + 1, repairs)
                     out_v.update(v if isinstance(v, dict) else {})
                     out_s.update(s_)
                 return S.conform(out_v, strict), out_s
-            self.unreadable.update(fields)
-            what = f" (fields: {', '.join(fields)})" if fields else ""
-            self.notes.append(f"the model's reply could not be read for pages {pages[0].number}-{pages[-1].number}"
-                              f"{what}; those values are empty, but they may be in the document")
+            if len(pages) > 1 and depth < 2:  # one field (a long list) cut off: its pages in two halves
+                mid = len(pages) // 2
+                a = self.extract(pages[:mid], prompt_schema, strict, part, extra, depth + 1, field_depth, repairs)
+                hint = carry_hint(a[0])  # the halves do not overlap: tell the second where the first ended
+                b = self.extract(pages[mid:], prompt_schema, strict, part, (extra + "\n\n" + hint).strip(), depth + 1,
+                                 field_depth, repairs)
+                tree = merge_trees(_annotate(a[0], a[1], strict), _annotate(b[0], b[1], strict), [])
+                return _split_tree(tree)
+            with self._lock:  # said in a warning only if these fields are still empty at the end
+                self.unreadable.update(fields)
+                self.failed.append((pages[0].number, pages[-1].number, fields))
             return S.empty_instance(strict), {}
         value, sources, errors = self._digest(data, strict)
-        for _ in range(self.opts["max_repairs"]):
+        for _ in range(self.opts["max_repairs"] if repairs is None else repairs):
             if not errors:
                 break
             problems = "\n".join(f"- {S.path_str(p)}: {msg}" for p, msg in errors[:40])
@@ -835,6 +946,107 @@ class _Extractor:
                 value, errors = v2, e2
                 sources = {**sources, **s2} if self.track else s2
         return value, sources
+
+    # -- the answer through the reply schema (structured outputs), in groups of fields
+    def ask(self, pages: list[PageRef], part: Optional[tuple[int, int]] = None, extra: str = "",
+            fields: Optional[list[str]] = None) -> tuple[Any, dict, list]:
+        """(value in the user's types, {object path: block label}, alternatives) for ``pages``.
+
+        The model answers in ``self.reply`` (reply_schema): every field required, "" for a value the document
+        does not have, so the API can enforce the shape. A schema too big for one call is asked in groups of
+        fields, decided before the call (reply_schema.plan), in parallel; every group sees the whole pages.
+        """
+        reply = self.reply
+        alt = reply["properties"].get(RS.ALT_FIELD)
+        core = {**reply, "properties": {k: v for k, v in reply["properties"].items() if k != RS.ALT_FIELD},
+                "required": [r for r in reply.get("required", []) if r != RS.ALT_FIELD]}
+        if fields:
+            core = RS.project(core, [(f,) for f in fields if f in core["properties"]])
+        user = _sub_schema(self.prompt_schema, fields) if fields else self.prompt_schema
+        strict = S.enforced(user)
+
+        def group_schema(paths: list[tuple]) -> dict:
+            g = RS.project(core, paths)
+            if alt is not None:
+                g = {**g, "properties": {**g["properties"], RS.ALT_FIELD: alt},
+                     "required": list(g.get("required", [])) + [RS.ALT_FIELD]}
+            return g
+
+        groups = RS.plan(core)
+        check = getattr(self.llm, "format_ok", None)
+        if check is not None and getattr(self.llm, "structured_outputs", False):
+            # the API also caps the size of the compiled schema (not published): a group it will not compile is
+            # split before the call, so every call keeps its enforced shape
+            fits: list[list[tuple]] = []
+            todo = list(groups)
+            while todo:
+                batch, todo = todo, []
+                if len(batch) > 1:
+                    from concurrent.futures import ThreadPoolExecutor
+                    with ThreadPoolExecutor(min(len(batch), 4)) as pool:
+                        oks = list(pool.map(lambda g: check(group_schema(g)), batch))
+                else:
+                    oks = [check(group_schema(batch[0]))]
+                for g, ok in zip(batch, oks):
+                    parts = None if ok else RS.split_group(core, g)
+                    if parts is None:
+                        fits.append(g)  # compiles, or cannot be split: sent as is (without a format if refused)
+                    else:
+                        todo += parts
+            groups = fits
+
+        def one(paths: list[tuple], note: str) -> Any:
+            # shape problems are judged after conversion, against the user's schema (below), not here
+            g = group_schema(paths)
+            return self.extract(pages, g, S.enforced(g), part, note, repairs=0)[0]
+
+        def answer(note: str, which: list[list[tuple]]) -> tuple[Any, dict, list]:
+            if len(which) > 1 and getattr(self.llm, "parallel_safe", False):
+                from concurrent.futures import ThreadPoolExecutor
+                with ThreadPoolExecutor(min(len(which), 4)) as pool:
+                    answers = list(pool.map(lambda g: one(g, note), which))
+            else:
+                answers = [one(g, note) for g in which]
+            merged: dict = {}
+            alts: list = []
+            for v in answers:
+                if not isinstance(v, dict):
+                    continue
+                a = v.pop(RS.ALT_FIELD, None)
+                if isinstance(a, list):
+                    alts += [x for x in a if isinstance(x, dict) and str(x.get("value", "")).strip()]
+                merged = RS.merge(merged, v)
+            hints = RS.take_blocks(merged)
+            value = S.conform(RS.from_reply(merged, user), strict)
+            if value is None and S.is_object(strict):
+                value = S.empty_instance(strict)
+            return value, hints, alts
+
+        value, hints, alts = answer(extra, groups)
+        # checked against the user's own schema (patterns, ranges, enums): what breaks it is asked for again,
+        # only in the groups that hold those fields; a re-ask is kept only when it has fewer problems
+        errors = S.find_errors(value, strict)
+        for _ in range(self.opts["max_repairs"]):
+            if not errors:
+                break
+            problems = "\n".join(f"- {S.path_str(p)}: {msg}" for p, msg in errors[:40])
+            fix = ((extra + "\n\n") if extra else "") + (
+                f"Your previous answer:\n{json.dumps(value, ensure_ascii=False, default=str)}\n\nIt breaks the schema "
+                f"in these places:\n{problems}\n\nReturn the complete corrected JSON. Fix only these problems; if the "
+                'document does not contain a valid value for a field, use "".')
+            bad = {p[0] for p, _ in errors if p and isinstance(p[0], str)}
+            which = [g for g in groups if any(path[0] in bad for path in g)] or groups
+            v2, h2, a2 = answer(fix, which)
+            if isinstance(value, dict) and isinstance(v2, dict) and which is not groups:
+                v2 = {**value, **{k: v2.get(k) for k in {path[0] for g in which for path in g}}}
+                h2 = {**hints, **h2}
+            e2 = S.find_errors(v2, strict)
+            if len(e2) < len(errors):
+                value, hints, errors = v2, h2, e2
+                alts = alts + a2
+            else:
+                break
+        return value, hints, alts
 
     # -- citation support
     def supported(self, value: Any, labels: list[str]) -> Optional[bool]:
@@ -1109,7 +1321,7 @@ def _citation(ref: RegionRef, match: Optional[Match], extract_conf: float, cit_c
     if match is not None:
         content = match.content
         box = bbox_dict(region, ref.page, match.bbox) if match.bbox is not None else block_box
-        label = "high"
+        label = "high" if extract_conf >= 0.7 else "low"  # low: one of several places the value is printed
     else:  # the block is real but the value was not found in it: say so
         content = " ".join(_TAG.sub(" ", region.content).split())[:300]
         box, label = block_box, "low"
@@ -1151,6 +1363,41 @@ def build_citations(value: Any, labels: list[str], ex: _Extractor, cit_cfg: dict
     if len(hits) == 1 and hits[0][1].occurrences == 1:  # no usable label, but the value occurs exactly once
         return [_citation(hits[0][0], hits[0][1], 0.7, cit_cfg)]
     return []
+
+
+def code_citations(value: Any, ex: _Extractor, cit_cfg: dict, hints: dict) -> dict[tuple, list[dict]]:
+    """Citations found by code: every value is looked up in the parsed pages (its exact text, then the other ways
+    a number or date is printed). A value printed once is cited there. A value printed in several places is
+    cited where the other values of its object (its table row, its address) were found, else in the block the
+    model named for that object (``hints``, the "_block" fields), else at its first place. A value that is not
+    in the document gets no citation, or the named block with low confidence. Measured on eight documents
+    against Reducto: 91.7% of boxes on the right words vs 88.7% (docs/decisions.md)."""
+    leaves = [(p, v) for p, v, _ in S.iter_leaves(value, ex.strict) if p and v is not None and not isinstance(v, bool)]
+    hits = {p: ex.found_anywhere(v) for p, v in leaves}
+    anchors: dict[tuple, dict[str, int]] = {}
+    for p, h in hits.items():  # an object's values (a row, an address) are printed together; the root's are not
+        if len(p) > 1 and len(h) == 1 and h[0][1].occurrences == 1:
+            anchors.setdefault(p[:-1], {}).setdefault(h[0][0].label, h[0][1].start)
+    out: dict[tuple, list[dict]] = {}
+    for p, v in leaves:
+        hint = next((hints[p[:k]] for k in range(len(p) - 1, -1, -1) if p[:k] in hints), None)
+        near = anchors.get(p[:-1], {})
+        h = hits[p]
+
+        def cite(ref: RegionRef, conf: float, v: Any = v, near: dict = near) -> list[dict]:
+            return [_citation(ref, locate(v, ref, near.get(ref.label)), conf, cit_cfg)]
+
+        if len(h) == 1 and h[0][1].occurrences == 1:
+            out[p] = cite(h[0][0], 0.95 if h[0][1].exact else 0.85)
+            continue
+        pick = ([x for x in h if x[0].label in near] or [x for x in h if hint and x[0].label == hint])
+        if pick:
+            out[p] = cite(pick[0][0], 0.9 if pick[0][1].exact else 0.8)
+        elif h:
+            out[p] = cite(h[0][0], 0.6)
+        else:
+            out[p] = build_citations(v, [hint], ex, cit_cfg) if hint else []
+    return out
 
 
 def row_anchors(value: Any, sources: dict, ex: _Extractor) -> dict[tuple, dict[str, int]]:
@@ -1244,15 +1491,51 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
     warnings += ex_warnings
 
     segments = _segments(pages, opts, force=deep or bool(settings.get("array_extract")))
-    report_on = settings.get("field_report", True) is not False  # on unless the request turns it off
-    track = citations_on or deep or len(segments) > 1 or report_on
+    review_on = bool(settings.get("review"))  # code-only checks on the answer, returned under "review"
+    alt_cfg = settings.get("alternatives")  # other values the document gives for a field (true or a list of paths)
+    derived_ok = settings.get("derived_values", True) is not False
+    # The model writes only the user's fields. Per-value source labels are asked for only by deep_extract,
+    # whose checks need them; citations are found by code (code_citations).
+    track = deep
     ex = _Extractor(view, pages, user_schema, system_prompt, llm, opts, track, bool(settings.get("include_images")))
     from . import field_report as FR
-    if report_on:
-        ex.struck = FR.struck_spans(all_pages)  # crossed-out words: shown to the model as ~~text~~
+    ex.struck = FR.struck_spans(all_pages)  # crossed-out words: shown to the model as ~~text~~ (code, no call)
     ex.results.extend(pre_results)
     ex.extra_text = X.examples_prompt(examples)
     is_obj = S.is_object(ex.strict)
+    use_reply = is_obj and not deep and not use_loop
+    if use_reply:  # structured outputs for any schema size (reply_schema): the model answers in this shape
+        reply = RS.to_reply(ex.prompt_schema)
+        if citations_on:
+            reply = RS.add_blocks(reply)
+            ex.labels = True
+        if alt_cfg:
+            reply = RS.add_alternatives(reply, [str(a) for a in alt_cfg] if isinstance(alt_cfg, list) else None)
+        ex.reply = reply
+        note = [RS.NOTE]
+        if citations_on:
+            note.append('Every block of the document starts with a label such as [r12|Table]; a "_block" field '
+                        "takes the label of the block its object's values were read from (for a table row, the "
+                        "table's label).")
+        if any(ex.struck.values()):
+            note.append("Text between ~~ and ~~ is crossed out on the page.")
+        if not derived_ok:
+            note.append('Give only values the document states. Do not work out or assume a value that is not printed '
+                        '(an end date from a term, a total by adding, a country from an address): write "" instead. '
+                        "Writing a printed value in another format is fine.")
+        ex.reply_note = "\n".join(note)
+    hints: dict = {}
+    alts: list = []
+
+    def run_segment(i: int, seg: list[PageRef], extra: str = "") -> tuple[Any, dict]:
+        if not use_reply:
+            return ex.extract(seg, part=(i + 1, len(segments)), extra=extra)
+        v, h, a = ex.ask(seg, part=(i + 1, len(segments)), extra=extra)
+        with ex._lock:
+            if len(segments) == 1:  # object paths shift when segments are merged: hints only for one segment
+                hints.update(h)
+            alts.extend(a)
+        return v, {}
 
     workers = min(int(opts.get("segment_workers", 4)), len(segments))
     if use_loop:  # the model starts from the relevant pages and may ask for more before it answers
@@ -1265,14 +1548,14 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
     elif workers > 1 and getattr(llm, "parallel_safe", False):  # independent calls: run the segments side by side
         from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor(workers) as pool:
-            parts = list(pool.map(lambda a: ex.extract(a[1], part=(a[0] + 1, len(segments))), enumerate(segments)))
+            parts = list(pool.map(lambda a: run_segment(a[0], a[1]), enumerate(segments)))
     else:
-        parts = [ex.extract(seg, part=(i + 1, len(segments))) for i, seg in enumerate(segments)]
+        parts = [run_segment(i, seg) for i, seg in enumerate(segments)]
     for i in range(1, len(parts)):
         # a later segment whose first rows miss a value the previous segment's last row has (a heading printed
         # on an earlier page): extract that segment again, told where the previous one ended
         if needs_carry(parts[i - 1][0], parts[i][0]):
-            redo = ex.extract(segments[i], part=(i + 1, len(segments)), extra=carry_hint(parts[i - 1][0]))
+            redo = run_segment(i, segments[i], carry_hint(parts[i - 1][0]))
             if not needs_carry(parts[i - 1][0], redo[0]):
                 parts[i] = redo
     if (settings.get("array_extract") or len(segments) > 1) and not use_loop and is_obj:
@@ -1283,9 +1566,10 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
     for i, (v, s) in enumerate(parts):
         t = _annotate(v, s, ex.strict)
         tree = t if tree is None else merge_trees(tree, t, conflicts)
-    if ex.notes and _is_empty(tree):
+    if (ex.notes or ex.failed) and _is_empty(tree):
         # every call failed (cut off or unparseable): an all-null answer would look like "nothing in the document"
-        raise TaskError(502, "the model returned no usable answer: " + "; ".join(ex.notes[:3]))
+        raise TaskError(502, "the model returned no usable answer: " + "; ".join(
+            ex.notes[:3] or [f"the reply could not be read for pages {a}-{b}" for a, b, _ in ex.failed[:3]]))
     value, sources = _split_tree(tree)
     value = S.conform(value, ex.strict)
     if (extras.get("relevance") or {}).get("filtered") and not use_loop and is_obj:
@@ -1293,7 +1577,11 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
         lost = X.missing_fields(value, ex.strict)
         rest = [p for p in all_pages if p.number not in {q.number for q in pages}]
         if lost and rest:
-            nv, ns = ex.extract(rest, _sub_schema(ex.prompt_schema, lost), _sub_schema(ex.strict, lost))
+            if use_reply:
+                nv, _h, _a = ex.ask(rest, fields=lost)
+                ns = {}
+            else:
+                nv, ns = ex.extract(rest, _sub_schema(ex.prompt_schema, lost), _sub_schema(ex.strict, lost))
             found = [f for f in lost if isinstance(nv, dict) and not X._empty(nv.get(f))]
             if found:
                 value, sources = _replace_fields(value, sources, nv, ns, found)
@@ -1353,47 +1641,43 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
         reason = ("; ".join(f["message"] for f in remaining[:8]) if remaining
                   else "schema valid; cited values found in their source blocks; cross-segment and arithmetic checks passed")
 
-    gaps: list[dict] = []
-    if report_on and is_obj and not use_loop:
-        # lists with fewer items than the rows of the table they were read from: ask once more for that field
-        asked: set = set()
-        for gap in FR.list_gaps(value, ex.strict, sources, ex):
-            top = gap["path"][0]
-            if not isinstance(top, str) or top in asked or len(asked) >= 2:
-                continue
-            asked.add(top)
-            note = (f"An earlier answer listed only {gap['items']} items in {S.path_str(gap['path'])}, but the table "
-                    f"they come from ({gap['block']}) has {gap['rows']} rows. List every item that belongs there.")
-            nv, ns = ex.extract(pages, _sub_schema(ex.prompt_schema, [top]), _sub_schema(ex.strict, [top]), extra=note)
-            if isinstance(nv, dict) and len(_get(nv, gap["path"]) or []) > gap["items"]:
-                value, sources = _replace_fields(value, sources, nv, ns, [top])
-                value = S.conform(value, ex.strict)
-        gaps = FR.list_gaps(value, ex.strict, sources, ex)
-
     shadow = _annotate(value, sources, ex.strict)  # mirrors every removal so source paths stay aligned
     value, _unresolved = S.null_out(value, ex.strict, shadow=shadow)
-    warnings = X.required_warnings(value, S.resolve_refs(user_schema), skip=ex.unreadable) + warnings + list(ex.notes)
+    # a part whose reply could not be read is reported only when its fields are still empty (a later call, e.g.
+    # for the other half of the fields or pages, may have filled them)
+    still = sorted(f for f in ex.unreadable if not is_obj or X._empty((value or {}).get(f)))
+    if still:
+        where = sorted({(a, b) for a, b, fs in ex.failed if set(fs) & set(still)})
+        warnings.append("the model's reply could not be read for pages "
+                        + ", ".join(f"{a}-{b}" for a, b in where) + f" (fields: {', '.join(still)}); those values are "
+                        "empty, but they may be in the document")
+    warnings = X.required_warnings(value, S.resolve_refs(user_schema), skip=set(still)) + warnings + list(ex.notes)
     sources = _split_tree(shadow)[1] if isinstance(shadow, (dict, list)) and value is not None else {}
-    report = None
-    if report_on:
-        void = FR.void_pages(all_pages)
-        fields, report_warnings = FR.build(value, ex.prompt_schema, sources, ex, meta=ex.leaf_meta, conflicts=conflicts,
-                                           unreadable=ex.unreadable, struck=ex.struck, void=void, pages=all_pages)
-        lists = [{"path": S.path_str(g["path"]), "items": g["items"], "table_rows": g["rows"], "block": g["block"]}
-                 for g in gaps]
-        report = {"fields": fields, "lists": lists,
-                  "pages": {"stamped": {str(k): v for k, v in void.items()}} if void else {}}
-        warnings += report_warnings
-        warnings += [f"{g['path']}: {g['items']} items, but the table they come from has {g['table_rows']} rows; "
-                     "some may be missing" for g in lists]
-        warnings += [f"page {k} is stamped {v}" for k, v in void.items()]
-    if citations_on:
-        anchors = row_anchors(value, sources, ex)
-        cited = S.map_leaves(value, ex.strict, lambda path, v, s: {
-            "value": v, "citations": build_citations(v, sources.get(path, []), ex, cit_cfg, anchors.get(path[:-1]))})
-        result: Any = cited
-    else:
-        result = [value]
+    cites: dict = {}
+    if citations_on or review_on:
+        if track:  # deep_extract: the model named a block for every value
+            anchors = row_anchors(value, sources, ex)
+            cites = {p: build_citations(v, sources.get(p, []), ex, cit_cfg, anchors.get(p[:-1]))
+                     for p, v, _ in S.iter_leaves(value, ex.strict) if p}
+        else:
+            cites = code_citations(value, ex, cit_cfg, hints)
+    result: Any = (S.map_leaves(value, ex.strict, lambda path, v, s: {"value": v, "citations": cites.get(path, [])})
+                   if citations_on else [value])
+    extra_out: dict = {}
+    if alt_cfg and use_reply:
+        found: dict[str, list] = {}
+        for a in alts:
+            item = {"value": str(a.get("value", "")).strip(), "note": str(a.get("note", "")).strip() or None}
+            if citations_on:
+                hit = ex.found_anywhere(item["value"])
+                item["citations"] = [_citation(hit[0][0], hit[0][1], 0.8, cit_cfg)] if hit else []
+            key = str(a.get("field", "")).strip()
+            if key and item not in found.setdefault(key, []):
+                found[key].append(item)
+        extra_out["alternatives"] = found
+    if review_on:
+        extra_out["review"] = FR.review(value, ex.strict, cites, ex, conflicts=conflicts, unreadable=set(still),
+                                        pages=all_pages)
 
     view.docs[0].usage.append({"task": "extract", **sum_usage(ex.results)})
     # num_fields as Reducto reports it: the number of leaf values returned (array items counted), not schema fields
@@ -1403,4 +1687,4 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
         usage["extract_pages"] = extras
     return {"response_type": "v3_extract", "result": result, "usage": usage,
             "studio_link": None, "confidence": confidence, "confidence_reason": reason,
-            "warnings": warnings, **({"field_report": report} if report is not None else {})}
+            "warnings": warnings, **extra_out}

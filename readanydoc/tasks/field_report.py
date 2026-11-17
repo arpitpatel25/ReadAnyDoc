@@ -1,22 +1,16 @@
-"""Field report: for every extracted field, how it was found, not just its value.
+"""Review checks on an extraction, all in code (no model call, no extra model output). Opt-in: settings.review.
 
-A bare value hides the cases where a reader should look again. Each field gets a status:
+Each check names a field and a reason a reader should look at it:
 
-- ``found``: the value is on the page (or, for a yes/no or a choice from a list, the cited block supports it).
-- ``conflict``: the document gives two or more different values for the field (a price table and a special
-  term, a contract and its amendment, a value that is crossed out). Every candidate is listed with its source.
-- ``inferred``: the document does not state the value; the model worked it out or assumed it.
-- ``not_in_document``, ``blank`` (the form has the field but it is empty), ``not_applicable``: three kinds
-  of empty that used to look the same.
-- ``unreadable``: the model's reply for this part could not be read (the value may be in the document).
+- ``not_found_on_page``: the value is not printed in the document as returned (worked out, converted, assumed);
+- ``ambiguous_date``, ``parentheses``, ``scale``, ``percent_scaled``: the printed form needs a second look (day
+  and month order, a negative in parentheses, "amounts in thousands", a percentage returned as a fraction);
+- ``struck_through``: every place the value is printed is crossed out; ``void_page``: its page is stamped VOID;
+- ``segments_disagree``: two parts of a long document gave different values;
+- ``list_may_be_incomplete``: a list has fewer items than the rows with an amount in the table it was read from;
+- ``unreadable``: the model's reply for the field could not be read.
 
-Plus ``printed_as`` (the text as printed, when a value was converted), ``flags`` for conversions a reader should
-check (day/month order, a number in parentheses, amounts stated in thousands, a percentage, a currency), a
-``note`` for a condition on the value ("first year only"), crossed-out text and pages stamped VOID, and lists
-that have fewer items than the table they come from.
-
-Nothing here changes a value. The candidates come from the model; each one is checked against the page text in
-code and dropped when it is not there.
+Nothing here changes a value.
 """
 
 from __future__ import annotations
@@ -26,10 +20,8 @@ import re
 from typing import Any, Optional
 
 from . import schema as S
-from .common import PageRef, RegionRef
+from .common import PageRef
 
-STATUSES = ("found", "conflict", "inferred", "not_in_document", "blank", "not_applicable", "unreadable")
-EMPTY_KINDS = {"blank", "not_applicable"}
 
 # ---------------------------------------------------------------- crossed-out words (from the page image)
 
@@ -194,231 +186,90 @@ def value_key(value: Any) -> str:
     return " ".join(str(value).lower().split()) if value is not None else ""
 
 
-def _num(x: Any) -> Optional[float]:
-    if isinstance(x, bool):
-        return None
-    if isinstance(x, (int, float)):
-        return float(x)
-    t = re.sub(r"[\s$€£¥₹,]|\b(?:USD|EUR|GBP|INR)\b", "", str(x))
-    try:
-        return float(t)
-    except ValueError:
-        return None
-
-
-def _same(a: Any, b: Any) -> bool:
-    na, nb = _num(a), _num(b)
-    if na is not None and nb is not None:
-        return abs(na - nb) < 1e-9
-    return value_key(a) == value_key(b)
-
-
-def _brief(ref: RegionRef, text: str) -> dict:
-    return {"page": ref.page.number, "block": ref.label, "type": ref.region.type.value, "text": text[:200]}
-
-
 def _overlaps(spans: list[tuple[int, int]], start: int, end: int) -> bool:
     return any(a < end and b > start for a, b in spans)
-
-
-def build(value: Any, schema: Any, sources: dict, ex: Any, *, meta: dict, conflicts: list, unreadable: set,
-          struck: dict, void: dict, pages: Optional[list[PageRef]] = None) -> tuple[dict, list[str]]:
-    """(report by field path, warnings). ``meta`` = {(pattern, value_key): notes from the model}."""
-    from .extract import locate  # the same matcher the citations use
-
-    report: dict[str, dict] = {}
-    warnings: list[str] = []
-    seg_conflicts: dict[tuple, list] = {}
-    for p, a, b in conflicts:
-        seg_conflicts.setdefault(tuple(p), []).extend([a, b])
-
-    def evidence(v: Any, labels: list[str]) -> tuple[Optional[RegionRef], Any]:
-        for l in labels:
-            ref = ex.view.lookup(l)
-            if ref is not None:
-                m = locate(v, ref)
-                if m is not None:
-                    return ref, m
-        for p in pages or ex.pages:  # every page, also those a relevance filter left out
-            for ref in p.regions:
-                m = locate(v, ref)
-                if m is not None:
-                    return ref, m
-        return None, None
-
-    def printed_ok(printed: str, labels: list[str]) -> Optional[RegionRef]:
-        want = " ".join(printed.lower().split())
-        refs = [r for r in (ex.view.lookup(l) for l in labels) if r is not None] or \
-               [ref for p in (pages or ex.pages) for ref in p.regions]
-        for ref in refs:
-            if want and want in " ".join(re.sub(r"<[^>]+>", " ", ref.region.content).lower().split()):
-                return ref
-        return None
-
-    for path, v, leaf_schema in S.iter_leaves(value, schema):
-        if not path:
-            continue
-        key = S.path_str(path)
-        m_ = meta.get((pattern(path), value_key(v))) or {}
-        labels = sources.get(path, [])
-        entry: dict[str, Any] = {"value": v}
-        if isinstance(v, str) and not v.strip(" _-.\t\n"):
-            # an empty string (or a line of underscores) is a blank on the form, not a value read from it
-            entry["status"] = m_.get("empty") if m_.get("empty") in EMPTY_KINDS else "blank"
-            report[key] = entry
-            continue
-        if v is None:
-            top = path[0] if isinstance(path[0], str) else None
-            if top in unreadable:
-                entry["status"] = "unreadable"
-            elif m_.get("empty") in EMPTY_KINDS:
-                entry["status"] = m_["empty"]
-            else:
-                entry["status"] = "not_in_document"
-            report[key] = entry
-            continue
-
-        ref, match = evidence(v, labels)
-        printed = m_.get("printed") if isinstance(m_.get("printed"), str) else None
-        pref = printed_ok(printed, labels) if printed else None
-        if pref is None:
-            printed = None
-        if printed is None and match is not None and match.content and value_key(match.content) != value_key(v):
-            printed = match.content
-        if printed:
-            entry["printed_as"] = printed
-        if isinstance(leaf_schema, dict) and "const" in leaf_schema:
-            report[key] = {"value": v, "status": "found"}  # fixed by the schema (a discriminator), not read
-            continue
-        cited = [r for r in (ex.view.lookup(l) for l in labels) if r is not None]
-        flags: list[str] = []
-        said_inferred = bool(m_.get("inferred"))
-        if match is not None or pref is not None:
-            status = "found"  # the text is on the page
-        elif isinstance(v, bool):
-            # a yes/no is rarely printed as a word: trust a cited block, and the model's own "inferred"
-            status = "inferred" if said_inferred else "found"
-            if not cited:
-                flags.append("not_checked")
-        elif isinstance(leaf_schema, dict) and "enum" in leaf_schema and cited and not said_inferred:
-            status = "found"  # a choice from the schema's list, read from the cited block
-        else:
-            status = "inferred"
-        notes: list[str] = []
-        if m_.get("note"):
-            notes.append(str(m_["note"])[:200])
-        where = ref or pref or (cited[0] if cited else None)
-        context = ""
-        if where is not None:
-            context = where.region.content + "\n" + "\n".join(r.region.content for r in where.page.regions)
-        checks = format_flags(v, printed, context)
-        flags += [f for f, _ in checks]
-        notes += [n for _, n in checks if n]
-
-        # candidates: other values the model saw for this field, each checked on the page
-        cands: list[dict] = []
-        if where is not None:
-            cands.append({"value": v, "source": _brief(where, match.content if match is not None else printed or "")})
-        for alt in m_.get("alternatives") or []:
-            av = alt.get("value")
-            if av is None or _same(av, v):
-                continue
-            aref, am = evidence(av, [alt["block"]] if alt.get("block") else [])
-            if aref is None:
-                continue  # not on the page: never report a candidate the document does not have
-            c = {"value": av, "source": _brief(aref, am.content)}
-            if alt.get("note"):
-                c["note"] = str(alt["note"])[:200]
-            if aref.page.number in void:
-                c["note"] = (c.get("note", "") + f" (page stamped {void[aref.page.number]})").strip()
-            cands.append(c)
-        for other in seg_conflicts.get(tuple(path), []):
-            if other is not None and not _same(other, v) and not any(_same(c["value"], other) for c in cands):
-                aref, am = evidence(other, [])
-                if aref is not None:
-                    cands.append({"value": other, "source": _brief(aref, am.content),
-                                  "note": "found on overlapping pages of a long document"})
-        # crossed-out text: the chosen value struck through means the document replaced it
-        if ref is not None and match is not None and _overlaps(struck.get(ref.label, []), match.start, match.end):
-            flags.append("struck_through")
-            notes.append("this value is crossed out on the page; the document may give a replacement")
-            status = "conflict"
-        if where is not None and where.page.number in void:
-            flags.append("void_page")
-            notes.append(f"page {where.page.number} is stamped {void[where.page.number]}")
-        if len(cands) > 1:
-            status = "conflict"
-            entry["candidates"] = cands
-        entry["status"] = status
-        if flags:
-            entry["flags"] = sorted(set(flags))
-        if notes:
-            entry["notes"] = notes
-        report[key] = entry
-        if status == "conflict":
-            vals = ", ".join(f"{c['value']!r} (page {c['source']['page']})" for c in cands) or repr(v)
-            warnings.append(f"{key}: the document gives different values: {vals}")
-        elif status == "inferred":
-            warnings.append(f"{key}: {v!r} is not stated in the document (worked out or assumed)")
-        warnings += [f"{key}: {n}" for f, n in checks if f in WARN_FLAGS and n]
-    return report, warnings
 
 
 _SUMMARY_ROW = re.compile(r"\b(sub-?\s?total|total|grand total|tax|vat|gst|balance|amount due|sum|"
                           r"carried forward|brought forward|discount)\b", re.I)
 
 
-def item_rows(content: str) -> int:
-    """Rows of a parsed table that can be items: not header rows, not total / tax / balance rows, and with at
-    least two filled cells."""
+_AMOUNT = re.compile(r"[$€£¥₹]\s?\d|\b\d{1,3}(?:[,.' ]\d{3})+(?:[.,]\d{2})?\b|\b\d+[.,]\d{2}\b")
+
+
+def amount_rows(content: str) -> int:
+    """Rows of a parsed table that look like items: not header rows, not total / tax / balance rows, and with an
+    amount in a cell (so wrapped description lines and label rows do not count)."""
     c = content or ""
     if re.search(r"<tr\b", c, re.I):
-        rows = re.findall(r"<tr\b[^>]*>(.*?)</tr>", c, re.I | re.S)
         n = 0
-        for row in rows:
+        for row in re.findall(r"<tr\b[^>]*>(.*?)</tr>", c, re.I | re.S):
             if re.search(r"<th\b", row, re.I):
                 continue
             cells = [" ".join(re.sub(r"<[^>]+>", " ", x).split()) for x in re.findall(r"<td\b[^>]*>(.*?)</td>", row, re.I | re.S)]
-            if sum(1 for x in cells if x) < 2 or any(_SUMMARY_ROW.search(x) for x in cells if x):
+            if any(_SUMMARY_ROW.search(x) for x in cells if x) or not any(_AMOUNT.search(x) for x in cells if x):
                 continue
             n += 1
         return n
     lines = [ln for ln in c.splitlines() if ln.strip().startswith("|")]
     body = [ln for ln in lines if not re.fullmatch(r"\s*\|?[\s:|-]+\|?\s*", ln)]
     body = body[1:] if len(body) < len(lines) else body
-    return sum(1 for ln in body if not _SUMMARY_ROW.search(ln)
-               and sum(1 for x in ln.strip().strip("|").split("|") if x.strip()) >= 2)
+    return sum(1 for ln in body if not _SUMMARY_ROW.search(ln) and _AMOUNT.search(ln))
 
 
-def list_gaps(value: Any, schema: Any, sources: dict, ex: Any) -> list[dict]:
-    """Lists with fewer items than the item rows of the table their items were read from.
+def review(value: Any, schema: Any, cites: dict, ex: Any, *, conflicts: list, unreadable: set,
+           pages: list[PageRef]) -> list[dict]:
+    """[{"field", "flag", "detail"}] for the values a reader should check (see the module docstring)."""
+    out: list[dict] = []
+    void = void_pages(pages)
 
-    One entry per list: {"path", "items", "rows", "block"}. Only lists not nested inside another list (a row's
-    own sub-list cites the same table). A schema may want only some rows, so this is a prompt to check, not
-    proof of a miss.
-    """
-    out = []
+    def add(field: str, flag: str, detail: Optional[str]) -> None:
+        item = {"field": field, "flag": flag, "detail": detail}
+        if item not in out:
+            out.append(item)
 
-    def walk(v: Any, s: Any, path: tuple) -> None:
+    for path, v, _ in S.iter_leaves(value, schema):
+        if not path or v is None or isinstance(v, bool):
+            continue
+        key = S.path_str(path)
+        good = [c for c in cites.get(path) or [] if c.get("confidence") == "high"]
+        if not good:
+            add(key, "not_found_on_page", "not printed in the document as returned: worked out, converted or assumed")
+        for c in good[:1]:
+            for flag, note in format_flags(v, c.get("content"), (c.get("parentBlock") or {}).get("content", "")):
+                if flag in WARN_FLAGS:
+                    add(key, flag, note)
+            pg = (c.get("bbox") or {}).get("page")
+            if pg in void:
+                add(key, "void_page", f"page {pg} is stamped {void[pg]}")
+        if ex.struck and any(ex.struck.values()):
+            hits = ex.found_anywhere(v)
+            if hits and all(_overlaps(ex.struck.get(r.label, []), m.start, m.end) for r, m in hits):
+                add(key, "struck_through", "every place this value is printed is crossed out")
+    for p, a, b in conflicts:
+        add(S.path_str(p), "segments_disagree", f"parts of the document give {a!r} and {b!r}")
+    for f in sorted(unreadable):
+        add(f, "unreadable", "the model's reply for this field could not be read; it may be in the document")
+
+    def lists(v: Any, s: Any, path: tuple) -> None:
         s = S.branch_for(s, v) if isinstance(s, dict) else s
         if isinstance(v, list) and S.is_array(s):
-            if v and all(isinstance(it, dict) for it in v) and not any(isinstance(x, int) for x in path):
-                labels: dict[str, int] = {}
-                for p, lab in sources.items():
-                    if len(p) > len(path) and p[:len(path)] == path:
-                        for l in lab:
-                            labels[l] = labels.get(l, 0) + 1
-                tables = [ex.view.lookup(l) for l in labels]
-                tables = [r for r in tables if r is not None and r.region.type.value == "Table"]
-                if tables:
-                    rows = sum(item_rows(r.region.content) for r in {t.label: t for t in tables}.values())
-                    if rows >= 2 and len(v) < rows:
-                        out.append({"path": path, "items": len(v), "rows": rows, "block": tables[0].label})
-            for i, it in enumerate(v):
-                walk(it, s.get("items", {}), path + (i,))
-        elif isinstance(v, dict) and S.is_object(s):
+            if v and all(isinstance(it, dict) for it in v):
+                tables = {}
+                for p_, cs in cites.items():
+                    if len(p_) > len(path) and p_[:len(path)] == path:
+                        for c in cs:
+                            blk = c.get("parentBlock") or {}
+                            if blk.get("type") == "Table" and blk.get("content"):
+                                tables[blk["content"]] = True
+                rows = sum(amount_rows(t) for t in tables)
+                if rows >= 2 and len(v) < rows:
+                    add(S.path_str(path), "list_may_be_incomplete",
+                        f"{len(v)} items, but the table they come from has {rows} rows with an amount")
+            return  # lists inside list items cite the same table: not checked again
+        if isinstance(v, dict) and S.is_object(s):
             for k, x in v.items():
-                walk(x, s["properties"].get(k, {}), path + (k,))
+                lists(x, s["properties"].get(k, {}), path + (k,))
 
-    walk(value, schema, ())
+    lists(value, schema, ())
     return out
