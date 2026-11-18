@@ -149,7 +149,8 @@ def extract(source: Source, schema: Union[dict[str, Any], type[BaseModel]], *, i
             handwriting_effort: Optional[str] = None, handwriting_options: Optional[dict[str, Any]] = None,
             pages: Optional[list[int]] = None, filename: Optional[str] = None,
             settings: Optional[dict[str, Any]] = None, timeout: Optional[float] = None, review: bool = False,
-            alternatives: Union[bool, list[str]] = False, derived_values: bool = True) -> ExtractResult:
+            alternatives: Union[bool, list[str]] = False, derived_values: bool = True,
+            part_tokens: Optional[int] = None, parse: bool = True) -> ExtractResult:
     """Extract the fields of ``schema`` (a JSON Schema dict or a pydantic model class) from a document.
 
     ``instructions`` is the system prompt for the extraction model. ``array_extract`` processes long documents in
@@ -158,7 +159,11 @@ def extract(source: Source, schema: Union[dict[str, Any], type[BaseModel]], *, i
     The output holds only the schema's fields. Optional extras: ``review=True`` adds code-only checks on the values
     (no model call); ``alternatives=True`` (or a list of field paths) also returns other values the document gives
     for a field (a special term, an amendment); ``derived_values=False`` asks for printed values only, never one
-    worked out or assumed.
+    worked out or assumed. ``part_tokens`` caps the size of each document part sent to the extraction model
+    (tokens); by default the largest part under the model's limits. ``parse=False`` (one stage, an Anthropic
+    extraction model): the pages are not parsed first; the model reads the file itself (a PDF, or the pages of an
+    image), and citations are found by code in the PDF's own words or, for scans and images, in local OCR words.
+    About half the cost and 2.5 times faster on a 43-page report, but less accurate: see docs/decisions.md.
     """
     from .tasks import extract as extract_task
     from .tasks.llm import get_llm
@@ -168,18 +173,25 @@ def extract(source: Source, schema: Union[dict[str, Any], type[BaseModel]], *, i
     schema_class = schema if isinstance(schema, type) and issubclass(schema, BaseModel) else None
     json_schema = schema_class.model_json_schema() if schema_class else schema
     with _local_file(source, filename) as path:
-        doc = _run_pipeline(path, mode=mode, model=model, effort=effort, model_options=model_options,
-                            handwriting_model=handwriting_model, handwriting_effort=handwriting_effort,
-                            handwriting_options=handwriting_options, pages=pages, citations=False, options=None,
-                            timeout=timeout)
+        if parse:
+            doc = _run_pipeline(path, mode=mode, model=model, effort=effort, model_options=model_options,
+                                handwriting_model=handwriting_model, handwriting_effort=handwriting_effort,
+                                handwriting_options=handwriting_options, pages=pages, citations=False, options=None,
+                                timeout=timeout)
+        else:  # one stage: no parsing; words for citations from the PDF text layer or local OCR (no model)
+            from .textlayer import one_stage_document
+            doc, direct = one_stage_document(str(path), pages)
         config: dict[str, Any] = {
             "instructions": {"schema": json_schema, **({"system_prompt": instructions} if instructions else {})},
             "settings": {**(settings or {}), "citations": {"enabled": citations}, "array_extract": array_extract,
                          **({"review": True} if review else {}), **({"alternatives": alternatives} if alternatives else {}),
-                         **({} if derived_values else {"derived_values": False})},
+                         **({} if derived_values else {"derived_values": False}),
+                         **({"part_tokens": part_tokens} if part_tokens else {})},
         }
         llm = get_llm(make_spec(extract_model or model, extract_effort or effort, extract_options))
-        raw = extract_task.run(doc, config, llm=llm)
+        if not parse and type(llm).__name__ != "AnthropicAPILLM":
+            raise ValueError("parse=False needs an Anthropic API extraction model (it sends the PDF as a document)")
+        raw = extract_task.run(doc, config, llm=llm, options=None if parse else {"direct": direct})
     result = raw.get("result")
     if isinstance(result, list) and len(result) == 1:  # Reducto's shape without citations: one object per document
         result = result[0]

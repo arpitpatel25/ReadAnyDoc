@@ -37,18 +37,54 @@ from typing import Any, Callable, Optional, Sequence, Union
 
 import httpx
 
+from .. import trace
+
 MODELS = {"haiku": "claude-haiku-5-5", "sonnet": "claude-sonnet-5-5", "opus": "claude-opus-5-5"}
 RETRY_STATUS = {408, 409, 429, 500, 502, 503, 504, 529}
 # USD per 1M tokens (input, output) for prompts up to 100K tokens, and above that.
 PRICES = {"claude-haiku-5-5": ((0.10, 0.50), (0.50, 2.50)), "claude-sonnet-5-5": ((2.00, 10.00), (2.00, 10.00))}
 USAGE_LOG_ENV = "READANYDOC_TASK_USAGE_LOG"
+# A prompt may hold this line once: what comes before it is the same in several calls (the document), and an LLM
+# with ``prompt_cache`` asks the API to cache it; other LLMs see a plain line break.
+CACHE_MARK = "\n<<readanydoc:cache>>\n"
+# one-stage extraction: the PDF itself goes to the model in place of the parsed text (pdf_mark / build_request)
+PDF_MARK = re.compile(r"<<readanydoc:pdf:([0-9a-f]{16})>>")
+_PDFS: dict[str, bytes] = {}
+_PDFS_LOCK = threading.Lock()
+
+
+def _mark(blocks: list[dict], seed: bytes) -> str:
+    import hashlib
+    key = hashlib.sha1(seed).hexdigest()[:16]
+    with _PDFS_LOCK:
+        _PDFS[key] = blocks
+    return f"<<readanydoc:pdf:{key}>>"
+
+
+def pdf_mark(data: bytes) -> str:
+    """A placeholder in a prompt for a PDF, sent by an adapter that reads PDFs as a document block."""
+    return _mark([{"type": "document", "source": {"type": "base64", "media_type": "application/pdf",
+                                                  "data": base64.standard_b64encode(data).decode("ascii")}}], data)
+
+
+def image_mark(images: list[bytes]) -> str:
+    """A placeholder for page images (a scan or photo), sent as image blocks in page order."""
+    blocks = [{"type": "image", "source": {"type": "base64", "media_type": _media_type(b),
+                                           "data": base64.standard_b64encode(b).decode("ascii")}} for b in images]
+    return _mark(blocks, b"".join(images))
 THINKING_HEADROOM = 16000  # thinking tokens count against max_tokens; keep the caller's budget for the answer
 MAX_OUTPUT = 64000
 
 
 def api_cost(model: str, usage: dict) -> Optional[float]:
     """Cost in USD of one Messages API call from its ``usage`` block (cache reads 0.1x, cache writes 1.25x)."""
-    if model not in PRICES or usage.get("input_tokens") is None:
+    if usage.get("input_tokens") is None:
+        return None
+    from .. import model_limits as ML
+    found = ML.lookup(model)[0]
+    if found is not None and "in" in found:
+        return ML.cost(found, usage)
+    if model not in PRICES:
         return None
     read, write = usage.get("cache_read_input_tokens") or 0, usage.get("cache_creation_input_tokens") or 0
     inp, out = usage.get("input_tokens") or 0, usage.get("output_tokens") or 0
@@ -450,6 +486,7 @@ def _save_format_verdict(key: str, ok: bool) -> None:
 class AnthropicAPILLM(LLM):
     supports_images = True
     parallel_safe = True  # stateless HTTP calls: callers may run several at once
+    prompt_cache = True  # the part of a prompt before CACHE_MARK is cached by the API (5 minutes)
 
     def __init__(self, model: str = "haiku", base_url: str = "https://api.anthropic.com",
                  effort: Optional[str] = None, timeout: float = 600.0, max_retries: int = 2,
@@ -469,6 +506,12 @@ class AnthropicAPILLM(LLM):
         self._rejected_formats: set[str] = set()  # schemas the API refused to compile: sent without a format
         self._accepted_formats: set[str] = set()  # schemas the API compiled (format_ok)
         self._client = client or httpx.Client(timeout=timeout)
+
+    def max_output(self) -> int:
+        """The model's output allowance from its public limits (MAX_OUTPUT when the model is not listed)."""
+        from .. import model_limits as ML
+        found = ML.lookup(self.model)[0] or {}
+        return int(found.get("max_output") or MAX_OUTPUT)
 
     def output_format(self, json_schema: Optional[dict]) -> Optional[dict]:
         if json_schema is None or not self.structured_outputs:
@@ -507,6 +550,7 @@ class AnthropicAPILLM(LLM):
         except httpx.HTTPError:
             return True
         if resp.status_code == 400:
+            trace.record("format_check_refused", self.model, None)
             self._rejected_formats.add(key)
             _save_format_verdict(_format_key(self.model, key), False)
             return False
@@ -514,6 +558,7 @@ class AnthropicAPILLM(LLM):
             self._accepted_formats.add(key)
             _save_format_verdict(_format_key(self.model, key), True)
             u = resp.json().get("usage") or {}
+            trace.record("format_check", self.model, u)
             _log_usage({"t": round(time.time(), 2), "model": self.model, "event": "format_check",
                         "input_tokens": u.get("input_tokens"), "output_tokens": u.get("output_tokens"),
                         "cost_usd": api_cost(self.model, u)})
@@ -526,8 +571,20 @@ class AnthropicAPILLM(LLM):
             data = img if isinstance(img, bytes) else Path(img).read_bytes()
             content.append({"type": "image", "source": {"type": "base64", "media_type": _media_type(data),
                                                         "data": base64.standard_b64encode(data).decode("ascii")}})
-        content.append({"type": "text", "text": user})
-        body: dict = {"model": self.model, "max_tokens": min(max_tokens + THINKING_HEADROOM, MAX_OUTPUT),
+        pdf = PDF_MARK.search(user)
+        if pdf is not None:
+            with _PDFS_LOCK:
+                content.extend(_PDFS[pdf.group(1)])
+            user = PDF_MARK.sub("(the pages above)", user)
+        if CACHE_MARK in user:
+            # the shared part (the document) is cached: the other calls on the same document read it at a tenth
+            # of the price instead of paying for it again
+            shared, _, rest = user.partition(CACHE_MARK)
+            content.append({"type": "text", "text": shared, "cache_control": {"type": "ephemeral"}})
+            content.append({"type": "text", "text": rest})
+        else:
+            content.append({"type": "text", "text": user})
+        body: dict = {"model": self.model, "max_tokens": min(max_tokens + THINKING_HEADROOM, self.max_output()),
                       "messages": [{"role": "user", "content": content}]}
         if system:
             body["system"] = system
@@ -543,10 +600,33 @@ class AnthropicAPILLM(LLM):
             if key == "output_config" and isinstance(value, dict):
                 body["output_config"] = {**body.get("output_config", {}), **value}
             elif key == "max_tokens":
-                body["max_tokens"] = min(int(value), MAX_OUTPUT)
+                body["max_tokens"] = min(int(value), self.max_output())
             else:
                 body[key] = value
         return body
+
+    def warm(self, system: str, user: str) -> None:
+        """Write the cache for the shared part of ``user`` (before CACHE_MARK) with a request that generates
+        nothing, so that calls sent together afterwards all read it: calls sent at the same moment cannot read
+        what the others are still writing. Best effort: any failure only means the calls pay full price."""
+        key = os.environ.get(self.api_key_env)
+        if not key or CACHE_MARK not in user:
+            return
+        body = self.build_request(system, user, None, None, 0)
+        body["messages"][0]["content"] = body["messages"][0]["content"][:1]  # only the shared part
+        body["max_tokens"] = 0
+        t0 = time.time()
+        try:
+            resp = self._client.post(f"{self.base_url}/v1/messages", json=body,
+                                     headers={"x-api-key": key, "anthropic-version": self.api_version,
+                                              "content-type": "application/json"})
+        except httpx.HTTPError:
+            return
+        if resp.status_code == 200:
+            trace.record("cache_warm", self.model, resp.json().get("usage"), round(time.time() - t0, 2))
+        else:
+            trace.record("cache_warm_failed", self.model, None, round(time.time() - t0, 2), status=resp.status_code,
+                         detail=resp.text[:200])
 
     def complete(self, system: str, user: str, *, images: Optional[Sequence[ImageInput]] = None,
                  json_schema: Optional[dict] = None, max_tokens: int = 16000) -> LLMResult:
@@ -576,6 +656,7 @@ class AnthropicAPILLM(LLM):
             self._rejected_formats.add(json.dumps(json_schema, sort_keys=True))
             _log_usage({"t": round(time.time(), 2), "model": self.model, "event": "format_rejected",
                         "detail": resp.text[:200]})
+            trace.event("format_rejected_in_call", detail=resp.text[:300])  # enforcement dropped for this call
             return self.complete(system, user, images=images, json_schema=json_schema, max_tokens=max_tokens)
         if resp.status_code != 200:
             raise LLMError(f"Anthropic API error {resp.status_code}: {resp.text[:300]}")
@@ -586,9 +667,15 @@ class AnthropicAPILLM(LLM):
             b.get("text", "") for b in j.get("content", []) if b.get("type") == "text")
         u = j.get("usage") or {}
         usage = {"input_tokens": u.get("input_tokens"), "output_tokens": u.get("output_tokens"),
+                 "cache_read_input_tokens": u.get("cache_read_input_tokens"),
+                 "cache_creation_input_tokens": u.get("cache_creation_input_tokens"),
                  "cost_usd": api_cost(self.model, u), "seconds": round(time.time() - t0, 2)}
         _log_usage({"t": round(time.time(), 2), "model": self.model, "effort": self.effort, "stop": stop,
                     "images": len(images or []), **usage})
+        trace.record("extract_call", self.model, u, usage["seconds"], stop=stop, images=len(images or []),
+                     max_tokens=body.get("max_tokens"),
+                     structured="format" in (body.get("output_config") or {}),
+                     cached_prefix=CACHE_MARK in user, reply=text[:60000])
         return LLMResult(text=text, data=_try_json(text) if text else None, model=j.get("model", self.model),
                          stop_reason=stop, usage=usage, raw=j)
 
@@ -691,6 +778,7 @@ class FakeLLM(LLM):
 
     name = "fake"
     supports_images = True
+    context_limits = {"max_input": 200_000, "max_output": 64_000}  # a test double: limits of a typical model
 
     def __init__(self, replies: Union[Sequence[Reply], Callable[[str, str, int], Reply], Reply, None] = None):
         self.calls: list[dict[str, Any]] = []
@@ -757,6 +845,8 @@ def ask_json(llm: LLM, system: str, user: str, *, images: Optional[Sequence[Imag
     failed to parse or the reply was truncated.
     """
     results: list[LLMResult] = []
+    if not getattr(llm, "prompt_cache", False):
+        user = user.replace(CACHE_MARK, "\n")
     prompt = user
     for _ in range(retries + 1):
         res = llm.complete(system, prompt, images=images, json_schema=json_schema, max_tokens=max_tokens)

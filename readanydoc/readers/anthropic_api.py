@@ -161,5 +161,7 @@ class AnthropicAPIReader(Reader):
             cost = round((u.get("input_tokens", 0) * pi + u.get("output_tokens", 0) * po) / 1e6, 6)
         usage = Usage(model=j.get("model", self.model), input_tokens=u.get("input_tokens"),
                       output_tokens=u.get("output_tokens"), cost_usd=cost, seconds=round(time.time() - t0, 2))
+        from .. import trace
+        trace.record("page_read", self.model, u, usage.seconds, stop=stop)
         return ReadResult(text=strip_code_fence(text), format="markdown", usage=usage, stop_reason=stop,
                           truncated=stop == "max_tokens", refused=stop == "refusal", raw=j)

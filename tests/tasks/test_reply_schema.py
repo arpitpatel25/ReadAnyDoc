@@ -8,6 +8,7 @@ still too large is split into groups of fields before any call.
 from __future__ import annotations
 
 import json
+import pytest
 import random
 
 from hypothesis import given, settings
@@ -163,41 +164,6 @@ def test_random_schemas_always_fit_after_the_rewrite_or_are_split():
             assert L.api_schema(RS.project(reply, g)) is not None
 
 
-def test_a_group_the_api_will_not_compile_is_split_before_the_call(monkeypatch):
-    """The API caps the compiled grammar (unpublished): a refused group is split until each part compiles, and the
-    real calls all carry a format."""
-    import httpx
-
-    from readanydoc.tasks import extract
-    from readanydoc.tasks.llm import AnthropicAPILLM
-    from tests.tasks.conftest import make_doc
-
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-not-real")
-    sent = []
-
-    def handler(request):
-        body = json.loads(request.content)
-        fmt = (body.get("output_config") or {}).get("format")
-        n = json.dumps(fmt["schema"]).count('"type": "string"') if fmt else 0
-        if fmt and n > 6:  # "too large" for this fake API
-            return httpx.Response(400, json={"type": "error", "error": {"message": "The compiled grammar is too large"}})
-        if body["max_tokens"] == 1:  # the check
-            return httpx.Response(200, json={"content": [], "stop_reason": "max_tokens", "usage": {}})
-        sent.append(fmt is not None)
-        props = fmt["schema"]["properties"] if fmt else {}
-        answer = {k: ({kk: "x" for kk in v["properties"]} if v.get("type") == "object" else "x") for k, v in props.items()}
-        return httpx.Response(200, json={"content": [{"type": "text", "text": json.dumps(answer)}],
-                                         "stop_reason": "end_turn", "usage": {"input_tokens": 1, "output_tokens": 1}})
-
-    llm = AnthropicAPILLM("haiku", client=httpx.Client(transport=httpx.MockTransport(handler)), max_retries=0)
-    schema = {"type": "object", "properties": {
-        "a": {"type": "object", "properties": {f"a{i}": {"type": ["string", "null"]} for i in range(5)}},
-        "b": {"type": "object", "properties": {f"b{i}": {"type": ["string", "null"]} for i in range(5)}}}}
-    out = extract.run(make_doc([["hello"]]), {"instructions": {"schema": schema}, "settings": {}}, llm=llm)
-    assert sent and all(sent)  # every real call had an enforced format
-    assert out["result"][0] == {"a": {f"a{i}": "x" for i in range(5)}, "b": {f"b{i}": "x" for i in range(5)}}
-
-
 def test_an_optional_object_the_document_does_not_have_comes_back_as_null():
     addr = {"type": "object", "properties": {"line1": {"type": "string"}, "city": {"type": "string"}}}
     schema = {"type": "object", "properties": {"ship_to": {"anyOf": [addr, {"type": "null"}]}, "bill_to": addr}}
@@ -209,3 +175,244 @@ def test_an_optional_object_the_document_does_not_have_comes_back_as_null():
 def test_null_written_as_text_is_null_where_the_schema_allows_it():
     schema = {"type": "object", "properties": {"payee": {"type": ["string", "null"]}, "code": {"type": "string"}}}
     assert RS.from_reply({"payee": "null", "code": "null"}, schema) == {"payee": None, "code": "null"}
+
+
+def _coded_fake(monkeypatch, answer_for, refuse_user_shape=True, truncate_first=False):
+    """A fake Anthropic API: refuses the user's own shape (too complex), accepts the coded format and answers with
+    ``answer_for(field path) -> [(item, value)]`` for the fields listed in each call."""
+    import httpx
+
+    from readanydoc.tasks.llm import AnthropicAPILLM
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-not-real")
+    sent = []
+    state = {"cut": truncate_first}
+
+    def handler(request):
+        body = json.loads(request.content)
+        fmt = (body.get("output_config") or {}).get("format")
+        if fmt and refuse_user_shape and "values" not in fmt["schema"]["properties"]:
+            return httpx.Response(400, json={"type": "error", "error": {"message": "Schema is too complex for compilation."}})
+        if body["max_tokens"] == 1:
+            return httpx.Response(200, json={"content": [], "stop_reason": "max_tokens", "usage": {}})
+        sent.append(body)
+        text = body["messages"][0]["content"][-1]["text"]
+        rows = [l.split(" | ") for l in text.splitlines() if l.startswith("f") and l.count(" | ") >= 2]
+        if state["cut"] and len(rows) > 1:
+            state["cut"] = False
+            return httpx.Response(200, json={"content": [{"type": "text", "text": '{"values": [{"code": "f1"'}],
+                                             "stop_reason": "max_tokens", "usage": {"input_tokens": 1, "output_tokens": 1}})
+        values = [{"code": code, "item": item, "value": v} for code, path, _ in rows for item, v in answer_for(path)]
+        return httpx.Response(200, json={"content": [{"type": "text", "text": json.dumps({"values": values})}],
+                                         "stop_reason": "end_turn", "usage": {"input_tokens": 1, "output_tokens": 1}})
+
+    return AnthropicAPILLM("haiku", client=httpx.Client(transport=httpx.MockTransport(handler)), max_retries=0), sent
+
+
+BIG = {"type": "object", "properties": {
+    "seller": {"type": "object", "properties": {"name": {"type": "string"}, "country": {"type": ["string", "null"]}}},
+    "total": {"type": ["number", "null"]},
+    "paid": {"type": "boolean"},
+    "lines": {"type": "array", "items": {"type": "object", "properties": {
+        "name": {"type": "string"}, "amount": {"type": "number"},
+        "tiers": {"type": "array", "items": {"type": "object", "properties": {"up_to": {"type": ["number", "null"]}}}}}}}}}
+
+ANSWERS = {"seller.name": [("", "Acme Ltd")], "seller.country": [("", "US")], "total": [("", "4,200.50")],
+           "paid": [("", "yes")], "lines[].name": [("0", "Seats"), ("1", "Support")],
+           "lines[].amount": [("0", "4000"), ("1", "200.50")], "lines[].tiers[].up_to": [("0.0", "10"), ("0.1", "")]}
+
+
+def test_a_refused_schema_comes_back_in_the_users_exact_shape_from_coded_answers(monkeypatch):
+    from readanydoc.tasks import extract
+    from tests.tasks.conftest import make_doc
+
+    llm, sent = _coded_fake(monkeypatch, lambda p: ANSWERS.get(p, []))
+    out = extract.run(make_doc([["hello"]]), {"instructions": {"schema": BIG}, "settings": {}}, llm=llm)
+    assert out["result"][0] == {"seller": {"name": "Acme Ltd", "country": "US"}, "total": 4200.5, "paid": True,
+                                "lines": [{"name": "Seats", "amount": 4000, "tiers": [{"up_to": 10}]},
+                                          {"name": "Support", "amount": 200.5, "tiers": []}]}
+    assert len(sent) == 1 and all("values" in b["output_config"]["format"]["schema"]["properties"] for b in sent)
+
+
+def test_coded_groups_share_one_cached_document_and_one_format(monkeypatch):
+    """Every coded call has the same system prompt, the same cached document block and the same format, so the
+    groups read the document from the cache; the first call goes alone and writes it."""
+    from readanydoc.tasks import extract
+    from tests.tasks.conftest import make_doc
+
+    llm, sent = _coded_fake(monkeypatch, lambda p: ANSWERS.get(p, []))
+    out = extract.run(make_doc([["hello world"]]), {"instructions": {"schema": BIG}, "settings": {}}, llm=llm,
+                      options={"coded_group_leaves": 2})
+    assert len(sent) > 2
+    first = sent[0]["messages"][0]["content"][0]
+    assert first["cache_control"] == {"type": "ephemeral"} and "hello world" in first["text"]
+    assert all(b["messages"][0]["content"][0] == first for b in sent)
+    assert all(b["system"] == sent[0]["system"] for b in sent)
+    assert all(b["output_config"] == sent[0]["output_config"] for b in sent)
+    assert "<<readanydoc:cache>>" not in json.dumps(sent)
+    assert out["result"][0]["lines"][1]["amount"] == 200.5  # a list's fields stay in one group
+
+
+def test_a_coded_reply_cut_off_is_asked_again_in_halves(monkeypatch):
+    from readanydoc.tasks import extract
+    from tests.tasks.conftest import make_doc
+
+    llm, sent = _coded_fake(monkeypatch, lambda p: ANSWERS.get(p, []), truncate_first=True)
+    out = extract.run(make_doc([["hello"]]), {"instructions": {"schema": BIG}, "settings": {}}, llm=llm)
+    assert len(sent) == 3  # cut off, then two halves
+    assert out["result"][0]["seller"]["name"] == "Acme Ltd" and len(out["result"][0]["lines"]) == 2
+
+
+def test_an_either_or_object_is_asked_field_by_field_and_matched_back(monkeypatch):
+    """"fixed {strategy, value} or metered {strategy}" is listed as its fields; the answer lands in the right form."""
+    from readanydoc.tasks import extract
+    from tests.tasks.conftest import make_doc
+
+    schema = {"type": "object", "properties": {"source": {"oneOf": [
+        {"type": "object", "properties": {"strategy": {"const": "fixed"}, "value": {"type": "number"}},
+         "required": ["strategy", "value"]},
+        {"type": "object", "properties": {"strategy": {"const": "metered"}}, "required": ["strategy"]}]},
+        "total": {"type": ["number", "null"]}}}
+    answers = {"source.strategy": [("", "fixed")], "source.value": [("", "40")], "total": [("", "12")]}
+    llm, sent = _coded_fake(monkeypatch, lambda p: answers.get(p, []))
+    out = extract.run(make_doc([["hello"]]), {"instructions": {"schema": schema}, "settings": {}}, llm=llm)
+    assert out["result"][0]["source"] == {"strategy": "fixed", "value": 40}
+
+
+def test_a_less_complete_copy_of_a_list_item_is_dropped_and_distinct_items_are_kept():
+    from readanydoc.tasks.extract import drop_partial_copies
+    rows = [{"period": "Q2", "value": 2353.6, "scale": None},
+            {"period": "Q2", "value": 2353.6, "scale": 1000000},
+            {"period": "Q1", "value": 2100.0, "scale": None},          # no fuller copy: kept as written
+            {"period": "Q2", "value": 99.0, "scale": None}]            # a different value: kept
+    out, n = drop_partial_copies({"goodwill": rows})
+    assert n == 1 and out["goodwill"] == rows[1:]
+    assert drop_partial_copies({"x": [{"a": 1, "b": None}, {"a": 1, "b": 2}]})[1] == 0  # one field: never merged
+
+
+def test_page_parts_are_sized_by_the_models_limits_and_can_be_set(monkeypatch):
+    from readanydoc import model_limits as ML
+    from readanydoc.tasks import extract
+    from readanydoc.tasks.common import DocView
+    from readanydoc.tasks.llm import AnthropicAPILLM, FakeLLM
+    from tests.tasks.conftest import make_doc
+
+    budget, source, limits = extract.part_budget_for(AnthropicAPILLM("haiku"), {})
+    assert limits["price_jump"] == 100_000 and budget == extract.DEFAULT_PART_TOKENS and "allows up to" in source
+    small = FakeLLM()
+    small.context_limits = {"max_input": 20_000, "max_output": 4_000}
+    assert extract.part_budget_for(small, {})[0] < 20_000                # a small window gets its own largest
+    assert extract.part_budget_for(AnthropicAPILLM("haiku"), {"part_tokens": 5000})[0] == 5000
+    pages = DocView(make_doc([["x" * 30_000]] * 10)).pages          # ~10K tokens a page (3 characters a token)
+    assert len(extract._token_parts(pages, 200_000)) == 1             # fits: one part, every field asked once
+    parts = extract._token_parts(pages, 35_000)
+    assert len(parts) > 1 and parts[0][-1].number == parts[1][0].number  # neighbouring parts share a page
+    assert {p.number for part in parts for p in part} == set(range(1, 11))
+
+    class Unknown(FakeLLM):
+        context_limits = None
+        model = "my-private-model"
+    with pytest.raises(extract.TaskError) as e:
+        extract.part_budget_for(Unknown(), {})
+    assert "part_tokens" in str(e.value) and ML.ENV in str(e.value)  # names the setting, never guesses
+    assert extract.part_budget_for(Unknown(), {"part_tokens": 9000})[0] == 9000
+
+
+def test_the_part_size_can_be_set_in_the_request_settings(monkeypatch):
+    """settings.part_tokens (and extract(part_tokens=...)) sets the page-part size; it is never sent to the API."""
+    from readanydoc.tasks import extract
+    from tests.tasks.conftest import make_doc
+
+    seen = []
+    real = extract._token_parts
+    monkeypatch.setattr(extract, "_token_parts", lambda pages, budget, overlap=1, per_page=0: seen.append(budget) or real(pages, budget, overlap, per_page))
+    llm, sent = _coded_fake(monkeypatch, lambda p: ANSWERS.get(p, []))
+    extract.run(make_doc([["hello"]]), {"instructions": {"schema": BIG}, "settings": {"part_tokens": 30000}}, llm=llm)
+    assert seen == [30000] and all("part_tokens" not in json.dumps(b) for b in sent)
+    with pytest.raises(extract.TaskError):
+        extract.run(make_doc([["hello"]]), {"instructions": {"schema": BIG}, "settings": {"part_tokens": "big"}}, llm=llm)
+
+
+CITE_SCHEMA = {"type": "object", "properties": {"revenue": {"type": "array", "items": {"type": "object", "properties": {
+    "value": {"type": "number"}, "period": {"type": "string"},
+    "segment_type": {"type": "string", "enum": ["company", "segment"]}, "repurchased": {"type": "number"}}}}}}
+
+
+def _cite_run(reply_for):
+    import re as _re
+    from readanydoc.tasks import FakeLLM, extract
+    from tests.tasks.conftest import make_doc
+
+    doc = make_doc([[
+        "Indicate whether the registrant is a smaller reporting company.",
+        "Revenue grew to 5,048.4 this quarter.",
+        ("Table", "<table><tr><th>(In millions)</th><th>Three Months Ended December 31, 2024</th></tr>"
+                  "<tr><td>Revenue</td><td>5,048.4</td></tr></table>"),
+        "Shares 2 — 1 were cancelled.",
+    ]])
+
+    def handler(system, user, i):
+        table = _re.search(r"\[([^|\]]+)\|Table\]", user).group(1)
+        return json.dumps(reply_for(table))
+    out = extract.run(doc, {"instructions": {"schema": CITE_SCHEMA}, "settings": {"citations": {"enabled": True}}},
+                      llm=FakeLLM(handler))
+    return out["result"]["revenue"][0]
+
+
+def test_citations_follow_the_models_block_and_named_words_and_skip_chosen_categories():
+    row = _cite_run(lambda t: {"revenue": [{"value": "5048.4", "period": "FY2025 Q2", "segment_type": "company",
+                                            "repurchased": "2.1", "_block": t,
+                                            "_from": "period: Three Months Ended December 31, 2024"}]})
+    v = row["value"]["citations"][0]
+    assert v["content"] == "5,048.4" and v["parentBlock"]["type"] == "Table"          # the row's table, not the text
+    assert "Three Months Ended December 31, 2024" in row["period"]["citations"][0]["content"]  # a worked-out value
+    assert row["segment_type"]["citations"] == []                  # "company" on the cover page is not its source
+    rep = row["repurchased"]["citations"]                          # 2.1 is not the digits of "2 — 1": not found,
+    assert all("2 — 1" not in c["content"] and c["confidence"] == "low" for c in rep)  # only its row's block, low
+
+
+def test_marks_follow_their_objects_when_parts_are_merged_and_items_move():
+    from readanydoc.tasks import extract
+    part1 = ({"rows": [{"name": "Seats", "amount": 4000.0}]}, {("rows", 0): {"block": "r3", "from": {}}})
+    part2 = ({"rows": [{"name": "Support", "amount": 200.5}]},
+             {("rows", 0): {"block": "r9", "from": {"amount": "two hundred"}}})
+    final = {"rows": [{"name": "Support", "amount": 200.5}, {"name": "Seats", "amount": 4000.0, "qty": 2}]}
+    marks = extract.remap_marks(final, [part1, part2])
+    assert marks[("rows", 0)] == {"block": "r9", "from": {"amount": "two hundred"}}
+    assert marks[("rows", 1)]["block"] == "r3"            # a fuller merged copy keeps the marks of its part
+
+
+
+def test_one_stage_sends_the_pdf_as_a_cached_document_block():
+    from readanydoc.tasks.llm import CACHE_MARK, AnthropicAPILLM, pdf_mark
+    user = "Document:\n" + pdf_mark(b"%PDF-1.4 fake") + CACHE_MARK + "JSON Schema: {}"
+    body = AnthropicAPILLM("haiku").build_request("sys", user, None, None, 1000)
+    content = body["messages"][0]["content"]
+    assert content[0]["type"] == "document" and content[0]["source"]["media_type"] == "application/pdf"
+    assert content[1]["cache_control"] == {"type": "ephemeral"} and "readanydoc:pdf" not in json.dumps(content)
+
+
+def test_one_stage_builds_placed_words_for_digital_pdfs_scans_and_images(tmp_path):
+    """No model call: a digital PDF gives its own words, a scan or an image gives local OCR words, and the model is
+    sent the PDF or the page images."""
+    pytest.importorskip("pypdfium2")
+    from readanydoc.pipeline.grounding import ocr
+    from readanydoc.textlayer import one_stage_document
+    canvas = pytest.importorskip("reportlab.pdfgen.canvas")
+    pdf = tmp_path / "f.pdf"
+    c = canvas.Canvas(str(pdf))
+    c.setFont("Helvetica", 18)
+    for i, line in enumerate(["Order Form", "Platform Standard USD 1,200.00", "Customer Brightpath Logistics LLC"]):
+        c.drawString(72, 720 - 40 * i, line)
+    c.save()
+    doc, direct = one_stage_document(str(pdf))
+    text = " ".join(r.content for p in doc.pages for r in p.regions)
+    assert direct == {"pdf": str(pdf)} and "1,200.00" in text and doc.pages[0].kind == "digital"
+    assert all(w.bbox is not None for p in doc.pages for r in p.regions for ln in r.lines for w in ln.words)
+    if not ocr.available():
+        return
+    import pypdfium2 as pdfium
+    png = tmp_path / "f.png"
+    pdfium.PdfDocument(str(pdf))[0].render(scale=3).to_pil().convert("RGB").save(png)
+    doc, direct = one_stage_document(str(png))
+    assert list(direct) == ["images"] and "1,200.00" in " ".join(r.content for p in doc.pages for r in p.regions)

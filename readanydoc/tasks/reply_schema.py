@@ -19,6 +19,7 @@ large into groups of fields, decided before any call, never inside a list. The u
 from __future__ import annotations
 
 import copy
+import re
 from typing import Any, Optional
 
 from . import schema as S
@@ -28,11 +29,13 @@ MAX_LEAVES = 40      # fields per call: larger schemas are split into groups (Re
                      # live, so a group the API still refuses is split further (split_group)
 MAX_UNIONS = 16      # the API's limit on fields with more than one type (anyOf branches left after the rewrite)
 
+NAMES = ("Copy names, titles and labels exactly as printed, every word of them, even when part of a name looks "
+         "like a plan, size or detail.")
 NOTE = ('Every field in the JSON Schema is required. Write "" for a field (or [] for a list) when the document '
         'gives no value for it and does not make one clear; never fill a field with a guess. A value the document '
         'gives in another form is not a guess: write it in the form the field asks for (a country name as its '
         'code, a yes/no that the terms answer). Write numbers, dates and yes/no answers as text: numbers as plain '
-        'digits ("4200.50", "-1200"), dates in the format the schema description asks for.')
+        'digits ("4200.50", "-1200"), dates in the format the schema description asks for.' + " " + NAMES)
 
 _KEEP = ("description", "title")
 
@@ -162,7 +165,8 @@ def _leaves(node: Any) -> int:
     if "anyOf" in node:
         return sum(_leaves(b) for b in node["anyOf"])
     if node.get("type") == "object":
-        return sum(_leaves(v) for v in node.get("properties", {}).values()) or 1
+        # "_from" (citations only) is a free-text note, not a field to fill: not counted towards a group's size
+        return sum(_leaves(v) for k, v in node.get("properties", {}).items() if k != "_from") or 1
     if node.get("type") == "array":
         return _leaves(node.get("items"))
     return 1
@@ -226,11 +230,11 @@ def split_group(reply: dict, paths: list[tuple]) -> Optional[list[list[tuple]]]:
     for k in paths[0]:
         node = (node.get("properties") or {}).get(k, {})
     props = node.get("properties") or {}
-    kids = [paths[0] + (k,) for k in props if k != "_block"]
+    kids = [paths[0] + (k,) for k in props if k not in MARKS]
     if node.get("type") != "object" or len(kids) < 2:
         return None
     half = (len(kids) + 1) // 2
-    label = [paths[0] + ("_block",)] if "_block" in props else []
+    label = [paths[0] + (m,) for m in MARKS if m in props]
     return [kids[:half] + label, kids[half:] + label]
 
 
@@ -262,7 +266,7 @@ def merge(a: Any, b: Any) -> Any:
     return b if a in (None, "", [], {}) else a
 
 
-def add_blocks(reply: dict) -> dict:
+def add_blocks(reply: dict, blocks: bool = True) -> dict:
     """The reply schema with a "_block" field on every object below the root: the label of the block the
     object's values were read from. Used only for citations, to tell apart repeated values."""
     reply = copy.deepcopy(reply)
@@ -276,9 +280,11 @@ def add_blocks(reply: dict) -> dict:
             for v in n.get("properties", {}).values():
                 go(v, False)
             if not top:
-                n["properties"]["_block"] = {"type": "string",
-                                             "description": "label of the block these values were read from, e.g. r12"}
-                n["required"] = list(n.get("required", [])) + ["_block"]
+                if blocks:
+                    n["properties"]["_block"] = {"type": "string",
+                                                 "description": "label of the block these values were read from, e.g. r12"}
+                n["properties"][FROM] = {"type": "string", "description": FROM_DESC}
+                n["required"] = list(n.get("required", [])) + (["_block"] if blocks else []) + [FROM]
         if isinstance(n.get("items"), dict):
             go(n["items"], False)
 
@@ -286,10 +292,49 @@ def add_blocks(reply: dict) -> dict:
     return reply
 
 
-def take_blocks(value: Any, path: tuple = (), out: Optional[dict] = None) -> dict:
-    """Remove the "_block" fields from an answer; {object path: block label}."""
+FROM = "_from"
+FROM_DESC = 'field: printed words, for values not printed as written'
+MARKS = ("_block", FROM)
+
+
+def parse_from(text: Any) -> dict[str, str]:
+    """{field: printed words} from a "_from" answer ("data_period: Three Months Ended December 31, 2024")."""
+    out: dict[str, str] = {}
+    if not isinstance(text, str):
+        return out
+    for line in re.split(r"[\n;]+", text):
+        if ":" not in line:
+            continue
+        k, w = line.split(":", 1)
+        k, w = k.strip().strip('"\'` '), w.strip().strip('"\'` ')
+        k = k.split(".")[-1].replace("[]", "").strip()  # "income_statement.revenue[].data_period" -> "data_period"
+        if k and w and k not in out:
+            out[k] = w
+    return out
+
+
+def take_marks(value: Any, path: tuple = (), out: Optional[dict] = None) -> dict:
+    """Remove the "_block" and "_from" fields from an answer; {object path: {"block": label, "from": {...}}}."""
     out = {} if out is None else out
     if isinstance(value, dict):
+        b = value.pop("_block", None)
+        f = parse_from(value.pop(FROM, None))
+        b = b.strip() if isinstance(b, str) and b.strip() else None
+        if b or f:
+            out[path] = {"block": b, "from": f}
+        for k, x in value.items():
+            take_marks(x, path + (k,), out)
+    elif isinstance(value, list):
+        for i, x in enumerate(value):
+            take_marks(x, path + (i,), out)
+    return out
+
+
+def take_blocks(value: Any, path: tuple = (), out: Optional[dict] = None) -> dict:
+    """Remove the "_block" (and "_from") fields from an answer; {object path: block label}."""
+    out = {} if out is None else out
+    if isinstance(value, dict):
+        value.pop(FROM, None)
         b = value.pop("_block", None)
         if isinstance(b, str) and b.strip():
             out[path] = b.strip()

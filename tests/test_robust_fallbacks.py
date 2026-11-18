@@ -111,18 +111,18 @@ def test_short_segment_is_found_relative_to_the_others():
 SCHEMA = {"type": "object", "properties": {"items": {"type": "array", "items": {"type": "string"}}}}
 
 
-def test_lost_rows_are_extracted_again_and_kept_when_more():
+def test_a_list_short_against_its_tables_is_reported_not_asked_again():
+    """Structured path: no re-ask (it would go without enforcement and replace whole answers); the gap is a
+    warning that names the pages."""
     doc = make_doc([[("Table", table(15))], [("Table", table(15))]])
 
     def reply(system, user, i):
-        if "do not stop early" in user:
-            return {"items": [f"row {k}" for k in range(15)]}
-        return {"items": ["row 0", "row 1"]}  # the first answer loses most rows
+        return {"items": ["row 0", "row 1"]}  # the answer misses most rows
     llm = FakeLLM(reply)
     out = extract.run(doc, {"instructions": {"schema": SCHEMA}, "settings": {"array_extract": True}},
                       llm=llm, options={"segment_chars": 10**6})
-    assert len(out["result"][0]["items"]) >= 15
-    assert len(llm.calls) == 3  # first answer, then the two halves
+    assert len(llm.calls) == 1
+    assert any("some items may be missing" in w for w in out["warnings"])
 
 
 def test_a_gap_that_remains_is_a_warning():
