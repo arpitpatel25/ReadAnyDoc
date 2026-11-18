@@ -117,6 +117,8 @@ def from_reply(value: Any, schema: Any) -> Any:
         v = value.strip()
         if not v:
             return None
+        if v.lower() in ("null", "none") and nullable:
+            return None  # "null" written as text where the reply schema asks for "": the user's schema allows null
         enum = schema.get("enum")
         if isinstance(enum, list):
             for e in enum:

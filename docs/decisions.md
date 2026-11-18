@@ -4,6 +4,32 @@ One line per decision, with the reason, grouped by area in the order they were m
 earlier ones; the first section lists what changed for the first public release. Add a line here when you change
 the document format, a default, or a public interface.
 
+## Extract 0.2.0: the model writes only the schema (2026-11-18)
+
+- The model writes only the fields of the user's schema. Per-value source notes (0.1.8) are asked for only by
+  `deep_extract`: in 0.1.8 they tripled output, hit the output cap on large schemas and set off a cascade of
+  split re-asks (11 calls, 158 s and $0.024 per contract on a test pack, against 20 s and $0.005 now).
+- Structured outputs for every object schema: code rewrites the schema into a reply schema (every field required,
+  "" for absent, numbers and yes/no as text, constraints kept as description text) and converts the answer back to
+  the user's types, so the API can enforce the shape at any size without making the model fill a field.
+- A schema too big for one call is split into groups of fields before the call (40 leaf fields, a list never split
+  inside its items); a 1-token check finds groups the API will not compile, which are split further, and the
+  verdicts are cached on disk. Each group is told which fields are asked separately: alone, a group holding only
+  the seller was filled with the buyer.
+- "" means the document neither gives a value nor makes one clear; a value given in another form ("USA" for a
+  country code) is written in the field's form. A required yes/no the document does not answer stays empty
+  rather than a guessed false. An absent optional object comes back as null.
+- Citations are found by code from the values (unique match, then the object's other values, then the block label
+  the model gave, then a low-confidence first match); a value not in the document gets no citation.
+- The field report is removed: output holds only what was asked for. Opt-in: `review` (code-only flags),
+  `alternatives` (other values the document gives for a field), `derived_values=False` (printed values only).
+- Test pack (5 contracts, 534 fields, scored by the pack's rules): 0.2.0 98.5%, 0.1.8 98.7%, 0.1.6 73.4%;
+  with `alternatives`, 4 of 4 planted ambiguities flagged (0.1.8: 3).
+- 12-case gate against 0.1.8 and 0.1.6 (same page reading): extraction $0.0300 / 194 s in total (0.1.8: $0.0776 /
+  534 s; 0.1.6: $0.0236 / 182 s); fields agree with 0.1.8 on 96.5%, the differences checked by hand (0.2.0 found
+  a line item and discount terms the others missed, and no longer copies a form's placeholder text); citations
+  on the right words 93.6% (0.1.8: 84.7%), by a judge that reads the page's own words.
+
 ## First public release (2026-11-14)
 
 - Two shipped profiles, `engine` (default) and `model-only`, defined explicitly in `readanydoc/profiles.py`, and a test

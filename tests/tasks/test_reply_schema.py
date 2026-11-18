@@ -204,3 +204,8 @@ def test_an_optional_object_the_document_does_not_have_comes_back_as_null():
     got = RS.from_reply({"ship_to": {"line1": "", "city": ""}, "bill_to": {"line1": "", "city": ""}}, schema)
     assert got["ship_to"] is None  # nullable: the user's schema says null when absent
     assert got["bill_to"] == {"line1": None, "city": None}  # required object: kept, with empty fields
+
+
+def test_null_written_as_text_is_null_where_the_schema_allows_it():
+    schema = {"type": "object", "properties": {"payee": {"type": ["string", "null"]}, "code": {"type": "string"}}}
+    assert RS.from_reply({"payee": "null", "code": "null"}, schema) == {"payee": None, "code": "null"}

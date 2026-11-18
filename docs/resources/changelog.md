@@ -26,6 +26,13 @@ Extraction costs what the answer costs again, and stays reliable on schemas of a
   CLI: `--review`, `--alternatives [FIELD ...]`, `--printed-only`.
 - No more "inferred" lines in `warnings`, and no automatic re-ask for lists that look short.
 - Enum values that differ only in case are matched ("PAID" to "paid").
+- Each group of a large schema is told which fields are asked separately, so neighbouring objects (buyer and
+  seller) are not mixed up. An optional object the document does not have comes back as null, and "null" written
+  as text is null where your schema allows it. A value the document gives in another form ("USA" for a country
+  code) is written in the field's form; a field the document does not answer stays empty instead of guessed.
+- Measured on 12 test documents against 0.1.8: 2.6x cheaper and 2.8x faster at extraction, about the cost and time
+  of 0.1.6; citations on the right words 93.6% (0.1.8: 84.7%). On a 5-contract test pack: 98.5% of fields right
+  (0.1.8: 98.7%), at a quarter of the cost and an eighth of the time.
 
 ## 0.1.8 (2026-11-17)
 
