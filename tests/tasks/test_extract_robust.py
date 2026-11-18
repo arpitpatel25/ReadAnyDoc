@@ -583,7 +583,9 @@ def test_schemas_the_api_cannot_enforce_are_sent_without_a_format(schema):
     assert L.api_schema(schema) is None
 
 
-def test_extract_sends_a_format_to_the_anthropic_api_and_survives_a_rejection(monkeypatch):
+def test_a_schema_the_api_refuses_is_asked_in_the_coded_format_with_enforcement(monkeypatch):
+    """The API refuses the whole reply schema: the answer comes in the fixed coded format, still enforced, and is
+    rebuilt into the user's exact object."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-not-real")
     small = obj({"customer": obj({"name": S_STR}), "number": S_STR})
     bodies = []
@@ -592,11 +594,18 @@ def test_extract_sends_a_format_to_the_anthropic_api_and_survives_a_rejection(mo
         body = json.loads(request.content)
         bodies.append(body)
         fmt = (body.get("output_config") or {}).get("format")
-        if fmt and len(fmt["schema"]["properties"]) > 1:  # this API refuses any schema with two top-level fields
+        if fmt and "values" not in fmt["schema"]["properties"]:  # this API refuses the user's own shape
             return httpx.Response(400, json={"error": {"message": "Schema is too complex for compilation."}})
         if body["max_tokens"] == 1:
             return httpx.Response(200, json={"stop_reason": "max_tokens", "content": [], "usage": {}})
-        reply = {"customer": {"name": "Acme Robotics Ltd", "_block": "r3"}, "number": "OF-2026-118"}
+        codes = {c: None for c in fmt["schema"]["properties"]["values"]["items"]["properties"]["code"]["enum"]}
+        text = body["messages"][0]["content"][-1]["text"]
+        line = {l.split(" | ")[1]: l.split(" | ")[0] for l in text.splitlines() if l.startswith("f") and " | " in l}
+        reply = {"values": [{"code": line["customer.name"], "item": "", "value": "Acme Robotics Ltd"},
+                            {"code": line["customer._block"], "item": "", "value": "r3"},
+                            {"code": line["number"], "item": "", "value": "OF-2026-118"},
+                            {"code": "f999", "item": "", "value": "invented"}]}
+        assert set(line.values()) <= set(codes)
         return httpx.Response(200, json={"stop_reason": "end_turn", "content": [{"type": "text", "text": json.dumps(reply)}],
                                          "usage": {"input_tokens": 10, "output_tokens": 10}})
 
@@ -606,8 +615,30 @@ def test_extract_sends_a_format_to_the_anthropic_api_and_survives_a_rejection(mo
     assert out["result"]["number"]["value"] == "OF-2026-118"
     checks = [b for b in bodies if b["max_tokens"] == 1]
     calls = [b for b in bodies if b["max_tokens"] > 1]
-    assert checks and len(checks[0]["output_config"]["format"]["schema"]["properties"]) == 2  # refused, then split
-    assert len(calls) == 2 and all("format" in b["output_config"] for b in calls)  # every call enforced
+    assert len(checks) == 2  # the whole schema (refused), then the coded format (accepted)
+    assert len(calls) == 1 and "values" in calls[0]["output_config"]["format"]["schema"]["properties"]
+
+
+def test_a_schema_the_api_accepts_is_asked_in_one_enforced_call(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-not-real")
+    small = obj({"customer": obj({"name": S_STR}), "number": S_STR})
+    bodies = []
+
+    def handler(request):
+        body = json.loads(request.content)
+        bodies.append(body)
+        if body["max_tokens"] == 1:
+            return httpx.Response(200, json={"stop_reason": "max_tokens", "content": [], "usage": {}})
+        reply = {"customer": {"name": "Acme Robotics Ltd", "_block": "r3"}, "number": "OF-2026-118"}
+        return httpx.Response(200, json={"stop_reason": "end_turn", "content": [{"type": "text", "text": json.dumps(reply)}],
+                                         "usage": {"input_tokens": 10, "output_tokens": 10}})
+
+    llm = L.AnthropicAPILLM(client=httpx.Client(transport=httpx.MockTransport(handler)))
+    out = extract.run(billing_doc(), cfg(small, citations={"enabled": True}), llm=llm)
+    assert out["result"]["number"]["value"] == "OF-2026-118"
+    calls = [b for b in bodies if b["max_tokens"] > 1]
+    assert len(calls) == 1 and set(calls[0]["output_config"]["format"]["schema"]["properties"]) == {"customer", "number"}
+    assert calls[0]["max_tokens"] == 128000  # the model's own output allowance (public limits): never cut short
 
 
 # ---------------------------------------------------------------- property test of the JSON reader (hypothesis)

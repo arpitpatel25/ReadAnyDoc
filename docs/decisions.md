@@ -4,6 +4,35 @@ One line per decision, with the reason, grouped by area in the order they were m
 earlier ones; the first section lists what changed for the first public release. Add a line here when you change
 the document format, a default, or a public interface.
 
+## Extract: enforced at any size, cached document, citations by marks, one stage (2026-11-19)
+
+- A schema the API refuses as one structured-output call is asked in one fixed "coded" format
+  (`{"values": [{"code", "item", "value"}]}`, codes an enum of the schema's own fields), the same in every call, so
+  every call is enforced and every group after the first reads the document from the prompt cache. No re-ask for
+  shape: what still breaks the user's schema is reported. Groups of 40 fields; a group of 150 skipped whole metrics.
+- The document goes first in every extraction prompt and is cached (`cache_control`); within a run only.
+- Page parts are sized in tokens (`part_tokens`, default 30,000, capped by the model's own limit). On a 43-page
+  10-Q (153 values): ~17K-token parts found 130, 30K 129, 45K 89, one 79K part 85. Model limits (context, output,
+  price jump, prices) come from a snapshot of LiteLLM's public model list (`readanydoc/data/model_limits.json`,
+  `scripts/refresh_model_limits.py`), then the server's `/models`; an unknown model is an error naming the
+  setting, never a guess. Every run logs one line with all its settings (`extract settings: {...}`); the trace
+  (`READANYDOC_TRACE`) records every call with tokens, cache reads and writes, cost and why it was made.
+- A value stated once for a table, column or page (a unit, "in thousands", a period in a heading) is written on
+  every item it covers; of two copies of a list item, the less complete one is dropped. Names, titles and labels
+  are copied in full (one-stage reads of a page image shortened "Platform Standard" to "Platform").
+- Citations: the block label the model gives for each object is kept across page parts (matched to the final
+  objects by their values; it was dropped whenever a document had more than one part); a `_from` note per object
+  names the printed words of a value that is not printed as written (a period from a column heading, a scale from
+  "in millions"); a category chosen from the schema's list is never boxed on the same word elsewhere; numbers are
+  never matched as loose digits ("2.1" on "2 — 1"); a short value printed in several places is not boxed at a
+  guess. On the 10-Q: category boxes on the cover page 128 -> 0, periods and scales boxed on their words 0 -> ~210,
+  numbers on the right row 93-94% (Reducto 81%); on the contract pack, whole-section boxes 179 -> 49.
+- `extract(..., parse=False)`: one stage, off by default. The model reads the file itself (a PDF, or page images
+  for scans and photos); words for citations come from the PDF's own text or local OCR, with no model. On the
+  10-Q, 4 runs: 102-110 values (two stages: 129 and 99), about half the cost ($0.12 vs $0.23) and 2.5 times
+  faster (110 s vs 270 s), 3-4 times fewer citation boxes; on the contract pack 83.9% vs 99.1% (names shortened).
+- Same setup, same document: 99 and 129 values in two runs. Decisions from one run are uncertain.
+
 ## Extract 0.2.0: the model writes only the schema (2026-11-18)
 
 - The model writes only the fields of the user's schema. Per-value source notes (0.1.8) are asked for only by

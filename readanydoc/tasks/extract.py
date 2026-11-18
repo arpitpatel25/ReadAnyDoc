@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import copy
 import json
+from pathlib import Path
+import os
 import re
 import threading
 from dataclasses import dataclass, field
@@ -25,7 +27,14 @@ from . import schema as S
 from .common import (DocView, PageRef, RegionRef, TaskError, bbox_dict, page_images, render_pages,
                      select_pages, sum_usage)
 from . import reply_schema as RS
-from .llm import LLM, LLMError, LLMResult, ask_json, repair_brackets
+from . import coded as CD
+from .. import trace
+from .llm import CACHE_MARK, LLM, LLMError, LLMResult, ask_json, repair_brackets
+
+# Largest page part sent to the extraction model, in tokens. Measured on a 43-page 10-Q (ExtractBench, 153 values):
+# ~17K-token parts found 130, 30K found 129 (fewer extra copies, cheaper), 45K found 89, one 79K part found 85.
+# A model with a smaller window gets its own largest; settings.part_tokens overrides either way.
+DEFAULT_PART_TOKENS = 30_000
 
 DEFAULTS: dict[str, Any] = {
     "segment_pages": 8,           # pages per segment for long documents
@@ -37,6 +46,8 @@ DEFAULTS: dict[str, Any] = {
     "row_check_min_rows": 10,     # list completeness: only segments whose tables have at least this many rows
     "row_check_ratio": 0.5,       # ... and whose items fall below this share of the expected count
     "max_tokens": 16000,
+    "coded_group_leaves": 40,     # fields per call in the coded format (lists kept whole): larger groups were
+                                  # measured to skip whole metrics; the document is cached, so groups are cheap
 }
 
 RULES = """You extract structured data from a parsed document.
@@ -391,6 +402,9 @@ def _find_tokens(tokens: list, want: list[str]) -> list[tuple[int, int]]:
             if norms[i] == first and norms[i:i + n] == want]
 
 
+_PLAIN_NUMBER = re.compile(r"[(\-+]?[$€£¥]?\s*[\d.,\s]+%?\)?")  # a number only: matched as a number, never as loose digits
+
+
 @dataclass
 class Match:
     start: int
@@ -413,8 +427,8 @@ def spans(value: Any, ref: RegionRef) -> tuple[list[tuple[int, int]], bool]:
     as_num = float(value) if isinstance(value, (int, float)) else S._to_number(str(value))
     if as_num is not None:
         found = _find_number(masked, as_num)
-        if not found and not isinstance(value, (int, float)) and not str(value).strip().isdigit():
-            found = _find_tokens(tokenize(content), norm_tokens(str(value)))
+        if not found and not isinstance(value, (int, float)) and not _PLAIN_NUMBER.fullmatch(str(value).strip()):
+            found = _find_tokens(tokenize(content), norm_tokens(str(value)))  # "INV-2041": text that holds a number
         return found, True
     want = norm_tokens(str(value))
     if not want:
@@ -734,6 +748,17 @@ def carry_hint(prev: Any) -> str:
 class _Extractor:
     def __init__(self, view: DocView, pages: list[PageRef], user_schema: dict, system_prompt: str,
                  llm: LLM, opts: dict, track: bool, include_images: bool):
+        if getattr(llm, "prompt_cache", False) and not opts.get("max_tokens_set"):
+            # Anthropic: the reply may use the model's whole output allowance (from its public limits); only the
+            # tokens written are billed, and a reply cut off at a lower cap would have to be asked again
+            from .. import model_limits as ML
+            from .llm import THINKING_HEADROOM
+            try:
+                out_cap = int(ML.for_llm(llm)[0].get("max_output") or 0)
+            except ML.UnknownModel:
+                out_cap = 0
+            if out_cap > THINKING_HEADROOM:
+                opts = {**opts, "max_tokens": out_cap - THINKING_HEADROOM}
         self.view, self.pages, self.llm, self.opts = view, pages, llm, opts
         self.prompt_schema = S.resolve_refs(user_schema)
         self.strict = S.enforced(self.prompt_schema)
@@ -753,11 +778,33 @@ class _Extractor:
         self.label_page = {ref.label: p.number for p in view.pages for ref in p.regions}
         self.track_text = TRACK
         self.extra_text = ""  # example outputs (instructions.examples), shown with every prompt
+        self.direct: dict = {}  # one-stage extraction: {"pdf": path} or {"images": {page: file}} the model reads
+        self.pdf_path: Optional[str] = None  # set when the model reads the file itself (direct), not parsed text
+        self._pdf_marks: dict = {}
+
+    def _pdf_part(self, pages: list[PageRef]) -> str:
+        """The placeholder for these pages of the file itself: a PDF of only these pages, or their images."""
+        from ..textlayer import pdf_subset
+        from .llm import image_mark, pdf_mark
+        key = tuple(p.number for p in pages)
+        with self._lock:
+            if key not in self._pdf_marks:
+                if self.direct.get("pdf"):
+                    self._pdf_marks[key] = pdf_mark(pdf_subset(self.direct["pdf"], list(key)))
+                else:
+                    imgs = self.direct["images"]
+                    self._pdf_marks[key] = image_mark([Path(imgs[n]).read_bytes() for n in key if n in imgs])
+            return self._pdf_marks[key]
 
     # -- prompts
     def _prompt(self, pages: list[PageRef], schema: dict, part: Optional[tuple[int, int]] = None,
                 extra: str = "") -> str:
-        out = ["Document:", render_pages(pages, labels=self.labels or self.track, marks=self.struck), "",
+        # the document comes first and is the same for every group of fields: CACHE_MARK lets the API cache it
+        if self.pdf_path:  # one-stage: the model reads the PDF pages themselves (sent as a document block)
+            doc_text = self._pdf_part(pages)
+        else:
+            doc_text = render_pages(pages, labels=self.labels or self.track, marks=self.struck)
+        out = ["Document:", doc_text + CACHE_MARK,
                "JSON Schema:", json.dumps(schema, ensure_ascii=False), ""]
         if self.track:
             out += [TRACK, ""]
@@ -786,6 +833,7 @@ class _Extractor:
         """
         images = page_images(pages) if self.include_images and self.llm.supports_images else None
         reply_schema = envelope_schema(schema) if self.track else schema
+        fmt_schema = reply_schema
         want = '"data" and "sources"' if self.track else (
             ", ".join(f'"{k}"' for k in schema["properties"]) if S.is_object(schema) else "")
         got: list[LLMResult] = []
@@ -818,7 +866,7 @@ class _Extractor:
             return fixed
 
         try:
-            data, results = ask_json(self.llm, self.system, prompt, images=images or None, json_schema=reply_schema,
+            data, results = ask_json(self.llm, self.system, prompt, images=images or None, json_schema=fmt_schema,
                                      max_tokens=self.opts["max_tokens"], retries=1, repair=repair)
             got += results
             if data is not None and not root_ok(data, schema):
@@ -826,7 +874,7 @@ class _Extractor:
                          + (f" (a JSON object with the top-level keys {want})" if want else "")
                          + ". Reply again with the complete JSON only.")
                 data, results = ask_json(self.llm, self.system, again, images=images or None,
-                                         json_schema=reply_schema, max_tokens=self.opts["max_tokens"], retries=0,
+                                         json_schema=fmt_schema, max_tokens=self.opts["max_tokens"], retries=0,
                                          repair=repair)
                 got += results
                 if not root_ok(data, schema):
@@ -972,28 +1020,26 @@ class _Extractor:
                      "required": list(g.get("required", [])) + [RS.ALT_FIELD]}
             return g
 
-        groups = RS.plan(core)
+        # One rule (enforcement on in every call where the model supports it):
+        #   single: the API compiles the whole reply schema -> one call, the user's schema enforced
+        #   coded:  it does not (the grammar is too large) -> the fixed coded format, the same in every call so the
+        #           document is cached once (coded.py)
+        #   plain:  a model without structured outputs -> groups of fields as before (reply_schema.plan)
         check = getattr(self.llm, "format_ok", None)
-        if check is not None and getattr(self.llm, "structured_outputs", False):
-            # the API also caps the size of the compiled schema (not published): a group it will not compile is
-            # split before the call, so every call keeps its enforced shape
-            fits: list[list[tuple]] = []
-            todo = list(groups)
-            while todo:
-                batch, todo = todo, []
-                if len(batch) > 1:
-                    from concurrent.futures import ThreadPoolExecutor
-                    with ThreadPoolExecutor(min(len(batch), 4)) as pool:
-                        oks = list(pool.map(lambda g: check(group_schema(g)), batch))
-                else:
-                    oks = [check(group_schema(batch[0]))]
-                for g, ok in zip(batch, oks):
-                    parts = None if ok else RS.split_group(core, g)
-                    if parts is None:
-                        fits.append(g)  # compiles, or cannot be split: sent as is (without a format if refused)
-                    else:
-                        todo += parts
-            groups = fits
+        so = check is not None and bool(getattr(self.llm, "structured_outputs", False))
+        whole = [(k,) for k in core["properties"]]
+        if so:
+            ok = check(group_schema(whole))
+            trace.event("extract_plan", mode="single" if ok else "coded", fields=RS._leaves(core),
+                        top_level=len(whole), pages=len(pages), part=part,
+                        reason="whole schema compiles" if ok else "the API refused the whole schema")
+            if not ok:
+                return self._ask_coded(pages, core, alt, user, strict, part, extra)
+            groups = [whole]
+        else:
+            groups = RS.plan(core)
+            trace.event("extract_plan", mode="plain", fields=RS._leaves(core), groups=len(groups), pages=len(pages),
+                        part=part, reason="model without structured outputs")
 
         def one(paths: list[tuple], note: str) -> Any:
             # shape problems are judged after conversion, against the user's schema (below), not here
@@ -1001,20 +1047,25 @@ class _Extractor:
             if len(groups) > 1:
                 # a group alone can be mistaken for its neighbours (the seller filled in with the buyer): it is
                 # told which fields of the whole schema are asked separately
-                mine = {".".join(p) for p in paths if p and p[-1] != "_block"}
-                others = [".".join(p) for gr in groups for p in gr if p and p[-1] != "_block"
+                mine = {".".join(p) for p in paths if p and p[-1] not in RS.MARKS}
+                others = [".".join(p) for gr in groups for p in gr if p and p[-1] not in RS.MARKS
                           and ".".join(p) not in mine]
                 if others:
                     part_note = ("This JSON Schema is one part of a larger one. These other fields are filled "
                                  "separately: " + ", ".join(dict.fromkeys(others)) + ". Fill only the fields "
                                  "here, each with the value that belongs to it and not to one of those fields.")
                     note = f"{note}\n\n{part_note}" if note else part_note
-            return self.extract(pages, g, S.enforced(g), part, note, repairs=0)[0]
+            with trace.tags(why="single" if len(groups) == 1 else f"group {groups.index(paths) + 1}/{len(groups)}"):
+                return self.extract(pages, g, S.enforced(g), part, note, repairs=0)[0]
 
         def answer(note: str, which: list[list[tuple]]) -> tuple[Any, dict, list]:
             if len(which) > 1 and getattr(self.llm, "parallel_safe", False):
                 from concurrent.futures import ThreadPoolExecutor
-                with ThreadPoolExecutor(min(len(which), 4)) as pool:
+                warm = getattr(self.llm, "warm", None)
+                if warm is not None and getattr(self.llm, "prompt_cache", False):
+                    # calls sent together cannot read each other's cache: write it once first
+                    warm(self.system, self._prompt(pages, group_schema(which[0]), part, note))
+                with ThreadPoolExecutor(min(len(which), 8)) as pool:
                     answers = list(pool.map(lambda g: one(g, note), which))
             else:
                 answers = [one(g, note) for g in which]
@@ -1027,7 +1078,7 @@ class _Extractor:
                 if isinstance(a, list):
                     alts += [x for x in a if isinstance(x, dict) and str(x.get("value", "")).strip()]
                 merged = RS.merge(merged, v)
-            hints = RS.take_blocks(merged)
+            hints = RS.take_marks(merged)
             value = S.conform(RS.from_reply(merged, user), strict)
             if value is None and S.is_object(strict):
                 value = S.empty_instance(strict)
@@ -1047,7 +1098,9 @@ class _Extractor:
                 'document does not contain a valid value for a field, use "".')
             bad = {p[0] for p, _ in errors if p and isinstance(p[0], str)}
             which = [g for g in groups if any(path[0] in bad for path in g)] or groups
-            v2, h2, a2 = answer(fix, which)
+            trace.event("schema_repair", errors=len(errors), fields=sorted(bad)[:20])
+            with trace.tags(why="repair: answer broke the user's schema"):
+                v2, h2, a2 = answer(fix, which)
             if isinstance(value, dict) and isinstance(v2, dict) and which is not groups:
                 v2 = {**value, **{k: v2.get(k) for k in {path[0] for g in which for path in g}}}
                 h2 = {**hints, **h2}
@@ -1057,6 +1110,95 @@ class _Extractor:
                 alts = alts + a2
             else:
                 break
+        return value, hints, alts
+
+    # -- a schema too complex for one structured call: the fixed coded format (coded.py)
+    def _ask_coded(self, pages: list[PageRef], core: dict, alt: Optional[dict], user: dict, strict: dict,
+                   part: Optional[tuple[int, int]], extra: str) -> tuple[Any, dict, list]:
+        leaves = CD.build(core)
+        fmt = CD.format_schema(leaves, alt)
+        enum_ok = self.llm.format_ok(fmt)
+        if not enum_ok:  # the list of codes is too large for the grammar: codes as plain text, checked by code
+            fmt = CD.format_schema(leaves, alt, enum_codes=False)
+        groups = CD.groups(leaves, int(self.opts.get("coded_group_leaves", 40)))
+        trace.event("coded_plan", codes=len(leaves), groups=len(groups), group_sizes=[len(g) for g in groups],
+                    code_enum=enum_ok)
+        note = self.reply_note.replace(RS.NOTE, CD.NOTE)
+        doc = render_pages(pages, labels=self.labels or self.track, marks=self.struck)
+
+        def prompt(gl: list) -> str:
+            out = ["Document:", doc + CACHE_MARK, "Fields to fill (code | field | what it takes):", CD.lines(gl), ""]
+            if len(groups) > 1:
+                out += ["These are some of the fields; the others are filled separately. Fill only these, each "
+                        "with the value that belongs to it.", ""]
+            out += [note, ""]
+            if part and part[1] > 1:
+                out += [f"This is part {part[0]} of {part[1]} of a longer document (pages {pages[0].number}-"
+                        f"{pages[-1].number}). Extract only what appears in these pages.", ""]
+            if self.extra_text:
+                out += [self.extra_text, ""]
+            if extra:
+                out += [extra, ""]
+            out.append("Return the JSON now.")
+            return "\n".join(out)
+
+        def call(gl: list, why: str, depth: int = 0) -> tuple[dict, list]:
+            with trace.tags(why=why, group_fields=len(gl)):
+                try:
+                    data, results = ask_json(self.llm, self.system, prompt(gl), json_schema=fmt,
+                                             max_tokens=self.opts["max_tokens"], retries=0)
+                except LLMError as e:
+                    raise TaskError(502, f"model call failed: {e}") from e
+                self.results.extend(results)
+                last = results[-1] if results else None
+                if data is None and last is not None and last.truncated and depth < 3:
+                    halves = CD.split(gl)
+                    trace.event("coded_truncated", fields=len(gl), split=halves is not None)
+                    if halves is not None:
+                        a = call(halves[0], f"{why} / cut off, first half", depth + 1)
+                        b = call(halves[1], f"{why} / cut off, second half", depth + 1)
+                        return RS.merge(a[0], b[0]), a[1] + b[1]
+                if data is None:
+                    trace.event("coded_unreadable", fields=len(gl),
+                                stop=last.stop_reason if last is not None else None)
+                    with self._lock:
+                        names = sorted({l.path[0] for l in gl})
+                        self.unreadable.update(names)
+                        self.failed.append((pages[0].number, pages[-1].number, names))
+                    return {}, []
+                value, stats = CD.rebuild(data, {l.code: l for l in gl})
+                trace.event("coded_rebuild", fields=len(gl), **stats)
+                a = data.get("alternatives") if isinstance(data, dict) else None
+                return value, [x for x in a if isinstance(x, dict) and str(x.get("value", "")).strip()] \
+                    if isinstance(a, list) else []
+
+        n = len(groups)
+        # the first call writes the document to the cache; the rest are sent together after it and read it
+        answers = [call(groups[0], f"coded group 1/{n}")]
+        if n > 1:
+            if getattr(self.llm, "parallel_safe", False):
+                from concurrent.futures import ThreadPoolExecutor
+                with ThreadPoolExecutor(min(n - 1, 8)) as pool:
+                    answers += list(pool.map(lambda a: call(a[1], f"coded group {a[0] + 2}/{n}"),
+                                             enumerate(groups[1:])))
+            else:
+                answers += [call(g, f"coded group {i + 2}/{n}") for i, g in enumerate(groups[1:])]
+        merged: dict = {}
+        alts: list = []
+        for v, a in answers:
+            merged = RS.merge(merged, v)
+            alts += a
+        hints = RS.take_marks(merged)
+        value = S.conform(RS.from_reply(merged, user), strict)
+        if value is None and S.is_object(strict):
+            value = S.empty_instance(strict)
+        errors = S.find_errors(value, strict)
+        # no re-ask: what still breaks the user's schema is reported (and emptied later, like any answer)
+        trace.event("coded_result", schema_errors=len(errors), examples=[S.path_str(p) for p, _ in errors[:10]])
+        if errors:
+            with self._lock:
+                self.notes.append("values that did not fit the schema: " +
+                                  ", ".join(S.path_str(p) for p, _ in errors[:8]))
         return value, hints, alts
 
     # -- citation support
@@ -1077,6 +1219,81 @@ class _Extractor:
                 if m is not None:
                     hits.append((ref, m))
         return hits
+
+
+def _blank_value(v: Any) -> bool:
+    return v is None or v == "" or v == [] or v == {}
+
+
+def _partial_copy(a: dict, b: dict) -> bool:
+    """``a`` adds nothing to ``b``: every field ``a`` fills, ``b`` fills with the same value, and ``b`` fills more.
+    At least two filled fields in common, so two short different items are never merged."""
+    filled = [k for k, v in a.items() if k not in RS.MARKS and not _blank_value(v)]
+    if len(filled) < 2 or any(b.get(k) != a[k] for k in filled):
+        return False
+    return any(_blank_value(a.get(k)) and not _blank_value(v) for k, v in b.items() if k not in RS.MARKS)
+
+
+def drop_partial_copies(value: Any) -> tuple[Any, int]:
+    """Every list of objects without the items that are less complete copies of another item; (value, dropped)."""
+    dropped = 0
+
+    def go(v: Any) -> Any:
+        nonlocal dropped
+        if isinstance(v, dict):
+            return {k: go(x) for k, x in v.items()}
+        if isinstance(v, list):
+            items = [go(x) for x in v]
+            if all(isinstance(x, dict) for x in items) and len(items) > 1:
+                keep = [a for a in items if not any(b is not a and _partial_copy(a, b) for b in items)]
+                dropped += len(items) - len(keep)
+                return keep
+            return items
+        return v
+
+    return go(value), dropped
+
+
+PDF_PAGE_TOKENS = 1600  # a PDF page sent to the model also costs its page image (about 1,600 tokens for a letter page)
+
+
+def _token_parts(pages: list[PageRef], budget: int, overlap: int = 1, per_page: int = 0) -> list[list[PageRef]]:
+    """Pages in parts of at most ``budget`` tokens (estimated from characters, no call), neighbouring parts
+    sharing ``overlap`` pages. One part when the whole document fits: every field is then answered from the whole
+    document, once."""
+    from .. import model_limits as ML
+    toks = [ML.estimate_tokens(sum(len(ref.region.content) for ref in p.regions)) + per_page for p in pages]
+    if sum(toks) <= budget or len(pages) < 2:
+        return [pages]
+    parts, i = [], 0
+    while i < len(pages):
+        j, used = i, 0
+        while j < len(pages) and (j == i or used + toks[j] <= budget):
+            used += toks[j]
+            j += 1
+        parts.append(pages[i:j])
+        if j >= len(pages):
+            break
+        i = j - overlap if j - overlap > i else j
+    return parts
+
+
+def part_budget_for(llm: LLM, opts: dict) -> tuple[int, str, dict]:
+    """(largest page part in tokens, where the number came from, the model's limits). ``part_tokens`` in the
+    options overrides; otherwise the largest part that stays under the model's price jump and context window."""
+    from .. import model_limits as ML
+    try:
+        limits, source = ML.for_llm(llm)
+    except ML.UnknownModel as e:
+        if opts.get("part_tokens"):
+            return int(opts["part_tokens"]), "set in options (part_tokens)", {}
+        raise TaskError(400, str(e)) from e
+    if opts.get("part_tokens"):
+        return int(opts["part_tokens"]), "set in options (part_tokens)", limits
+    largest = ML.part_budget(limits)
+    if largest <= DEFAULT_PART_TOKENS:
+        return largest, f"largest under the model's limits ({source})", limits
+    return DEFAULT_PART_TOKENS, f"default (measured best for accuracy; this model allows up to {largest})", limits
 
 
 def _segments(pages: list[PageRef], opts: dict, force: bool) -> list[list[PageRef]]:
@@ -1376,36 +1593,142 @@ def build_citations(value: Any, labels: list[str], ex: _Extractor, cit_cfg: dict
     return []
 
 
+def _is_label(schema: Any) -> bool:
+    """A field whose value is one of a fixed list (an enum): a category the model chose, not printed text."""
+    if not isinstance(schema, dict):
+        return False
+    if isinstance(schema.get("enum"), list) or "const" in schema:
+        return True
+    return any(_is_label(b) for b in schema.get("anyOf") or [] if isinstance(b, dict) and b.get("type") != "null")
+
+
+def _mark_value(x: Any) -> Optional[str]:
+    if x is None or isinstance(x, (dict, list)) or (isinstance(x, str) and not x.strip()):
+        return None
+    if isinstance(x, bool):
+        return str(x)
+    try:
+        return repr(float(x))
+    except (TypeError, ValueError):
+        return str(x).strip().lower()
+
+
+def _signature(obj: dict) -> frozenset:
+    return frozenset((k, v) for k, x in obj.items() if (v := _mark_value(x)) is not None)
+
+
+def _objects(value: Any, path: tuple = ()) -> Any:
+    if isinstance(value, dict):
+        yield path, value
+        for k, x in value.items():
+            yield from _objects(x, path + (k,))
+    elif isinstance(value, list):
+        for i, x in enumerate(value):
+            yield from _objects(x, path + (i,))
+
+
+def _shape(path: tuple) -> tuple:
+    return tuple("*" if isinstance(p, int) else p for p in path)
+
+
+def remap_marks(value: Any, parts: list[tuple[Any, dict]]) -> dict[tuple, dict]:
+    """The model's marks ("_block": which block an object was read from, "_from": the printed words of a value
+    that is not printed as written) moved from each part's answer onto the final value's objects.
+
+    Paths change when parts are merged and copies dropped, so an object is matched by its values: a part's
+    object whose filled values are all in the final object (same place in the schema) gives it its marks; of
+    several, the one with the most values in common."""
+    cands: dict[tuple, list] = {}
+    for v, marks in parts:
+        for path, mark in (marks or {}).items():
+            obj = _get(v, path) if path else v
+            if isinstance(obj, dict):
+                cands.setdefault(_shape(path), []).append((_signature(obj), mark))
+    out: dict[tuple, dict] = {}
+    for path, obj in _objects(value):
+        options = cands.get(_shape(path))
+        if not options:
+            continue
+        sig = _signature(obj)
+        listed = "*" in _shape(path)
+        fits = [(len(c), m) for c, m in options if c <= sig and (c or not listed)]
+        if not fits:
+            continue
+        fits.sort(key=lambda t: -t[0])
+        best = fits[0][0]
+        top = [m for n, m in fits if n == best]
+        block = next((m["block"] for m in top if m.get("block")), None)
+        frm: dict = {}
+        for m in top:
+            for k, w in (m.get("from") or {}).items():
+                frm.setdefault(k, w)
+        out[path] = {"block": block, "from": frm}
+    return out
+
+
 def code_citations(value: Any, ex: _Extractor, cit_cfg: dict, hints: dict) -> dict[tuple, list[dict]]:
     """Citations found by code: every value is looked up in the parsed pages (its exact text, then the other ways
     a number or date is printed). A value printed once is cited there. A value printed in several places is
     cited where the other values of its object (its table row, its address) were found, else in the block the
-    model named for that object (``hints``, the "_block" fields), else at its first place. A value that is not
-    in the document gets no citation, or the named block with low confidence. Measured on eight documents
-    against Reducto: 91.7% of boxes on the right words vs 88.7% (docs/decisions.md)."""
-    leaves = [(p, v) for p, v, _ in S.iter_leaves(value, ex.strict) if p and v is not None and not isinstance(v, bool)]
-    hits = {p: ex.found_anywhere(v) for p, v in leaves}
+    model named for that object (``hints``: the "_block" marks), else, for a printed value, at its first place
+    (low confidence). A value the model worked out or wrote in another form is cited on the printed words it
+    named for it (the "_from" marks: a column heading for a period, "in millions" for a scale). A category the
+    model chose from the schema's list (an enum) is cited only where its object's values are, never on the same
+    word elsewhere in the document. A value that is not in the document gets no citation, or the named block with
+    low confidence."""
+    leaves = [(p, v, sch) for p, v, sch in S.iter_leaves(value, ex.strict) if p and v is not None and not isinstance(v, bool)]
+    hits = {p: ex.found_anywhere(v) for p, v, _ in leaves}
+    label_field = {p: _is_label(sch) for p, _, sch in leaves}
     anchors: dict[tuple, dict[str, int]] = {}
     for p, h in hits.items():  # an object's values (a row, an address) are printed together; the root's are not
-        if len(p) > 1 and len(h) == 1 and h[0][1].occurrences == 1:
+        if len(p) > 1 and len(h) == 1 and h[0][1].occurrences == 1 and not label_field[p]:
             anchors.setdefault(p[:-1], {}).setdefault(h[0][0].label, h[0][1].start)
+
+    def mark_of(p: tuple) -> tuple[Optional[str], Optional[str]]:
+        """(block label of the nearest object with one, printed words the model named for this value)"""
+        block = words = None
+        for k in range(len(p) - 1, -1, -1):
+            m = hints.get(p[:k])
+            if not m:
+                continue
+            if k == len(p) - 1 and isinstance(p[-1], str):
+                words = (m.get("from") or {}).get(p[-1])
+            if m.get("block"):
+                block = m["block"]
+                break
+        return block, words
+
     out: dict[tuple, list[dict]] = {}
-    for p, v in leaves:
-        hint = next((hints[p[:k]] for k in range(len(p) - 1, -1, -1) if p[:k] in hints), None)
+    for p, v, _ in leaves:
+        hint, words = mark_of(p)
         near = anchors.get(p[:-1], {})
         h = hits[p]
+        here = set(near) | ({hint} if hint else set())
 
         def cite(ref: RegionRef, conf: float, v: Any = v, near: dict = near) -> list[dict]:
             return [_citation(ref, locate(v, ref, near.get(ref.label)), conf, cit_cfg)]
 
-        if len(h) == 1 and h[0][1].occurrences == 1:
+        if words:  # the model named the printed words this value comes from
+            wh = ex.found_anywhere(words)
+            pick = [x for x in wh if x[0].label in here]
+            if pick:
+                out[p] = cite(pick[0][0], 0.9, v=words)
+                continue
+            if len(wh) == 1 and wh[0][1].occurrences == 1:
+                out[p] = cite(wh[0][0], 0.85, v=words)
+                continue
+        if len(h) == 1 and h[0][1].occurrences == 1 and not (label_field[p] and here and h[0][0].label not in here):
             out[p] = cite(h[0][0], 0.95 if h[0][1].exact else 0.85)
             continue
         pick = ([x for x in h if x[0].label in near] or [x for x in h if hint and x[0].label == hint])
         if pick:
             out[p] = cite(pick[0][0], 0.9 if pick[0][1].exact else 0.8)
-        elif h:
-            out[p] = cite(h[0][0], 0.6)
+        elif h and not label_field[p] and sum(ch.isalnum() for ch in str(v)) >= 4:
+            out[p] = cite(h[0][0], 0.6)  # a distinctive value printed in several places: its first place, low
+        elif h and not label_field[p]:
+            out[p] = []  # a short value ("1", "7") printed in several places with nothing to choose by: no guess
+        elif label_field[p]:
+            out[p] = []  # a chosen category with no printed source near its object: no box beats a wrong one
         else:
             out[p] = build_citations(v, [hint], ex, cit_cfg) if hint else []
     return out
@@ -1501,7 +1824,20 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
     examples, ex_warnings = X.check_examples(instructions.get("examples"), S.resolve_refs(user_schema))
     warnings += ex_warnings
 
-    segments = _segments(pages, opts, force=deep or bool(settings.get("array_extract")))
+    if settings.get("part_tokens"):  # largest page part in tokens, from the request's settings
+        try:
+            opts["part_tokens"] = int(settings["part_tokens"])
+        except (TypeError, ValueError) as e:
+            raise TaskError(400, f"settings.part_tokens must be a whole number of tokens, not {settings['part_tokens']!r}") from e
+        if opts["part_tokens"] < 1000:
+            raise TaskError(400, "settings.part_tokens must be at least 1000")
+    forced = deep or bool(settings.get("array_extract"))
+    budget, budget_source, limits = part_budget_for(llm, opts)
+    if forced:  # array_extract / deep_extract ask for smaller parts on purpose (long lists, per-part checks)
+        segments = _segments(pages, opts, force=True)
+    else:
+        segments = _token_parts(pages, budget, int(opts.get("segment_overlap", 1)),
+                                PDF_PAGE_TOKENS if (opts.get("direct") or {}) else 0)
     review_on = bool(settings.get("review"))  # code-only checks on the answer, returned under "review"
     alt_cfg = settings.get("alternatives")  # other values the document gives for a field (true or a list of paths)
     derived_ok = settings.get("derived_values", True) is not False
@@ -1509,6 +1845,8 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
     # whose checks need them; citations are found by code (code_citations).
     track = deep
     ex = _Extractor(view, pages, user_schema, system_prompt, llm, opts, track, bool(settings.get("include_images")))
+    ex.direct = dict(opts.get("direct") or {})
+    ex.pdf_path = "direct" if (ex.direct.get("pdf") or ex.direct.get("images")) else None
     from . import field_report as FR
     ex.struck = FR.struck_spans(all_pages)  # crossed-out words: shown to the model as ~~text~~ (code, no call)
     ex.results.extend(pre_results)
@@ -1518,16 +1856,20 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
     if use_reply:  # structured outputs for any schema size (reply_schema): the model answers in this shape
         reply = RS.to_reply(ex.prompt_schema)
         if citations_on:
-            reply = RS.add_blocks(reply)
-            ex.labels = True
+            reply = RS.add_blocks(reply, blocks=not ex.pdf_path)  # the PDF has no block labels to name
+            ex.labels = not ex.pdf_path
         if alt_cfg:
             reply = RS.add_alternatives(reply, [str(a) for a in alt_cfg] if isinstance(alt_cfg, list) else None)
         ex.reply = reply
         note = [RS.NOTE]
         if citations_on:
-            note.append('Every block of the document starts with a label such as [r12|Table]; a "_block" field '
-                        "takes the label of the block its object's values were read from (for a table row, the "
-                        "table's label).")
+            note.append(("" if ex.pdf_path else
+                         'Every block of the document starts with a label such as [r12|Table]; a "_block" field '
+                         "takes the label of the block its object's values were read from (for a table row, the "
+                         "table's label). ") + "A \"_from\" field names, for each value of its object that is not "
+                        "printed word for word (a period read from a column heading, a scale from \"in millions\", "
+                        "a code from a name, a date worked out from a term), the printed words it comes from, copied "
+                        "exactly, as \"field name: words\" lines (the field's name, not its code); \"\" when every value is printed as written.")
         if any(ex.struck.values()):
             note.append("Text between ~~ and ~~ is crossed out on the page.")
         if not derived_ok:
@@ -1536,15 +1878,34 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
                         "Writing a printed value in another format is fine.")
         ex.reply_note = "\n".join(note)
     hints: dict = {}
+    seg_marks: dict = {}  # id(part answer) -> (answer, marks)
     alts: list = []
+    run_config = {
+        "extract_model": getattr(llm, "name", type(llm).__name__), "effort": getattr(llm, "effort", None),
+        "structured_outputs": bool(getattr(llm, "structured_outputs", False)),
+        "prompt_cache": bool(getattr(llm, "prompt_cache", False)),
+        "model_limits": {k: limits.get(k) for k in ("max_input", "max_output", "price_jump") if k in limits},
+        "part_tokens": budget, "part_tokens_source": budget_source,
+        "parts": len(segments), "pages_per_part": [len(sg) for sg in segments], "forced_parts": forced,
+        "fields_per_group": int(opts.get("coded_group_leaves", 40)), "max_output_tokens": ex.opts.get("max_tokens"),
+        "citations": citations_on, "deep_extract": deep, "array_extract": bool(settings.get("array_extract")),
+        "review": review_on, "alternatives": bool(alt_cfg), "derived_values": derived_ok,
+        "include_images": bool(settings.get("include_images")), "page_range": settings.get("page_range"),
+        "relevance_filter": bool(settings.get("relevance_filter")), "pages": len(pages),
+        "one_stage": bool(ex.pdf_path),  # the model read the PDF itself; no parsing stage
+    }
+    trace.event("run_config", **run_config)
+    import logging
+    logging.getLogger("readanydoc").info("extract settings: %s", json.dumps(run_config, default=str))
 
     def run_segment(i: int, seg: list[PageRef], extra: str = "") -> tuple[Any, dict]:
         if not use_reply:
             return ex.extract(seg, part=(i + 1, len(segments)), extra=extra)
         v, h, a = ex.ask(seg, part=(i + 1, len(segments)), extra=extra)
         with ex._lock:
-            if len(segments) == 1:  # object paths shift when segments are merged: hints only for one segment
-                hints.update(h)
+            # object paths shift when parts are merged and copies dropped: the marks are matched back to the final
+            # objects by their values (remap_marks), for every part
+            seg_marks[id(v)] = (v, h)
             alts.extend(a)
         return v, {}
 
@@ -1570,8 +1931,19 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
             if not needs_carry(parts[i - 1][0], redo[0]):
                 parts[i] = redo
     if (settings.get("array_extract") or len(segments) > 1) and not use_loop and is_obj:
-        parts, gaps = _complete_rows(parts, segments, ex, opts)  # long lists: rows checked against the tables
-        warnings += gaps
+        if use_reply:
+            # structured path: no re-ask (it would go without enforcement and replace a whole answer); a list that
+            # looks short against its tables is reported
+            ap = _main_array(parts)
+            rows = [table_rows(seg) for seg in segments]
+            for i in short_segments(parts, rows, ap, opts) if ap is not None else []:
+                got = len(_get(parts[i][0], ap) or [])
+                warnings.append(f"{S.path_str(ap)}: pages {segments[i][0].number}-{segments[i][-1].number} gave "
+                                f"{got} items but their tables have about {rows[i]} rows; some items may be missing")
+            trace.event("list_check", reported=len(warnings))
+        else:
+            parts, gaps = _complete_rows(parts, segments, ex, opts)  # long lists: rows checked against the tables
+            warnings += gaps
     conflicts: list = []
     tree = None
     for i, (v, s) in enumerate(parts):
@@ -1583,6 +1955,12 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
             ex.notes[:3] or [f"the reply could not be read for pages {a}-{b}" for a, b, _ in ex.failed[:3]]))
     value, sources = _split_tree(tree)
     value = S.conform(value, ex.strict)
+    if use_reply:
+        # page parts and groups can each write the same list item, one copy with fewer fields filled (a scale or
+        # unit given once for a table): the less complete copy is dropped, the fuller one is the evidence
+        value, dropped = drop_partial_copies(value)
+        if dropped:
+            trace.event("partial_copies_dropped", items=dropped)
     if (extras.get("relevance") or {}).get("filtered") and not use_loop and is_obj:
         # the relevance step left pages out: a field that is still empty gets one look at those pages
         lost = X.missing_fields(value, ex.strict)
@@ -1671,6 +2049,9 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
             cites = {p: build_citations(v, sources.get(p, []), ex, cit_cfg, anchors.get(p[:-1]))
                      for p, v, _ in S.iter_leaves(value, ex.strict) if p}
         else:
+            hints = remap_marks(value, [seg_marks[id(v)] for v, _ in parts if id(v) in seg_marks])
+            trace.event("citation_marks", objects=len(hints), with_block=sum(1 for m in hints.values() if m.get("block")),
+                        with_from=sum(1 for m in hints.values() if m.get("from")))
             cites = code_citations(value, ex, cit_cfg, hints)
     result: Any = (S.map_leaves(value, ex.strict, lambda path, v, s: {"value": v, "citations": cites.get(path, [])})
                    if citations_on else [value])
