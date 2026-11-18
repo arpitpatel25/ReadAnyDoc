@@ -196,3 +196,11 @@ def test_a_group_the_api_will_not_compile_is_split_before_the_call(monkeypatch):
     out = extract.run(make_doc([["hello"]]), {"instructions": {"schema": schema}, "settings": {}}, llm=llm)
     assert sent and all(sent)  # every real call had an enforced format
     assert out["result"][0] == {"a": {f"a{i}": "x" for i in range(5)}, "b": {f"b{i}": "x" for i in range(5)}}
+
+
+def test_an_optional_object_the_document_does_not_have_comes_back_as_null():
+    addr = {"type": "object", "properties": {"line1": {"type": "string"}, "city": {"type": "string"}}}
+    schema = {"type": "object", "properties": {"ship_to": {"anyOf": [addr, {"type": "null"}]}, "bill_to": addr}}
+    got = RS.from_reply({"ship_to": {"line1": "", "city": ""}, "bill_to": {"line1": "", "city": ""}}, schema)
+    assert got["ship_to"] is None  # nullable: the user's schema says null when absent
+    assert got["bill_to"] == {"line1": None, "city": None}  # required object: kept, with empty fields

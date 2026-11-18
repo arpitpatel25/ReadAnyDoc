@@ -998,6 +998,17 @@ class _Extractor:
         def one(paths: list[tuple], note: str) -> Any:
             # shape problems are judged after conversion, against the user's schema (below), not here
             g = group_schema(paths)
+            if len(groups) > 1:
+                # a group alone can be mistaken for its neighbours (the seller filled in with the buyer): it is
+                # told which fields of the whole schema are asked separately
+                mine = {".".join(p) for p in paths if p and p[-1] != "_block"}
+                others = [".".join(p) for gr in groups for p in gr if p and p[-1] != "_block"
+                          and ".".join(p) not in mine]
+                if others:
+                    part_note = ("This JSON Schema is one part of a larger one. These other fields are filled "
+                                 "separately: " + ", ".join(dict.fromkeys(others)) + ". Fill only the fields "
+                                 "here, each with the value that belongs to it and not to one of those fields.")
+                    note = f"{note}\n\n{part_note}" if note else part_note
             return self.extract(pages, g, S.enforced(g), part, note, repairs=0)[0]
 
         def answer(note: str, which: list[list[tuple]]) -> tuple[Any, dict, list]:

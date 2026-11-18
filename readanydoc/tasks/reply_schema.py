@@ -28,9 +28,11 @@ MAX_LEAVES = 40      # fields per call: larger schemas are split into groups (Re
                      # live, so a group the API still refuses is split further (split_group)
 MAX_UNIONS = 16      # the API's limit on fields with more than one type (anyOf branches left after the rewrite)
 
-NOTE = ('Every field in the JSON Schema is required. When the document does not contain a value, write "" for '
-        'it (or [] for a list); never fill a field with a guess. Write numbers, dates and yes/no answers as text: '
-        'numbers as plain digits ("4200.50", "-1200"), dates in the format the schema description asks for.')
+NOTE = ('Every field in the JSON Schema is required. Write "" for a field (or [] for a list) when the document '
+        'gives no value for it and does not make one clear; never fill a field with a guess. A value the document '
+        'gives in another form is not a guess: write it in the form the field asks for (a country name as its '
+        'code, a yes/no that the terms answer). Write numbers, dates and yes/no answers as text: numbers as plain '
+        'digits ("4200.50", "-1200"), dates in the format the schema description asks for.')
 
 _KEEP = ("description", "title")
 
@@ -93,6 +95,7 @@ def from_reply(value: Any, schema: Any) -> Any:
     """The answer in the user's types: "" -> null, number and yes/no text converted, enum spelling matched."""
     if not isinstance(schema, dict):
         return value
+    nullable = _allows_null(schema)
     schema = S.branch_for(schema, value)
     live = _live(schema)
     if len(live) == 1 and live[0] is not schema:
@@ -100,8 +103,10 @@ def from_reply(value: Any, schema: Any) -> Any:
     if S.is_object(schema):
         if not isinstance(value, dict):
             return None if value in ("", None) else value
-        return {k: from_reply(value.get(k), sub) for k, sub in schema["properties"].items()} | \
+        out = {k: from_reply(value.get(k), sub) for k, sub in schema["properties"].items()} | \
             {k: v for k, v in value.items() if k not in schema["properties"]}
+        # an optional object the document does not have comes back as null, as the user's schema allows
+        return None if nullable and _blank(out) else out
     if S.is_array(schema):
         if value in ("", None):
             return []
@@ -131,6 +136,21 @@ def from_reply(value: Any, schema: Any) -> Any:
             return None
         return value  # numbers: S.conform converts "4,200" / "(1,200)" against the user's schema
     return value
+
+
+def _allows_null(schema: dict) -> bool:
+    t = schema.get("type")
+    if t == "null" or (isinstance(t, list) and "null" in t):
+        return True
+    return any(isinstance(b, dict) and _allows_null(b) for b in schema.get("anyOf") or schema.get("oneOf") or [])
+
+
+def _blank(v: Any) -> bool:
+    if isinstance(v, dict):
+        return all(_blank(x) for x in v.values())
+    if isinstance(v, list):
+        return all(_blank(x) for x in v)
+    return v is None or (isinstance(v, str) and not v.strip())
 
 
 def _leaves(node: Any) -> int:
