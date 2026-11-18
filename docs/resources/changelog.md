@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.3.0 (2026-11-19)
+
+Every extraction call is enforced by the API, whatever the schema's size, and reads one cached copy of the
+document; citations point where a person checking a value would look; and a cheaper one-stage mode.
+
+- Enforced output at any size. A schema the API refuses as one structured-output call is asked in one fixed answer
+  format (`{"values": [{"code", "item", "value"}]}`, codes from your schema's own fields), the same in every call,
+  and turned back into your exact shape. No call is ever made just to fix the shape.
+- The document is cached within a run: after the first group of fields, every group reads it at a tenth of the
+  price. Nothing is reused between runs.
+- Page parts are sized in tokens: `part_tokens` (default 30,000, capped by the model's own limit; `extract(...,
+  part_tokens=...)`, `settings.part_tokens`, MCP `part_tokens`). Measured on a 43-page 10-Q: 30,000 kept the
+  accuracy of small parts at lower cost; one 43-page part lost a third of the values.
+- Model limits (context, output, price jump, prices) come from a snapshot of LiteLLM's public model list, about
+  4,300 models, or an OpenAI-compatible server's `/models`; your own file in `READANYDOC_MODEL_LIMITS` overrides
+  them. An unknown model is an error naming `part_tokens`, never a guess. The output limit is the model's own.
+- One log line per run with every setting chosen (`readanydoc` logger, `extract settings: {...}`), and
+  `READANYDOC_TRACE=<file.jsonl>`: one line per model call (tokens, cache reads and writes, cost, seconds, why the
+  call was made, the reply) and per decision.
+- A value stated once for a whole table or page (a unit, "in thousands", a period in a heading) is written on every
+  item it covers; of two copies of the same list item, the less complete one is dropped; names are copied in full.
+- Citations: the table the model read each row from is kept across page parts; worked-out values (a period from a
+  column heading, a scale from "in millions", a code from a name) are boxed on the printed words they come from;
+  a category chosen from your schema's list is never boxed on the same word elsewhere; a number is matched only as
+  a whole number; a short value printed in several places is not boxed at a guess. On a 10-Q, numbers boxed on the
+  right row: 94% (Reducto 81%); category boxes on the cover page: 128 to 0.
+- `extract(..., parse=False)` (MCP `parse_first=false`): one stage, off by default. The model reads the file itself
+  (PDF, scans, images, Office files) and citations come from the PDF's own words or local OCR, with no model. About
+  half the cost and 2.5 times faster on a 43-page 10-Q, but less accurate (102-110 values against 99-129) and with
+  3-4 times fewer citations.
+- A value the document does not give stays null, also for a required field: never an invented value.
+
+Full research record: [Extraction research](../research/extraction.md).
+
 ## 0.2.0 (2026-11-18)
 
 Extraction costs what the answer costs again, and stays reliable on schemas of any size. Breaking: the
