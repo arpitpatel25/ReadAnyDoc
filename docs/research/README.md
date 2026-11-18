@@ -6,6 +6,7 @@ How ReadAnyDoc was built and why it looks the way it does.
 |---|---|
 | [../story.md](../story.md) | The short story: the bet, what we found, what we chose to build |
 | [journey.md](journey.md) | The full record, stage by stage (11-14 November 2026): every idea tested, kept or dropped and why, the sample results the full benchmarks overturned, and the 272-entry experiment ledger (Appendix D) |
+| [extraction.md](extraction.md) | Extraction research (15-19 November 2026): structured output at any schema size, cost and caching, page-part size, citations, one stage against two stages, with every measurement |
 | [../../BENCHMARKS.md](../resources/benchmarks.md) | The final results against Reducto r-1, with method and caveats |
 | [../../results/](https://github.com/arpitpatel25/ReadAnyDoc/tree/main/results) | Per-document scores behind those results |
 | [../decisions.md](../decisions.md) | Every design decision with its reason |

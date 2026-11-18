@@ -129,6 +129,7 @@ nav:
     - Benchmarks: resources/benchmarks.md
     - How we built it: story.md
     - Research record: research/journey.md
+    - "Extraction research: structured output, citations, one stage": research/extraction.md
     - Design decisions: decisions.md
     - FAQ and troubleshooting: resources/faq.md
     - Changelog: resources/changelog.md
