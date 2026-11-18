@@ -76,11 +76,15 @@ def _extract(args: argparse.Namespace) -> int:
     if instructions and instructions.startswith("@"):  # long rubrics live in a file: --instructions @rules.md
         with open(instructions[1:], encoding="utf-8") as f:
             instructions = f.read()
+    alts = args.alternatives
+    alts = True if alts == [] else (alts or False)
     result = extract(args.input, schema, instructions=instructions, citations=not args.no_citations,
-                     extract_model=args.extract_model, **_common(args))
+                     extract_model=args.extract_model, review=args.review, alternatives=alts,
+                     derived_values=not args.printed_only, **_common(args))
     _warn(result.warnings)
     out = {"data": result.data, "citations": {k: [c.model_dump() for c in v] for k, v in result.citations.items()},
-           "field_report": result.report, "usage": result.usage.model_dump()}
+           **({"review": result.review} if args.review else {}),
+           **({"alternatives": result.alternatives} if alts else {}), "usage": result.usage.model_dump()}
     json.dump(out, sys.stdout, indent=2, ensure_ascii=False, default=str)
     sys.stdout.write("\n")
     from .star import maybe_ask
@@ -136,6 +140,14 @@ def main(argv: list[str] | None = None) -> int:
     x.add_argument("--instructions", help="system prompt for the extraction model, or @file to read it from a file")
     x.add_argument("--extract-model", help="model that fills the schema (default: --model)")
     x.add_argument("--no-citations", action="store_true")
+    x.add_argument("--review", action="store_true",
+                   help="also list values to check (not printed as returned, ambiguous dates, crossed out, lists "
+                        "shorter than their table); found by code, no extra model call")
+    x.add_argument("--alternatives", nargs="*", metavar="FIELD",
+                   help="also return other values the document gives for a field (a special term, an amendment); "
+                        "for every field, or only the fields named")
+    x.add_argument("--printed-only", action="store_true",
+                   help="only values printed in the document: never one worked out or assumed")
     _model_args(x)
     x.set_defaults(fn=_extract)
 

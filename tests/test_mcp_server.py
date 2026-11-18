@@ -26,7 +26,7 @@ def test_cli_has_the_mcp_command():
         cli.main(["mcp", "--help"])
 
 
-def test_cli_extract_reads_instructions_from_a_file_and_prints_the_field_report(tmp_path, monkeypatch, capsys):
+def test_cli_extract_reads_instructions_from_a_file_and_passes_the_extract_options(tmp_path, monkeypatch, capsys):
     import json
 
     import readanydoc.library as lib
@@ -38,7 +38,8 @@ def test_cli_extract_reads_instructions_from_a_file_and_prints_the_field_report(
     def fake_extract(path, schema, **kw):
         seen.update(kw)
         return ExtractResult(data={"a": 1}, usage=Usage(seconds=0.1),
-                             report={"fields": {"a": {"value": 1, "status": "found"}}, "lists": [], "pages": {}})
+                             review=[{"field": "a", "flag": "not_found_on_page", "detail": "x"}],
+                             alternatives={"a": [{"value": "2", "note": "amendment"}]})
 
     monkeypatch.setattr(lib, "extract", fake_extract)
     monkeypatch.setenv("READANYDOC_NO_STAR", "1")
@@ -47,20 +48,28 @@ def test_cli_extract_reads_instructions_from_a_file_and_prints_the_field_report(
     cli.main(["extract", str(tmp_path / "x.pdf"), "--schema", str(tmp_path / "s.json"),
               "--instructions", "@" + str(tmp_path / "rules.md")])
     assert seen["instructions"].startswith("Use the billing contact") and len(seen["instructions"]) > 1000
+    assert seen["review"] is False and seen["alternatives"] is False and seen["derived_values"] is True
     out = json.loads(capsys.readouterr().out)
-    assert out["field_report"]["fields"]["a"]["status"] == "found"
+    assert set(out) == {"data", "citations", "usage"}  # only what was asked for
+    cli.main(["extract", str(tmp_path / "x.pdf"), "--schema", str(tmp_path / "s.json"), "--review",
+              "--alternatives", "a", "--printed-only"])
+    assert seen["review"] is True and seen["alternatives"] == ["a"] and seen["derived_values"] is False
+    out = json.loads(capsys.readouterr().out)
+    assert out["review"][0]["flag"] == "not_found_on_page" and out["alternatives"]["a"][0]["value"] == "2"
 
 
-def test_mcp_extract_lists_only_the_fields_to_check(monkeypatch):
+def test_mcp_extract_lists_the_values_to_check(monkeypatch):
     import readanydoc
     from readanydoc.library import ExtractResult, Usage
 
-    report = {"fields": {"a": {"value": 1, "status": "found"},
-                         "b": {"value": 2, "status": "conflict", "candidates": []},
-                         "c": {"value": None, "status": "not_in_document"},
-                         "d": {"value": "2025-03-04", "status": "found", "flags": ["ambiguous_date"]}}}
-    monkeypatch.setattr(readanydoc, "extract", lambda *a, **k: ExtractResult(data={}, usage=Usage(seconds=0),
-                                                                              report=report))
+    review = [{"field": "d", "flag": "ambiguous_date", "detail": "printed as 03/04/2025"}]
+    seen = {}
+
+    def fake(*a, **k):
+        seen.update(k)
+        return ExtractResult(data={}, usage=Usage(seconds=0), review=review)
+
+    monkeypatch.setattr(readanydoc, "extract", fake)
     monkeypatch.setattr(mcp_server, "_path", lambda p: p)
     out = mcp_server.extract_fields("x.pdf", {"type": "object", "properties": {}})
-    assert set(out["fields_to_check"]) == {"b", "c", "d"}
+    assert out["to_check"] == review and seen["review"] is True and "alternatives" not in out

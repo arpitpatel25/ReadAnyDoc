@@ -223,7 +223,7 @@ def _after_array_item(text: str, rng: random.Random) -> int:
             stack.pop()
             if c == "}" and stack and stack[-1] == "[":
                 spots.append(i + 1)
-    return rng.choice(spots) if spots else len(text) // 2
+    return rng.choice(spots) if spots else -1
 
 
 def mutate(text: str, kind: str, rng: random.Random):
@@ -231,6 +231,17 @@ def mutate(text: str, kind: str, rng: random.Random):
     pos = _structural(text)
     if kind == "extra_closer_in_list":
         i = _after_array_item(text, rng)
+        if i < 0:  # no list in this reply (one group of fields): a "]" inside an object, the same kind of mistake
+            stack, spots = [], []
+            for j, c in L._scan_brackets(text):
+                if c in "{[":
+                    stack.append(c)
+                else:
+                    stack.pop()
+                    if c == "}" and stack and stack[-1] == "{":
+                        spots.append(j + 1)
+            i = rng.choice(spots)
+            return text[:i] + "]" + text[i:]
         return text[:i] + "}" + text[i:]
     if kind == "extra_closer_anywhere":
         i = rng.choice(pos) + 1
@@ -305,11 +316,17 @@ def test_zenskar_case_old_format_extra_bracket_in_a_list_is_read_in_full():
     broken = mutate(text, "extra_closer_in_list", random.Random(0))
     with pytest.raises(json.JSONDecodeError):
         json.loads(broken)
+
+    def handler(system, user, i):  # with citations the schema is asked in groups; each reply has the extra "}"
+        fields = list(json.loads(user.split("JSON Schema:\n", 1)[1].split("\n", 1)[0])["properties"])
+        part = {f: wrapped()[f] for f in fields if f in TRUTH}
+        return mutate(compact(part), "extra_closer_in_list", random.Random(0)) if "contract" in part else compact(part)
+
     # before the fix, the reader kept the customer block and returned all nulls
-    llm = FakeLLM([broken])
+    llm = FakeLLM(handler)
     out = extract.run(billing_doc(), cfg(citations={"enabled": True}), llm=llm)
     assert plain_result(out) == TRUTH
-    assert len(llm.calls) == 1  # repaired, no extra model call
+    assert len(llm.calls) == 2  # one call per group: repaired, no extra model call
     assert not [w for w in out["warnings"] if "not found" in w]
 
 
@@ -355,16 +372,17 @@ def test_ambiguous_mistakes_are_not_guessed(bad):
 
 # ---------------------------------------------------------------- new reply format: data + flat sources
 
-def test_citations_ask_for_data_plus_a_flat_source_list_and_cite_from_it():
+def test_citations_ask_only_for_the_fields_plus_one_block_label_per_object():
     doc = billing_doc()
-    llm = FakeLLM([envelope()])
+    llm = FakeLLM([envelope()])  # an older-format reply is still read
     out = extract.run(doc, cfg(citations={"enabled": True}), llm=llm)
     assert plain_result(out) == TRUTH
-    sent = llm.calls[0]["json_schema"]
-    assert set(sent["properties"]) == {"data", "sources"}  # the reply shape asked for
-    assert '"v"' not in llm.calls[0]["user"]  # no per-value wrapping any more
-    # the data part has the brackets of the user's schema only: no extra object around every value
-    assert compact(envelope()["data"]).count("{") * 2 < compact(wrapped()).count("{")
+    sent = [c["json_schema"] for c in llm.calls]
+    props = {k: v for s_ in sent for k, v in s_["properties"].items()}
+    assert set(props) == {"customer", "business_entity", "contract"}  # the user's fields only (in groups)
+    assert "_block" in props["customer"]["properties"]  # one label per object, not per value
+    assert not any("_block" in s_["properties"] for s_ in sent)  # (the root has none)
+    assert not any('"v"' in c["user"] for c in llm.calls) and '"sources"' not in json.dumps(sent)
     name = out["result"]["customer"]["name"]["citations"][0]
     assert name["confidence"] == "high" and name["content"] == "Acme Robotics Ltd"
     seats = out["result"]["contract"]["line_items"][1]["quantity_schedule"]["periods"][0]["quantity"]
@@ -450,7 +468,7 @@ def test_an_extra_field_the_schema_never_mentions_is_dropped_quietly():
 
 def test_a_reply_of_the_wrong_shape_is_asked_for_again_never_used():
     llm = FakeLLM([compact(TRUTH["customer"]), envelope()])
-    out = extract.run(billing_doc(), cfg(citations={"enabled": True}), llm=llm)
+    out = extract.run(billing_doc(), cfg(), llm=llm)
     assert plain_result(out) == TRUTH
     assert len(llm.calls) == 2 and "top-level keys" in llm.calls[1]["user"]
 
@@ -464,7 +482,7 @@ def test_a_reply_that_keeps_breaking_is_split_into_smaller_requests():
         return envelope({f: TRUTH[f] for f in fields})
 
     llm = FakeLLM(handler)
-    out = extract.run(billing_doc(), cfg(citations={"enabled": True}), llm=llm)
+    out = extract.run(billing_doc(), cfg(), llm=llm)
     assert plain_result(out) == TRUTH
     assert len(llm.calls) == 4  # 2 tries on the whole schema, then one call per half
 
@@ -502,7 +520,7 @@ def test_required_field_in_an_unreadable_part_is_not_called_missing():
 def test_no_readable_reply_at_all_is_an_error(reply):
     llm = FakeLLM([reply])
     with pytest.raises(TaskError) as e:
-        extract.run(billing_doc(), cfg(citations={"enabled": True}), llm=llm)
+        extract.run(billing_doc(), cfg(), llm=llm)
     assert e.value.status_code == 502
     assert len(llm.calls) <= 3  # no long chain of calls for a reply with no JSON in it
 
@@ -573,17 +591,23 @@ def test_extract_sends_a_format_to_the_anthropic_api_and_survives_a_rejection(mo
     def handler(request):
         body = json.loads(request.content)
         bodies.append(body)
-        if len(bodies) == 1:
+        fmt = (body.get("output_config") or {}).get("format")
+        if fmt and len(fmt["schema"]["properties"]) > 1:  # this API refuses any schema with two top-level fields
             return httpx.Response(400, json={"error": {"message": "Schema is too complex for compilation."}})
-        reply = {"data": {"customer": {"name": "Acme Robotics Ltd"}, "number": "OF-2026-118"},
-                 "sources": [{"path": "customer.name", "block": "r3"}, {"path": "number", "block": "r1"}]}
+        if body["max_tokens"] == 1:
+            return httpx.Response(200, json={"stop_reason": "max_tokens", "content": [], "usage": {}})
+        reply = {"customer": {"name": "Acme Robotics Ltd", "_block": "r3"}, "number": "OF-2026-118"}
         return httpx.Response(200, json={"stop_reason": "end_turn", "content": [{"type": "text", "text": json.dumps(reply)}],
                                          "usage": {"input_tokens": 10, "output_tokens": 10}})
 
     llm = L.AnthropicAPILLM(client=httpx.Client(transport=httpx.MockTransport(handler)))
     out = extract.run(billing_doc(), cfg(small, citations={"enabled": True}), llm=llm)
     assert out["result"]["customer"]["name"]["value"] == "Acme Robotics Ltd"
-    assert "format" in bodies[0]["output_config"] and "format" not in bodies[1]["output_config"]
+    assert out["result"]["number"]["value"] == "OF-2026-118"
+    checks = [b for b in bodies if b["max_tokens"] == 1]
+    calls = [b for b in bodies if b["max_tokens"] > 1]
+    assert checks and len(checks[0]["output_config"]["format"]["schema"]["properties"]) == 2  # refused, then split
+    assert len(calls) == 2 and all("format" in b["output_config"] for b in calls)  # every call enforced
 
 
 # ---------------------------------------------------------------- property test of the JSON reader (hypothesis)

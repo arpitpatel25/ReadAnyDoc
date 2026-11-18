@@ -105,11 +105,13 @@ class ExtractResult(BaseModel):
                                                  description="by field path, e.g. 'lines[0].amount'")
     usage: Usage
     warnings: list[str] = Field(default_factory=list)
-    report: dict[str, Any] = Field(default_factory=dict,
-                                   description="how each field was found: 'fields' by path, each with a status "
-                                               "(found, conflict, inferred, not_in_document, blank, not_applicable, "
-                                               "unreadable), printed_as, candidates, flags and notes; 'lists' whose "
-                                               "table has more rows than items; 'pages' stamped VOID or similar")
+    review: list[dict[str, Any]] = Field(default_factory=list,
+                                         description="with review=True: values to check, each {field, flag, detail} "
+                                                     "(not_found_on_page, ambiguous_date, struck_through, "
+                                                     "list_may_be_incomplete, ...); found by code, no model call")
+    alternatives: dict[str, list[dict[str, Any]]] = Field(
+        default_factory=dict, description="with alternatives=True (or a list of field paths): other values the "
+                                          "document gives for a field, by path, each {value, note, citations}")
     raw: dict[str, Any] = Field(default_factory=dict, description="the Reducto-shaped extract response", repr=False)
 
 
@@ -146,11 +148,17 @@ def extract(source: Source, schema: Union[dict[str, Any], type[BaseModel]], *, i
             extract_options: Optional[dict[str, Any]] = None, handwriting_model: Optional[str] = _UNSET,
             handwriting_effort: Optional[str] = None, handwriting_options: Optional[dict[str, Any]] = None,
             pages: Optional[list[int]] = None, filename: Optional[str] = None,
-            settings: Optional[dict[str, Any]] = None, timeout: Optional[float] = None) -> ExtractResult:
+            settings: Optional[dict[str, Any]] = None, timeout: Optional[float] = None, review: bool = False,
+            alternatives: Union[bool, list[str]] = False, derived_values: bool = True) -> ExtractResult:
     """Extract the fields of ``schema`` (a JSON Schema dict or a pydantic model class) from a document.
 
     ``instructions`` is the system prompt for the extraction model. ``array_extract`` processes long documents in
     parts and merges their arrays. ``settings`` takes any further Reducto extract setting.
+
+    The output holds only the schema's fields. Optional extras: ``review=True`` adds code-only checks on the values
+    (no model call); ``alternatives=True`` (or a list of field paths) also returns other values the document gives
+    for a field (a special term, an amendment); ``derived_values=False`` asks for printed values only, never one
+    worked out or assumed.
     """
     from .tasks import extract as extract_task
     from .tasks.llm import get_llm
@@ -166,7 +174,9 @@ def extract(source: Source, schema: Union[dict[str, Any], type[BaseModel]], *, i
                             timeout=timeout)
         config: dict[str, Any] = {
             "instructions": {"schema": json_schema, **({"system_prompt": instructions} if instructions else {})},
-            "settings": {**(settings or {}), "citations": {"enabled": citations}, "array_extract": array_extract},
+            "settings": {**(settings or {}), "citations": {"enabled": citations}, "array_extract": array_extract,
+                         **({"review": True} if review else {}), **({"alternatives": alternatives} if alternatives else {}),
+                         **({} if derived_values else {"derived_values": False})},
         }
         llm = get_llm(make_spec(extract_model or model, extract_effort or effort, extract_options))
         raw = extract_task.run(doc, config, llm=llm)
@@ -181,7 +191,8 @@ def extract(source: Source, schema: Union[dict[str, Any], type[BaseModel]], *, i
         except Exception as e:  # keep the extracted values; say why they are not an instance
             warnings.append(f"result does not validate against {schema_class.__name__}: {e}")
     return ExtractResult(data=data, citations=cites, usage=_usage(doc, time.time() - t0), warnings=warnings,
-                         report=raw.get("field_report") or {}, raw=raw)
+                         review=raw.get("review") or [],
+                         alternatives=raw.get("alternatives") or {}, raw=raw)
 
 
 # ---------------------------------------------------------------- internals

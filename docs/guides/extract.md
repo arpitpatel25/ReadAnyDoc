@@ -33,7 +33,14 @@ out.data              # a Contract instance
 out.citations         # {"title": [...], "parties[0].name": [...], ...}
 out.usage.cost_usd
 out.warnings          # e.g. "required field 'governing_law' was not found in the document"
-out.report            # how each field was found: see "Field report" below
+
+# opt-in extras (see "Extras" below)
+out = readanydoc.extract("contract.pdf", schema=Contract,
+                         review=True,          # values to check, found by code: no model call
+                         alternatives=True,    # other values the document gives for a field (a special term)
+                         derived_values=False) # printed values only, never one worked out or assumed
+out.review            # [{"field": "effective_date", "flag": "ambiguous_date", "detail": "printed as 03/04/2025 ..."}]
+out.alternatives      # {"total_value": [{"value": "$4,500", "note": "fee table; special term 1 gives $4,200"}]}
 ```
 
 | Argument | Meaning |
@@ -45,6 +52,7 @@ out.report            # how each field was found: see "Field report" below
 | `mode`, `model`, `effort`, `model_options` | how pages are read (see [Choosing models](../concepts/models.md)) |
 | `extract_model`, `extract_effort`, `extract_options` | the model that fills the schema; default the reader's model |
 | `pages`, `filename`, `timeout` | as in Parse |
+| `review`, `alternatives`, `derived_values` | opt-in extras, see below |
 | `settings` | any further Reducto extract setting |
 
 ## HTTP
@@ -62,58 +70,40 @@ curl -s -X POST http://localhost:8000/extract -H "content-type: application/json
 
 `input` can also be `jobid://<parse job id>` to reuse an earlier parse without reading the document again.
 
+## What the model writes, and what it costs
+
+The model writes your schema's fields and nothing else: no source list, no notes per value. Citations are found by
+code, by looking each value up on the parsed pages (its exact text, then the other ways a number or a date is printed:
+`$4,200.00`, `03/04/2025`, `March 4, 2025`). When a value is printed in several places, the one next to the other
+values of its object (its table row, its address) is cited; for that, each object in the reply carries one short
+`_block` label, which is removed before you see the result. A value that is not in the document gets no citation.
+
 ## How ReadAnyDoc makes the output fit
 
-Every reply is checked against your schema. Unambiguous spellings are converted (`"$1,575.00"` to `1575.0`, `"yes"` to
-`true`); anything that still does not fit is re-asked a bounded number of times and then set to null, never guessed.
-Missing values are `null`, as in Reducto. When your schema fits the Anthropic API's structured-output limits, the API
-is also told the reply's shape; large schemas with many optional fields work without it.
+Your schema is rewritten in code before the call so that the Anthropic API can enforce it (structured outputs), for
+any size of schema: every field is required, an empty string stands for "not in the document" (so nothing is ever
+forced to hold a guess), and numbers and yes/no answers are written as text. The answer is turned back into your
+types (`"4,200"` to `4200`, `"yes"` to `true`, `""` to `null`) and checked against your schema, patterns and ranges
+included; what breaks it is asked for again a bounded number of times, then set to null. You only ever see your own
+schema. A schema too big for one call (more than 60 fields) is split into groups of fields before any call; the
+groups run in parallel and each one sees the whole document.
 
-A reply that cannot be read (broken JSON, cut off, the wrong shape) is never used in part: it is repaired only when
-the result fits the schema exactly, otherwise asked for again, then asked for in halves. A field that still cannot be
-read is reported as unreadable, never as missing from the document.
+A reply that cannot be read (broken, or cut off at the length limit) is asked for in parts: lists apart from the
+other fields first, then halves of the fields, with all pages in view, so a price on page 1 is still read against a
+special term on page 2. Only a single long list is split by pages. A field whose reply still cannot be read is named
+in a warning; a field that a later call filled is not.
 
-## Field report
+## Extras
 
-A bare value hides the cases where someone should look again: a contract that gives two prices, a value the document
-never states, a date that could be read two ways. The response has a `field_report` next to the values (`out.report`
-in Python), for any document and any schema:
+All off by default; the response holds only what you ask for.
 
-```json
-"platform_fee": {
-  "value": 4500,
-  "status": "conflict",
-  "printed_as": "$4,500 / month",
-  "candidates": [
-    {"value": 4500, "source": {"page": 1, "block": "r2", "type": "Table", "text": "4,500"}},
-    {"value": 4200, "source": {"page": 2, "block": "r5", "type": "Text", "text": "4,200"}, "note": "first year only"}
-  ],
-  "flags": ["currency"]
-}
-```
+| Option | Python / HTTP setting | What you get |
+|---|---|---|
+| Review | `review=True` / `settings.review: true` | `review`: values a reader should check, found by code (no model call, no extra output): `not_found_on_page` (worked out, converted or assumed), `ambiguous_date`, `parentheses`, `scale` ("in thousands"), `percent_scaled`, `struck_through`, `void_page`, `list_may_be_incomplete` (fewer items than the table's rows with an amount), `segments_disagree`, `unreadable` |
+| Alternatives | `alternatives=True` or a list of field paths / `settings.alternatives` | `alternatives`: other values the document gives for a field (a special term, an amendment, a crossed-out or second total), each with a note and, with citations on, where it is printed. The model writes them in one extra list, only when there are any |
+| Printed values only | `derived_values=False` / `settings.derived_values: false` | The model is told not to work out or assume values (an end date from a term, a country from an address); such fields come back null |
 
-| `status` | Meaning |
-|---|---|
-| `found` | The value is on the page (a yes/no or a choice from your list: the cited block supports it) |
-| `conflict` | The document gives different values for the field, or the value is crossed out. Every candidate is listed with its page; each was checked on the page |
-| `inferred` | The document does not state the value; it was worked out or assumed |
-| `not_in_document` | The document does not mention it |
-| `blank` | The form has the field but it is empty |
-| `not_applicable` | The field does not apply to this document |
-| `unreadable` | The model's reply for this part could not be read; the value may be in the document |
-
-`flags` mark conversions worth a check: `ambiguous_date` (03/04/2025), `parentheses` ((1,200) usually means minus),
-`scale` (the page says "in thousands"), `percent_scaled` (10% returned as 0.1), `currency`, `struck_through` (the value
-is crossed out on the page), `void_page` (the page is stamped VOID or CANCELLED). `notes` explain them, and carry a
-condition on the value such as "first year only".
-
-`field_report.lists` names lists with fewer items than the rows of the table they come from (total and tax rows are
-not counted); such a list is asked for once more before it is reported. `field_report.pages.stamped` lists pages
-stamped VOID, CANCELLED and similar. Crossed-out words are found on the page image and shown to the model as
-`~~text~~`.
-
-Conflicts, inferred values and the conversions above also appear in `warnings`. The report adds a few output tokens
-and no extra calls (except the one re-ask for a short list). Turn it off with `settings.field_report: false`.
+You can also ask for any of these in your own schema: a field `price_alternatives` of type array, for example.
 
 ## Additions over Reducto
 
@@ -121,8 +111,8 @@ These are opt-in; a client that sends none of them behaves as on Reducto, plus t
 
 | Field | What it does |
 |---|---|
-| `warnings` (response) | One line per required field that came back empty, at any depth; conflicts, inferred values and conversions to check |
-| `field_report` (response) | How each field was found (see above). On by default; `settings.field_report: false` turns it off |
+| `warnings` (response) | One line per required field that came back empty, at any depth, and parts whose reply could not be read |
+| `review`, `alternatives`, `derived_values` (settings) | See "Extras" above |
 | `instructions.examples` | Up to 5 example outputs, shown to the model as format examples. A returned value that equals an example and is not in the document is removed and reported |
 | `settings.relevance_filter: true` | For documents of 4+ pages, one cheap call picks the pages that matter for your schema first. 80% cheaper with the same answers on an 86-page packet |
 | `settings.request_pages: true` | The model may ask for more pages or search for a phrase (up to 3 rounds) before it answers. For cross-referenced contracts |

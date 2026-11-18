@@ -5,15 +5,15 @@
   "description": "Parse PDFs, scans and Office files to Markdown; extract typed fields with page citations.",
   "websiteUrl": "https://arpitpatel25.github.io/ReadAnyDoc/",
   "repository": {"url": "https://github.com/arpitpatel25/ReadAnyDoc", "source": "github"},
-  "version": "0.1.8",
+  "version": "0.2.0",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "readanydoc",
-      "version": "0.1.8",
+      "version": "0.2.0",
       "runtimeHint": "uvx",
       "runtimeArguments": [
-        {"type": "named", "name": "--from", "value": "readanydoc[engine]==0.1.8"}
+        {"type": "named", "name": "--from", "value": "readanydoc[engine]==0.2.0"}
       ],
       "packageArguments": [
         {"type": "positional", "value": "mcp"}

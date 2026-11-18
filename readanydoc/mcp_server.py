@@ -43,21 +43,25 @@ def parse_document(path: str, mode: str = "engine", pages: Optional[list[int]] =
 
 
 def extract_fields(path: str, schema: dict[str, Any], instructions: Optional[str] = None,
-                   array_extract: bool = False, mode: str = "engine") -> dict[str, Any]:
+                   array_extract: bool = False, mode: str = "engine", review: bool = True,
+                   alternatives: bool = False) -> dict[str, Any]:
     """Extract structured values from a local document into a JSON Schema, with citations.
 
     schema: a JSON Schema object (type "object" with properties). instructions: optional guidance for the
-    extraction. array_extract: true for long lists or tables that span many pages.
+    extraction. array_extract: true for long lists or tables that span many pages. review: also list values to
+    check (found by code, no extra cost). alternatives: also return other values the document gives for a field
+    (a special term or an amendment that changes a price).
     """
     import readanydoc
     if isinstance(schema, str):
         schema = json.loads(schema)
-    res = readanydoc.extract(_path(path), schema, instructions=instructions, array_extract=array_extract, mode=mode)
+    res = readanydoc.extract(_path(path), schema, instructions=instructions, array_extract=array_extract, mode=mode,
+                             review=review, alternatives=alternatives)
     data = res.data.model_dump() if hasattr(res.data, "model_dump") else res.data
     cites = {k: [c.model_dump(exclude_none=True) for c in v] for k, v in res.citations.items()}
-    flagged = {k: v for k, v in (res.report.get("fields") or {}).items() if v.get("status") != "found" or v.get("flags")}
     return {"data": data, "citations": cites, "warnings": res.warnings,
-            "fields_to_check": flagged,  # conflicts, inferred values, kinds of empty, conversions to check
+            **({"to_check": res.review} if review else {}),  # values not printed as returned, ambiguous dates, ...
+            **({"alternatives": res.alternatives} if alternatives else {}),
             "cost_usd": res.usage.cost_usd, "seconds": res.usage.seconds}
 
 
