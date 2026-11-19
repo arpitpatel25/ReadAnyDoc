@@ -200,8 +200,9 @@ independent evidence. Design decisions and their reasons: [docs/decisions.md](ht
 | | |
 |---|---|
 | [BENCHMARKS.md](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/BENCHMARKS.md) | full results against Reducto, cost, method, caveats; per-document scores in [results/](https://github.com/arpitpatel25/ReadAnyDoc/tree/main/results/) |
-| [docs/story.md](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/story.md) | why this exists, the bet behind it, what we learned |
-| [docs/research/journey.md](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/research/journey.md) | the full research record: every stage, every experiment, what was kept and dropped and why |
+| [docs/story.md](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/story.md) | the whole story: the idea, how we measured, the parser, the extractor, two stages or one, what we learned |
+| [docs/research/journey.md](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/research/journey.md) | the parser research record: every stage, every experiment, what was kept and dropped and why |
+| [docs/research/extraction.md](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/research/extraction.md) | the extraction research record: structured output, caching, page parts, citations, one stage |
 | [docs/decisions.md](https://github.com/arpitpatel25/ReadAnyDoc/blob/main/docs/decisions.md) | every design decision with its reason |
 | [Documentation](https://arpitpatel25.github.io/ReadAnyDoc/docs/) | guides, API reference, configuration, migrating from Reducto |
 | [examples/](https://github.com/arpitpatel25/ReadAnyDoc/tree/main/examples/) | runnable scripts |

@@ -62,8 +62,8 @@ ExtractBench and the contract pack, all fresh:
 | Swimming (5) | **0.975** | 0.888 | **0.975** |
 | Contract pack, fields right | **98.5%** | 93.3% | 98.3% |
 | Citations on the right words (printed values) | 94.6% ExtractBench, 99.2% pack | 65.7%, 75.7% | none |
-| Cost, 35 docs | $6.86 | credits | $3.01 |
-| Time, 35 docs | 252 min | 31 min | 14 min |
+| Cost per document (mean of 35) | $0.196 | ~$1.19 at list price | $0.086 |
+| Time per document (mean of 35) | 7.2 min | 0.9 min | 0.4 min |
 
 Accurate, but expensive and slow. The rest of this page is about why, and what we changed.
 
@@ -161,8 +161,8 @@ only for this reason (for example `other_disclosures` on a 10-Q that has none). 
   zero-token "warm-up" call with a format. So the first group goes alone and the rest go together after it.
 - Caching never crosses runs: a document is always paid for in full the first time a run sees it.
 
-On 12 documents (the pack and seven 10-Qs), groups with their own formats cost $4.26 (pack 96.1%); the same with
-caching $2.67 (97.4%). The coded format then made caching work for every call.
+On 12 documents (the pack and seven 10-Qs), caching cut the cost of groups with their own formats by 37% (pack
+96.1% -> 97.4%). The coded format then made caching work for every call.
 
 ## 6. Generic instructions
 

@@ -2,7 +2,7 @@
 
 Every stage of the project from 11 to 14 November 2026: what we set out to prove, what we built, each idea we tested, what we kept, what we threw away and why, and what the complete public benchmarks finally said.
 
-All numbers are our own measurements unless marked "Reducto published". They come from the project's report files and its experiment ledger (272 entries, listed in Appendix D). Per-document scores for the final benchmarks are in [`results/`](https://github.com/arpitpatel25/ReadAnyDoc/tree/main/results).
+All numbers are our own measurements unless marked "Reducto published". They come from the project's report files and its experiment ledger (272 entries, listed in Appendix C). Per-document scores for the final benchmarks are in [`results/`](https://github.com/arpitpatel25/ReadAnyDoc/tree/main/results).
 
 ## The short version
 
@@ -132,7 +132,7 @@ Before the build · Reducto's own table benchmark and official grader
 > **Later correction**The 91.4 for Haiku was one lucky draw with a table-specific prompt. Re-measured through the API it was about 88.9, and on all 1,000 tables plain Haiku scored 88.2. This was the first of several sample results that did not survive.
 
 ## 4. First neutral benchmark: 140 olmOCR-bench pages
-11 November, 07:21–09:05 · 28 pages each of tables, old scans, multi-column, tiny text, headers/footers · Reducto run through Studio ($1.76)
+11 November, 07:21–09:05 · 28 pages each of tables, old scans, multi-column, tiny text, headers/footers
 
 | System | Overall | Tables | Multi-column | Tiny text | Headers/footers | Old scans |
 |---|---|---|---|---|---|---|
@@ -148,7 +148,7 @@ Before the build · Reducto's own table benchmark and official grader
 > **Sample vs full**On the full 1,403 pages the lead narrowed: plain Haiku 82.2 against Reducto 80.9, inside the margin.
 
 ## 5. Small open models on a rented GPU
-11 November, 09:40–11:26 · RunPod RTX 4090, $1.53
+11 November, 09:40–11:26 · RunPod RTX 4090
 
 **Why:** Haiku looked (through the CLI) like about $0.007 a page, above r-1 mini's $0.001. Could small open models carry a cheap tier?
 
@@ -562,7 +562,7 @@ Plain Haiku beat Reducto on text for handwritten notes, slides, research reports
 
 ### LongExtract (whole documents)
 
-The 50 documents total 19,528 pages (one alone is 11,622), about $390 on Reducto. Within budget: Reducto on the 32 shortest, ours on the 10 shortest.
+The 50 documents total 19,528 pages (one alone is 11,622). Reducto ran on the 32 shortest, ours on the 10 shortest.
 
 - Reducto's rows found on its 32 documents: 37.2%. It returned only part of long tables (e.g. 258 of 1,560 rows, 37 of 1,295) and no rows at all on 5 documents.
 - On the 10 common documents: rows found 53.9 (Reducto), 75.4 (plain), 75.9 (engine), with wide intervals.
@@ -574,7 +574,7 @@ The 50 documents total 19,528 pages (one alone is 11,622), about $390 on Reducto
 - A one-hour stall of the server mid-run, with no error in the log; pages later retried.
 
 ## 26. Full RD-TableBench on the final engine
-14 November, 17:00–20:06 · separate server pinned to `final-round-4` · $4.41
+14 November, 17:00–20:06 · separate server pinned to `final-round-4`
 
 | System | Score on 1,000 tables | $ per table |
 |---|---|---|
@@ -614,7 +614,7 @@ Ours is a fixed tier (0.95 / 0.8 / 0.7 / 0.3) based on how cleanly the text was 
 
 - **Default:** the engine on Haiku 5.5 at high effort, exactly as benchmarked, with Sonnet 5.5 for handwritten pages. Shipped as `engine`; the plain read ships as `model-only`.
 - **Users choose:** mode, page model, handwriting model, extraction model, effort and other model options, with any Anthropic model and OpenAI-style models. Benchmarks claimed only for Haiku 5.5.
-- **Compare against Reducto only:** Mistral OCR (about $21) and LlamaParse (about $255 at its best tier) were dropped as too costly for an open-source project.
+- **Compare against Reducto only:** Mistral OCR and LlamaParse were not run.
 - **Set aside for now:** the fallback for pages Anthropic blocks, the long-list extraction instability (one run lost about 650 of 694 rows), form block types, formulas, speed.
 - **Next:** clean-up for open source (two profiles instead of 25, research code out of the package), reliability (time limits per page, warnings, concurrency), a Python library, per-request model choice, cost reporting.
 
@@ -653,16 +653,7 @@ Ours is a fixed tier (0.95 / 0.8 / 0.7 / 0.3) based on how cleanly the text was 
 | Table re-read (every table) | second read kept only if cells agree | ≈ $0.0015 per table | not significant on full RD-TableBench |
 | Formula matrices, missed tables | targeted re-reads | rare | small sample gains |
 
-## Appendix C: money spent (approximate)
-
-| Where | About | Notes |
-|---|---|---|
-| Reducto API credits | $100 | early comparisons about $27 (including the 1,000-table run), full benchmarks $71.37 ($29.71 parse, $41.66 extract) |
-| Anthropic API | $65 | development rounds about $28, full benchmarks $28.47, 1,000-table re-run $4.41, round 4 $1.70, demos and checks under $1 |
-| RunPod GPU | $1.56 | small open models, day 1 |
-| Claude subscription | – | agents and the AI judge (about $50–70 of API-equivalent judging on days 1–2) |
-
-## Appendix D: all 272 experiments in the ledger
+## Appendix C: all 272 experiments in the ledger
 
 Every idea scored on the judge-free development set, in the order it was run, with the verdict and the reason recorded at the time. "dev / held" numbers are the two halves of the set. Earlier stages (sections 3–15) were judged by an AI or measured directly and are described above.
 
