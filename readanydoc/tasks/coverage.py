@@ -108,6 +108,8 @@ def pieces(pages: Iterable[dict]) -> list[Piece]:
                         # "TOTAL | 46,000": a label and its value; it may also be an item ("Y.B.BAT | 46,000")
                     if len(x) < width or not cells[0] or any(_SUMMARY.search(v) for v in cells if v):
                         continue  # a total under the items, a spanned label
+                    if any(v.endswith(":") for v in cells) or not any(re.search(r"\d", v) for v in cells):
+                        continue  # labels with their values ("Terms: | 60 days"), or a header row: not an item
                     label = " ".join(head) if head else ""
                     out.append(Piece(label, " | ".join(cells), p["number"], r["label"], "row", tid))
                 continue
@@ -377,6 +379,8 @@ def check(value: Any, schema: Any, pages: list[dict]) -> list[dict]:
         shape = _shape(p.value)
         best, score = None, 0
         for f in empty:
+            if p.kind == "row" and f not in lists_:
+                continue  # a table's rows are the items of a list, never one single value
             fw = words.get(f, set())
             own = _words(f.rsplit(".", 1)[-1], _BASIC)
             hit = len(lw & fw) + len(_words(p.label, _BASIC) & own)  # the field's own name counts twice, and
