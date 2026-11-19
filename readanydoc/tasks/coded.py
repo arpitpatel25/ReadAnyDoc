@@ -30,8 +30,8 @@ NOTE = ('Answer as {"values": [...]} with one entry per value: "code" is the fie
         "column, section or page (a unit, a scale such as \"in thousands\", a currency, a date or period in a "
         "heading) applies to every item it covers: write it on each of those items. Leave out only a field the "
         "document gives no value for and does not make clear; never write a guess. A field marked \"always answer\" is "
-        "required in every list item or section you write: never leave it out there, write the choice the "
-        "document\'s terms mean (it never makes you write an item or section the document does not have). A value the document gives in "
+        "required in every list item or section you write: never leave it out there; write the choice or value "
+        "the document\'s terms mean (it never makes you write an item or section the document does not have). A value the document gives in "
         "another form is not a guess: write it in the form the field asks for (a country name as its code). "
         'Write numbers as plain digits ("4200.50", "-1200") and dates in the format the field asks for. '
         'Copy names, titles and labels exactly as printed, every word of them, even when part of a name looks like '

@@ -66,46 +66,99 @@ def _live(node: dict) -> list:
     return [b for b in br if S.types_of(b) != {"null"} and b != {"type": "null"}]
 
 
-def to_reply(schema: Any, must: bool = True) -> Any:
+FILL_HINT = ("always answer: required by the schema; when the document does not give it, write your best value "
+             "from the document")
+
+
+def fill_policy(value: Any) -> Any:
+    """The ``fill_required`` setting as used inside: "choices" (default), True, False, or a set of field paths
+    (names joined by dots, list brackets dropped: "contract.line_items.prices.price.unit_amount")."""
+    if value is None or value == "choices":
+        return "choices"
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        value = [value]
+    return {_norm_path(str(v)) for v in value if str(v).strip()}
+
+
+def _norm_path(p: Any) -> str:
+    if isinstance(p, tuple):
+        return ".".join(str(x) for x in p if isinstance(x, str) and x != "[]")
+    return ".".join(x for x in re.sub(r"\[[^\]]*\]", "", p).split(".") if x)
+
+
+def to_reply(schema: Any, must: bool = True, policy: Any = "choices", path: tuple = (),
+             _forced_leaf: bool = False) -> Any:
     """The structured-output version of a resolved schema (see the module docstring).
 
-    ``must``: the user's schema requires this value and does not allow null, and every object above it is always
-    present (required, not nullable). A yes/no, enum or const field like that gets no "" choice: the API makes the
-    model answer it, so the output never breaks the user's required type. Other required fields keep "" (no
-    number or text is ever made up); one that comes back empty is reported (``required_warnings``)."""
+    ``must``: this object is always present (required and not nullable all the way up). ``policy``: which fields
+    must be answered (``fill_policy``; see ``_forced``). A forced yes/no, enum or const gets no "" choice, so the
+    API makes the model answer it; a forced number or text keeps "" (it cannot be forced by the grammar without
+    allowing made-up text) and is asked for in its description instead."""
     if not isinstance(schema, dict):
         return {"type": "string"}
     must = must and not _allows_null(schema)
     live = _live(schema)
     if len(live) == 1 and live[0] is not schema:
         merged = {**{k: v for k, v in schema.items() if k not in ("anyOf", "oneOf")}, **live[0]}
-        return to_reply(merged, must)
+        return to_reply(merged, must, policy, path, _forced_leaf)
     if len(live) > 1:
-        return {"anyOf": [to_reply(b, False) for b in live], **_desc(schema)}
+        return {"anyOf": [to_reply(b, False, policy, path) for b in live], **_desc(schema)}
     ts = S.types_of(schema) - {"null"}
-    empty = [] if must else [""]
+    empty = [] if _forced_leaf else [""]
     if "const" in schema:
         return {"type": "string", "enum": [str(schema["const"])] + empty, **_desc(schema)}
     if S.is_object(schema) or ("object" in ts and "properties" in schema):
-        req, forced = set(schema.get("required") or []), _forced(schema, must)
-        props = {k: to_reply(v, k in forced or (must and k in req)) for k, v in (schema.get("properties") or {}).items()}
+        req, forced = set(schema.get("required") or []), _forced(schema, must, policy, path)
+        props = {k: to_reply(v, must and k in req, policy, path + (k,), k in forced)
+                 for k, v in (schema.get("properties") or {}).items()}
         return {"type": "object", "properties": props, "required": list(props), "additionalProperties": False,
                 **_desc(schema)}
     if "array" in ts or "items" in schema:
-        return {"type": "array", "items": to_reply(schema.get("items") or {"type": "string"}), **_desc(schema)}
+        return {"type": "array", "items": to_reply(schema.get("items") or {"type": "string"}, True, policy, path),
+                **_desc(schema)}
     enum = schema.get("enum")
     if isinstance(enum, list):
         vals = [str(v).lower() if isinstance(v, bool) else str(v) for v in enum if v is not None]
         return {"type": "string", "enum": list(dict.fromkeys(vals + empty)) or [""], **_desc(schema)}
     if ts == {"boolean"}:
         return {"type": "string", "enum": ["true", "false"] + empty, **_desc(schema)}
+    hint = FILL_HINT if _forced_leaf else ""
     if ts & {"number", "integer"} and "string" not in ts:
-        return {"type": "string", **_desc(schema, "a number")}
-    return {"type": "string", **_desc(schema)}
+        return {"type": "string", **_desc(schema, "; ".join(x for x in ["a number", hint] if x))}
+    return {"type": "string", **_desc(schema, hint)}
 
 
-def from_reply(value: Any, schema: Any) -> Any:
-    """The answer in the user's types: "" -> null, number and yes/no text converted, enum spelling matched."""
+def forced_paths(schema: Any, policy: Any = "choices") -> set:
+    """Normalised paths (``_norm_path``) of the number and text fields that ``policy`` forces: the values a
+    review marks as filled because the schema requires them, when the document does not print them."""
+    out: set = set()
+
+    def go(node: Any, must: bool, path: tuple) -> None:
+        if not isinstance(node, dict):
+            return
+        must = must and not _allows_null(node)
+        live = _live(node)
+        n = live[0] if len(live) == 1 else node
+        if not isinstance(n, dict):
+            return
+        if S.is_object(n):
+            req, forced = set(n.get("required") or []), _forced(n, must, policy, path)
+            for k, v in (n.get("properties") or {}).items():
+                if k in forced and not _choice(v):
+                    out.add(_norm_path(path + (k,)))
+                go(v, must and k in req, path + (k,))
+        elif S.is_array(n):
+            go(n.get("items") or {}, True, path)
+
+    go(schema, True, ())
+    return out
+
+
+def from_reply(value: Any, schema: Any, policy: Any = "choices", path: tuple = ()) -> Any:
+    """The answer in the user's types: "" -> null, number and yes/no text converted, enum spelling matched.
+    ``policy``: the ``fill_required`` setting the reply schema was built with (``fill_policy``)."""
     if not isinstance(schema, dict):
         return value
     nullable = _allows_null(schema)
@@ -116,11 +169,11 @@ def from_reply(value: Any, schema: Any) -> Any:
     if S.is_object(schema):
         if not isinstance(value, dict):
             return None if value in ("", None) else value
-        out = {k: from_reply(value.get(k), sub) for k, sub in schema["properties"].items()} | \
+        out = {k: from_reply(value.get(k), sub, policy, path + (k,)) for k, sub in schema["properties"].items()} | \
             {k: v for k, v in value.items() if k not in schema["properties"]}
         # an optional object the document does not have comes back as null, as the user's schema allows; its
         # yes/no and enum fields that had to be answered (``_forced``) do not count as something found
-        forced = _forced(schema, False)
+        forced = _forced(schema, False, policy, path)
         return None if nullable and _blank({k: v for k, v in out.items() if k not in forced}) else out
     if S.is_array(schema):
         if value in ("", None):
@@ -128,9 +181,9 @@ def from_reply(value: Any, schema: Any) -> Any:
         if not isinstance(value, list):
             return value
         items = schema.get("items") or {}
-        out = [from_reply(v, items) for v in value]
+        out = [from_reply(v, items, policy, path) for v in value]
         live = S.branch_for(items, {}) if isinstance(items, dict) else None
-        forced = _forced(live, False) if isinstance(live, dict) and S.is_object(live) else set()
+        forced = _forced(live, False, policy, path) if isinstance(live, dict) and S.is_object(live) else set()
         if forced:  # an item holding only answers it was made to give is not an item the document has
             out = [x for x in out if not (isinstance(x, dict) and _blank({k: v for k, v in x.items() if k not in forced}))]
         return out
@@ -171,11 +224,40 @@ def _choice(node: Any) -> bool:
                                     or S.types_of(n) - {"null"} == {"boolean"})
 
 
-def _forced(obj: dict, must: bool) -> set:
-    """Fields of an object answered without a "" choice: required, not nullable, yes/no or enum. In an object that
-    may be absent and has nothing else to find, none are forced (forcing them would make the object up)."""
+def _leaf(node: Any) -> bool:
+    """A single value (number, text, yes/no, enum), not an object, a list or a union holding one."""
+    if not isinstance(node, dict):
+        return False
+    return all(isinstance(n, dict) and not S.is_object(n) and not S.is_array(n) and "properties" not in n
+               for n in _live(node))
+
+
+def _forced(obj: dict, must: bool, policy: Any = "choices", path: tuple = ()) -> set:
+    """Fields of an object that must be answered, by ``policy`` (``fill_policy``):
+
+    - "choices" (default): required, non-nullable yes/no and enum fields;
+    - True: those, and every required, non-nullable number and text field of an object that is always present
+      (in a section that may be absent, numbers and text are not forced: that would make the section up);
+    - a set of paths: the choices, and the listed fields wherever they are;
+    - False: none.
+
+    In an object that may be absent, if every field would be forced none is: nothing would be left to show
+    whether the document has it."""
+    if policy is False:
+        return set()
     req, props = set(obj.get("required") or []), obj.get("properties") or {}
-    keys = {k for k, v in props.items() if k in req and isinstance(v, dict) and not _allows_null(v) and _choice(v)}
+
+    def eligible(k: str, v: Any) -> bool:
+        if not isinstance(v, dict):
+            return False
+        listed = isinstance(policy, set) and _norm_path(path + (k,)) in policy and _leaf(v)
+        if listed:
+            return True
+        if k not in req or _allows_null(v):
+            return False
+        return _choice(v) or (policy is True and must and _leaf(v))
+
+    keys = {k for k, v in props.items() if eligible(k, v)}
     return keys if must or len(keys) < len(props) else set()
 
 

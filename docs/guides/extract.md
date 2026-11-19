@@ -53,6 +53,7 @@ out.alternatives      # {"total_value": [{"value": "$4,500", "note": "fee table;
 | `extract_model`, `extract_effort`, `extract_options` | the model that fills the schema; default the reader's model |
 | `pages`, `filename`, `timeout` | as in Parse |
 | `review`, `alternatives`, `derived_values` | opt-in extras, see below |
+| `fill_required` | which required fields always get a value, see below |
 | `settings` | any further Reducto extract setting |
 
 ## HTTP
@@ -93,13 +94,33 @@ other fields first, then halves of the fields, with all pages in view, so a pric
 special term on page 2. Only a single long list is split by pages. A field whose reply still cannot be read is named
 in a warning; a field that a later call filled is not.
 
+## Required fields: `fill_required`
+
+A field your schema requires (and does not allow null) can still be missing from a document. What happens then is
+up to you, per field:
+
+| `fill_required` | What always gets a value | When the document does not give it |
+|---|---|---|
+| `"choices"` (default) | required yes/no and enum fields | the model picks the answer the document's terms mean ("Net 30": last day of month = `false`); numbers and text stay `null` |
+| `True` | also every required number and text field | the model writes its best value, which may be a guess |
+| a list of field paths, e.g. `["customer.tax_id", "line_items[].end_date"]` | the choices, and these fields (required or not) | as for `True`, for these fields only |
+| `False` | nothing | `null` (each missing required field is listed in `warnings`) |
+
+Forcing numbers or text makes the model guess when the document does not give a value, and a wrong guess looks like
+a real value. On a pack of 5 order forms, `True` filled end dates for one-time fees that the answer key leaves
+empty (98.3% of fields right, against 100% with the default). Turn it on only for fields where a best guess is
+acceptable. With `review=True`, a filled value that is not printed in the document is flagged
+`filled_because_required`. An optional section the document does not have stays `null`, and no list item is made
+up to hold forced answers. CLI: `--fill-required` (every field), `--fill-required customer.tax_id` (those
+fields), `--fill-required none`.
+
 ## Extras
 
 All off by default; the response holds only what you ask for.
 
 | Option | Python / HTTP setting | What you get |
 |---|---|---|
-| Review | `review=True` / `settings.review: true` | `review`: values a reader should check, found by code (no model call, no extra output): `not_found_on_page` (worked out, converted or assumed), `ambiguous_date`, `parentheses`, `scale` ("in thousands"), `percent_scaled`, `struck_through`, `void_page`, `list_may_be_incomplete` (fewer items than the table's rows with an amount), `segments_disagree`, `unreadable` |
+| Review | `review=True` / `settings.review: true` | `review`: values a reader should check, found by code (no model call, no extra output): `not_found_on_page` (worked out, converted or assumed), `ambiguous_date`, `parentheses`, `scale` ("in thousands"), `percent_scaled`, `struck_through`, `void_page`, `filled_because_required` (see above), `list_may_be_incomplete` (fewer items than the table's rows with an amount), `segments_disagree`, `unreadable` |
 | Alternatives | `alternatives=True` or a list of field paths / `settings.alternatives` | `alternatives`: other values the document gives for a field (a special term, an amendment, a crossed-out or second total), each with a note and, with citations on, where it is printed. The model writes them in one extra list, only when there are any |
 | Printed values only | `derived_values=False` / `settings.derived_values: false` | The model is told not to work out or assume values (an end date from a term, a country from an address); such fields come back null |
 

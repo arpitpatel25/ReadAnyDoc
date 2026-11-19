@@ -150,7 +150,8 @@ def extract(source: Source, schema: Union[dict[str, Any], type[BaseModel]], *, i
             pages: Optional[list[int]] = None, filename: Optional[str] = None,
             settings: Optional[dict[str, Any]] = None, timeout: Optional[float] = None, review: bool = False,
             alternatives: Union[bool, list[str]] = False, derived_values: bool = True,
-            part_tokens: Optional[int] = None, parse: bool = True) -> ExtractResult:
+            part_tokens: Optional[int] = None, parse: bool = True,
+            fill_required: Union[bool, str, list[str]] = "choices") -> ExtractResult:
     """Extract the fields of ``schema`` (a JSON Schema dict or a pydantic model class) from a document.
 
     ``instructions`` is the system prompt for the extraction model. ``array_extract`` processes long documents in
@@ -164,6 +165,13 @@ def extract(source: Source, schema: Union[dict[str, Any], type[BaseModel]], *, i
     extraction model): the pages are not parsed first; the model reads the file itself (a PDF, or the pages of an
     image), and citations are found by code in the PDF's own words or, for scans and images, in local OCR words.
     About half the cost and 2.5 times faster on a 43-page report, but less accurate: see docs/decisions.md.
+
+    ``fill_required``: which required fields always get a value. ``"choices"`` (default): required yes/no and enum
+    fields (the document's terms decide them; "Net 30" means last day of month = false). ``True``: also every
+    required number and text field. A list of field paths (``["customer.tax_id", "items[].amount"]``): the choices
+    and these fields. ``False``: none, a value the document does not give stays null. Forcing numbers or text makes
+    the model guess when the document does not give the value: each such value not printed in the document is
+    flagged ``filled_because_required`` in ``review``. Not forced: a field stays null and is listed in ``warnings``.
     """
     from .tasks import extract as extract_task
     from .tasks.llm import get_llm
@@ -186,7 +194,8 @@ def extract(source: Source, schema: Union[dict[str, Any], type[BaseModel]], *, i
             "settings": {**(settings or {}), "citations": {"enabled": citations}, "array_extract": array_extract,
                          **({"review": True} if review else {}), **({"alternatives": alternatives} if alternatives else {}),
                          **({} if derived_values else {"derived_values": False}),
-                         **({"part_tokens": part_tokens} if part_tokens else {})},
+                         **({"part_tokens": part_tokens} if part_tokens else {}),
+                         **({} if fill_required == "choices" else {"fill_required": fill_required})},
         }
         llm = get_llm(make_spec(extract_model or model, extract_effort or effort, extract_options))
         if not parse and type(llm).__name__ != "AnthropicAPILLM":

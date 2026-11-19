@@ -51,3 +51,53 @@ def test_total_row_without_item_name_is_not_an_item():
     assert FR.amount_rows(t) == 2
     assert FR._category({"enum": ["a"]}) and FR._category({"anyOf": [{"enum": ["a"]}, {"type": "null"}]})
     assert not FR._category({"type": "string"})
+
+
+def _flat(r, path=()):
+    out = {}
+    if r.get("type") == "object":
+        for k, v in r["properties"].items():
+            out.update(_flat(v, path + (k,)))
+    elif r.get("type") == "array":
+        out.update(_flat(r["items"], path))
+    else:
+        out[".".join(path)] = r
+    return out
+
+
+DOC = {"type": "object", "required": ["name", "total", "paid", "items"], "properties": {
+    "name": {"type": "string"}, "total": {"type": "number"}, "paid": {"type": "boolean"},
+    "tax_id": {"type": "string"},
+    "items": {"type": "array", "items": {"type": "object", "required": ["sku", "kind"], "properties": {
+        "sku": {"type": "string"}, "kind": {"enum": ["a", "b"]}, "amount": {"type": "number"}}}}}}
+
+
+def test_fill_policies():
+    pol = RS.fill_policy
+    f = _flat(RS.to_reply(DOC, policy=pol("choices")))
+    assert f["paid"]["enum"] == ["true", "false"] and RS.FILL_HINT not in f["name"].get("description", "")
+    assert RS.forced_paths(DOC, pol("choices")) == set()
+    f = _flat(RS.to_reply(DOC, policy=pol(True)))
+    assert RS.FILL_HINT in f["name"]["description"] and RS.FILL_HINT in f["total"]["description"]
+    assert RS.FILL_HINT in f["items.sku"]["description"] and RS.FILL_HINT not in f.get("tax_id", {}).get("description", "")
+    assert RS.forced_paths(DOC, pol(True)) == {"name", "total", "items.sku"}
+    f = _flat(RS.to_reply(DOC, policy=pol(False)))
+    assert "" in f["paid"]["enum"] and "" in f["items.kind"]["enum"]
+    p = pol(["tax_id", "items[].amount"])
+    f = _flat(RS.to_reply(DOC, policy=p))
+    assert RS.FILL_HINT in f["tax_id"]["description"] and RS.FILL_HINT in f["items.amount"]["description"]
+    assert f["paid"]["enum"] == ["true", "false"] and RS.FILL_HINT not in f["name"].get("description", "")
+    assert RS.forced_paths(DOC, p) == {"tax_id", "items.amount"}
+
+
+def test_cli_fill_values():
+    from readanydoc.cli import _fill
+    assert _fill(None) == "choices" and _fill([]) is True and _fill(["none"]) is False
+    assert _fill(["a.b"]) == ["a.b"]
+
+
+def test_spanned_total_row_is_not_an_item():
+    t = ("<table><tr><td>Product</td><td>Billing</td><td>Amount</td></tr>"
+         "<tr><td>A</td><td>Monthly</td><td>USD 1.00</td></tr><tr><td>B</td><td>One-time</td><td>USD 5.00</td></tr>"
+         "<tr><td colspan='2'>Monthly recurring</td><td>USD 1.00</td></tr></table>")
+    assert FR.amount_rows(t) == 2
