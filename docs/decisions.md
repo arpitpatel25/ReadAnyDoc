@@ -16,6 +16,8 @@ the document format, a default, or a public interface.
   set's official grader uses one (ExtractBench's semantic fields).
 - A run shows a rough cost and asks before spending (MCP: `confirm=false` returns the plan only); `budget_usd`
   stops new documents; results are saved per document, so a run resumes and can be rescored for free.
+- Samples spread hard input types first (photos, scans, handwriting) and mix difficulties, so a small `--limit`
+  is not only clean PDFs (a 3-document sample had picked three clean ones).
 - Systems use the user's own keys. Reducto's cost is its list price, labelled as such.
 - Smoke run (3 invoices, 2 receipts; readanydoc, one stage, plain Haiku, Reducto): every system ran; scores and
   costs per document as measured (invoices: all four 100% of key values; receipts: Reducto 92.3%, others 100%).

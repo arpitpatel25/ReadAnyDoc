@@ -92,20 +92,42 @@ INVOICE_SCHEMA = {
 }
 
 
+# Hard input types first, so that even a small sample has photos, scans and handwriting, not only clean PDFs.
+_INVOICE_ORDER = ["photo", "scan", "handwritten", "multipage", "hard", "freight", "credit", "tax", "currency", "clean"]
+_DIFFICULTY = ["hard", "medium", "easy"]
+
+
+def _spread(meta: list[dict], limit: int) -> list[dict]:
+    """One document of every category before a second of any, each category's documents mixed across difficulties
+    (the starting difficulty rotates between categories), so a sample of any size covers the whole set."""
+    by: dict[str, list] = {}
+    for m in meta:
+        by.setdefault(m["category"], []).append(m)
+    cats = [c for c in _INVOICE_ORDER if c in by] + sorted(c for c in by if c not in _INVOICE_ORDER)
+    for ci, c in enumerate(cats):
+        levels = _DIFFICULTY[ci % 3:] + _DIFFICULTY[:ci % 3]
+        groups = [[m for m in by[c] if m.get("difficulty") == d] for d in levels]
+        groups.append([m for m in by[c] if m.get("difficulty") not in _DIFFICULTY])
+        mixed = []
+        while any(groups):
+            for g in groups:
+                if g:
+                    mixed.append(g.pop(0))
+        by[c] = mixed
+    out, i = [], 0
+    while len(out) < min(limit, len(meta)):
+        for c in cats:
+            if i < len(by[c]) and len(out) < limit:
+                out.append(by[c][i])
+        i += 1
+    return out
+
+
 def _invoices(limit: Optional[int]) -> list[dict]:
     meta = [json.loads(l) for l in fetch.hf_file(INV_REPO, "corpus/v1/metadata.jsonl").read_text().splitlines()
             if l.strip()]
-    if limit:  # a spread of every category before more of any one
-        by: dict[str, list] = {}
-        for m in meta:
-            by.setdefault(m["category"], []).append(m)
-        mixed, i = [], 0
-        while len(mixed) < min(limit, len(meta)):
-            for c in sorted(by):
-                if i < len(by[c]) and len(mixed) < limit:
-                    mixed.append(by[c][i])
-            i += 1
-        meta = mixed
+    if limit:
+        meta = _spread(meta, limit)
     out = []
     for m in meta:
         exp = m["expected"]
