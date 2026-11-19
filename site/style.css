@@ -281,7 +281,8 @@ code{font-family:var(--mono)}
 .build-col li{margin:8px 0}
 .build-col a{color:var(--green)}
 .build-col .beats{display:grid;grid-template-columns:96px 1fr;gap:10px 20px;margin:26px 0;padding:22px 24px;background:var(--warm);border:1px solid var(--line);border-radius:14px;font:15.5px/1.6 var(--sans)}
-.build-col .beats b{font:500 12.5px/1.9 var(--mono)}
+.build-col .beats>b{font:500 12.5px/1.9 var(--mono)}
+.build-col .beats .sep{display:none}
 .build-col .exp{color:var(--gray)} .build-col .got{color:#A33A2A} .build-col .did,.build-col .ok{color:var(--green)}
 .build-col .pull{margin:34px 0;padding:4px 0 4px 22px;border-left:3px solid var(--green);font-size:25px;line-height:1.4;font-style:italic}
 .build-col .meanwhile{margin:26px 0;padding:18px 22px;background:var(--green-soft);border-radius:14px;font:15.5px/1.6 var(--sans)}
