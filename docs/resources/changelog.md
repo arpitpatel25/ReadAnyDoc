@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 (2026-11-19)
+
+Test it yourself: compare ReadAnyDoc with other systems on public test sets or your own documents.
 
 - `readanydoc bench`: compare ReadAnyDoc with Reducto, a plain model call or its own other modes, on 8 public test
   sets (invoices, receipts, quarterly reports, credit agreements, research papers, resumes, result tables, long
