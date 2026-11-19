@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.3 (2026-11-19)
+
+- `fill_required` (Python, CLI `--fill-required`, MCP, `settings.fill_required`): which required fields always get
+  a value. `"choices"` (default, as in 0.4.2): required yes/no and enum fields. `True`: also every required number
+  and text field. A list of field paths: the choices and those fields. `False`: none. Forced numbers and text may be
+  guesses: with `review`, each one not printed in the document is flagged `filled_because_required`. On a pack of 5
+  order forms, `True` scored 98.3% of fields right against 100% for the default (it filled end dates the answer
+  key leaves empty).
+- Review: a total row whose label spans the columns ("Monthly recurring | USD 1,500.00") no longer counts as a
+  missing list item.
+
 ## 0.4.2 (2026-11-19)
 
 From a user's test of 0.4.0 on a pack of 5 order forms (their scorer: 97.9% of fields right). After these fixes,

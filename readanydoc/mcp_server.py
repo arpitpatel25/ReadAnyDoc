@@ -47,7 +47,7 @@ def parse_document(path: str, mode: str = "engine", pages: Optional[list[int]] =
 def extract_fields(path: str, schema: dict[str, Any], instructions: Optional[str] = None,
                    array_extract: bool = False, mode: str = "engine", review: bool = True,
                    alternatives: bool = False, part_tokens: Optional[int] = None,
-                   parse_first: bool = True) -> dict[str, Any]:
+                   parse_first: bool = True, fill_required: Any = "choices") -> dict[str, Any]:
     """Extract structured values from a local document into a JSON Schema, with citations.
 
     schema: a JSON Schema object (type "object" with properties). instructions: optional guidance for the
@@ -55,13 +55,16 @@ def extract_fields(path: str, schema: dict[str, Any], instructions: Optional[str
     check (found by code, no extra cost). alternatives: also return other values the document gives for a field
     (a special term or an amendment that changes a price). part_tokens: largest document part per call, in tokens
     (default 30,000). parse_first: false to skip parsing (the model reads the file itself: about half the cost and
-    faster, less accurate, fewer citations).
+    faster, less accurate, fewer citations). fill_required: which required fields always get a value: "choices"
+    (default, yes/no and enum fields), true (numbers and text too: the model may guess, each guess is flagged in
+    to_check as filled_because_required), a list of field paths, or false (nothing forced).
     """
     import readanydoc
     if isinstance(schema, str):
         schema = json.loads(schema)
     res = readanydoc.extract(_path(path), schema, instructions=instructions, array_extract=array_extract, mode=mode,
-                             review=review, alternatives=alternatives, part_tokens=part_tokens, parse=parse_first)
+                             review=review, alternatives=alternatives, part_tokens=part_tokens, parse=parse_first,
+                             fill_required=fill_required)
     data = res.data.model_dump() if hasattr(res.data, "model_dump") else res.data
     cites = {k: [c.model_dump(exclude_none=True) for c in v] for k, v in res.citations.items()}
     return {"data": data, "citations": cites, "warnings": res.warnings,

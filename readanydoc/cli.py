@@ -69,6 +69,16 @@ def _parse_profile(args: argparse.Namespace) -> int:
     return 0
 
 
+def _fill(v):
+    if v is None:
+        return "choices"
+    if v == []:
+        return True
+    if v == ["none"]:
+        return False
+    return v
+
+
 def _extract(args: argparse.Namespace) -> int:
     from .library import extract
     with open(args.schema) as f:
@@ -81,7 +91,7 @@ def _extract(args: argparse.Namespace) -> int:
     alts = True if alts == [] else (alts or False)
     result = extract(args.input, schema, instructions=instructions, citations=not args.no_citations,
                      extract_model=args.extract_model, review=args.review, alternatives=alts,
-                     derived_values=not args.printed_only, **_common(args))
+                     derived_values=not args.printed_only, fill_required=_fill(args.fill_required), **_common(args))
     _warn(result.warnings)
     out = {"data": result.data, "citations": {k: [c.model_dump() for c in v] for k, v in result.citations.items()},
            **({"review": result.review} if args.review else {}),
@@ -206,6 +216,10 @@ def main(argv: list[str] | None = None) -> int:
     x.add_argument("--alternatives", nargs="*", metavar="FIELD",
                    help="also return other values the document gives for a field (a special term, an amendment); "
                         "for every field, or only the fields named")
+    x.add_argument("--fill-required", nargs="*", metavar="FIELD",
+                   help="always give a value to required fields: alone, every required field (numbers and text "
+                        "too: the model may guess, and each guess is flagged in --review); with FIELDs, only those; "
+                        "'none' for no field. Default: required yes/no and enum fields only")
     x.add_argument("--printed-only", action="store_true",
                    help="only values printed in the document: never one worked out or assumed")
     _model_args(x)

@@ -756,6 +756,8 @@ def carry_hint(prev: Any) -> str:
 # ---------------------------------------------------------------- the extractor
 
 class _Extractor:
+    fill: Any = "choices"  # the fill_required policy (reply_schema.fill_policy)
+
     def __init__(self, view: DocView, pages: list[PageRef], user_schema: dict, system_prompt: str,
                  llm: LLM, opts: dict, track: bool, include_images: bool):
         if getattr(llm, "prompt_cache", False) and not opts.get("max_tokens_set"):
@@ -868,7 +870,7 @@ class _Extractor:
                 plain = copy.deepcopy(plain)
                 RS.take_blocks(plain)
                 plain.pop(RS.ALT_FIELD, None)
-                plain = RS.from_reply(plain, self.prompt_schema)
+                plain = RS.from_reply(plain, self.prompt_schema, getattr(self, "fill", "choices"))
                 check = S.enforced(self.prompt_schema)
             _, moved, stray = S.relocate(plain, check)
             if moved or stray or S.find_errors(S.conform(plain, check), check):
@@ -1089,7 +1091,7 @@ class _Extractor:
                     alts += [x for x in a if isinstance(x, dict) and str(x.get("value", "")).strip()]
                 merged = RS.merge(merged, v)
             hints = RS.take_marks(merged)
-            value = S.conform(RS.from_reply(merged, user), strict)
+            value = S.conform(RS.from_reply(merged, user, self.fill), strict)
             if value is None and S.is_object(strict):
                 value = S.empty_instance(strict)
             return value, hints, alts
@@ -1199,7 +1201,7 @@ class _Extractor:
             merged = RS.merge(merged, v)
             alts += a
         hints = RS.take_marks(merged)
-        value = S.conform(RS.from_reply(merged, user), strict)
+        value = S.conform(RS.from_reply(merged, user, self.fill), strict)
         if value is None and S.is_object(strict):
             value = S.empty_instance(strict)
         errors = S.find_errors(value, strict)
@@ -1851,10 +1853,12 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
     review_on = bool(settings.get("review"))  # code-only checks on the answer, returned under "review"
     alt_cfg = settings.get("alternatives")  # other values the document gives for a field (true or a list of paths)
     derived_ok = settings.get("derived_values", True) is not False
+    fill = RS.fill_policy(settings.get("fill_required"))  # which required fields must be answered (reply_schema)
     # The model writes only the user's fields. Per-value source labels are asked for only by deep_extract,
     # whose checks need them; citations are found by code (code_citations).
     track = deep
     ex = _Extractor(view, pages, user_schema, system_prompt, llm, opts, track, bool(settings.get("include_images")))
+    ex.fill = fill
     ex.direct = dict(opts.get("direct") or {})
     ex.pdf_path = "direct" if (ex.direct.get("pdf") or ex.direct.get("images")) else None
     from . import field_report as FR
@@ -1864,7 +1868,7 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
     is_obj = S.is_object(ex.strict)
     use_reply = is_obj and not deep and not use_loop
     if use_reply:  # structured outputs for any schema size (reply_schema): the model answers in this shape
-        reply = RS.to_reply(ex.prompt_schema)
+        reply = RS.to_reply(ex.prompt_schema, policy=fill)
         if citations_on:
             reply = RS.add_blocks(reply, blocks=not ex.pdf_path)  # the PDF has no block labels to name
             ex.labels = not ex.pdf_path
@@ -1900,6 +1904,7 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
         "fields_per_group": int(opts.get("coded_group_leaves", 40)), "max_output_tokens": ex.opts.get("max_tokens"),
         "citations": citations_on, "deep_extract": deep, "array_extract": bool(settings.get("array_extract")),
         "review": review_on, "alternatives": bool(alt_cfg), "derived_values": derived_ok,
+        "fill_required": sorted(fill) if isinstance(fill, set) else fill,
         "include_images": bool(settings.get("include_images")), "page_range": settings.get("page_range"),
         "relevance_filter": bool(settings.get("relevance_filter")), "pages": len(pages),
         "one_stage": bool(ex.pdf_path),  # the model read the PDF itself; no parsing stage
@@ -2083,6 +2088,7 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
         extra_out["alternatives"] = found
     if review_on:
         extra_out["review"] = FR.review(value, ex.strict, cites, ex, conflicts=conflicts, unreadable=set(still),
+                                        filled=RS.forced_paths(ex.prompt_schema, fill) if use_reply else set(),
                                         pages=all_pages)
 
     view.docs[0].usage.append({"task": "extract", **sum_usage(ex.results)})

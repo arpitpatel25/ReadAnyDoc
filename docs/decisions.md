@@ -12,8 +12,12 @@ the document format, a default, or a public interface.
   answer" in the coded format): the model picks the value the document's terms mean (on these forms "Net 30" means
   last_day_of_month = false, as in the answer key). Forced answers do not count as content: an optional section
   with nothing else found is still null, and a list item with only forced answers is dropped.
-- Numbers and text are still never forced, since that would mean making a value up; a required one left empty is
-  reported in `warnings`.
+- Numbers and text are still never forced by default, since that would mean making a value up; a required one
+  left empty is reported in `warnings`.
+- 0.4.3: `fill_required` lets the user choose, per field (`True`, a list of paths, `False`). Forced numbers and text
+  are asked for in the field's description (the grammar cannot force text without allowing made-up text), and a
+  forced value not printed in the document is flagged `filled_because_required`. Measured on the 5-form pack:
+  `True` 525/534 against 534/534 for the default; the extra errors were made-up end dates for one-time fees.
 
 ## Test suite for users: `readanydoc bench` (2026-11-19)
 

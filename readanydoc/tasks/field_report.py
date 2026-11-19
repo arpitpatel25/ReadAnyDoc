@@ -7,6 +7,8 @@ Each check names a field and a reason a reader should look at it:
   and month order, a negative in parentheses, "amounts in thousands", a percentage returned as a fraction);
 - ``struck_through``: every place the value is printed is crossed out; ``void_page``: its page is stamped VOID;
 - ``segments_disagree``: two parts of a long document gave different values;
+- ``filled_because_required``: a number or text field filled because ``fill_required`` asks for it, and not
+  printed in the document as returned: it may be a guess;
 - ``list_may_be_incomplete``: a list has fewer items than the rows with an amount in the table it was read from;
 - ``unreadable``: the model's reply for the field could not be read.
 
@@ -203,7 +205,11 @@ def amount_rows(content: str) -> int:
     c = content or ""
     if re.search(r"<tr\b", c, re.I):
         n = 0
-        for row in re.findall(r"<tr\b[^>]*>(.*?)</tr>", c, re.I | re.S):
+        rows = re.findall(r"<tr\b[^>]*>(.*?)</tr>", c, re.I | re.S)
+        width = max((len(re.findall(r"<t[dh]\b", r, re.I)) for r in rows), default=0)
+        for row in rows:
+            if len(re.findall(r"<t[dh]\b", row, re.I)) < width:  # a label spanning the columns: a total row
+                continue
             if re.search(r"<th\b", row, re.I):
                 continue
             cells = [" ".join(re.sub(r"<[^>]+>", " ", x).split()) for x in re.findall(r"<td\b[^>]*>(.*?)</td>", row, re.I | re.S)]
@@ -219,6 +225,10 @@ def amount_rows(content: str) -> int:
     return sum(1 for ln in body if not _SUMMARY_ROW.search(ln) and _AMOUNT.search(ln))
 
 
+def _norm(path: tuple) -> str:
+    return ".".join(str(p) for p in path if isinstance(p, str))
+
+
 def _category(leaf: Any) -> bool:
     """An enum or const field: a category the model picks (a pricing model, a billing cadence code), which is not
     printed on the page as such, so "not printed" says nothing about it."""
@@ -229,7 +239,7 @@ def _category(leaf: Any) -> bool:
 
 
 def review(value: Any, schema: Any, cites: dict, ex: Any, *, conflicts: list, unreadable: set,
-           pages: list[PageRef]) -> list[dict]:
+           pages: list[PageRef], filled: Any = ()) -> list[dict]:
     """[{"field", "flag", "detail"}] for the values a reader should check (see the module docstring)."""
     out: list[dict] = []
     void = void_pages(pages)
@@ -244,7 +254,10 @@ def review(value: Any, schema: Any, cites: dict, ex: Any, *, conflicts: list, un
             continue
         key = S.path_str(path)
         good = [c for c in cites.get(path) or [] if c.get("confidence") == "high"]
-        if not good and not _category(_leaf):
+        if not good and _norm(path) in filled:
+            add(key, "filled_because_required", "not printed in the document as returned; filled because the "
+                "schema requires it (fill_required): it may be a guess")
+        elif not good and not _category(_leaf):
             add(key, "not_found_on_page", "not printed in the document as returned: worked out, converted or assumed")
         for c in good[:1]:
             for flag, note in format_flags(v, c.get("content"), (c.get("parentBlock") or {}).get("content", "")):
