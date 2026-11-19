@@ -7,7 +7,9 @@ nullable, is over both after a dozen fields, so the model used to write free JSO
 ``to_reply`` rewrites the user's schema (``$ref``-free) into one the API accepts, in code, before the call:
 
 - every field is required, and "or null" is dropped: an empty string means "not in the document", an empty list
-  an empty list; a field is never forced to hold a guess, because "" is always a valid answer;
+  an empty list; a number or text is never forced to hold a guess, because "" is always a valid answer for it;
+- a yes/no or enum field that the user's schema requires and does not allow null has no "" choice: the model has
+  to answer it (as the user's schema demands), so the output does not break the user's own validation;
 - numbers, integers and booleans become strings (the value as printed: "$4,200.00", "yes"), so they need no
   null either; enums keep their values plus "".
 
@@ -64,21 +66,29 @@ def _live(node: dict) -> list:
     return [b for b in br if S.types_of(b) != {"null"} and b != {"type": "null"}]
 
 
-def to_reply(schema: Any) -> Any:
-    """The structured-output version of a resolved schema (see the module docstring)."""
+def to_reply(schema: Any, must: bool = True) -> Any:
+    """The structured-output version of a resolved schema (see the module docstring).
+
+    ``must``: the user's schema requires this value and does not allow null, and every object above it is always
+    present (required, not nullable). A yes/no, enum or const field like that gets no "" choice: the API makes the
+    model answer it, so the output never breaks the user's required type. Other required fields keep "" (no
+    number or text is ever made up); one that comes back empty is reported (``required_warnings``)."""
     if not isinstance(schema, dict):
         return {"type": "string"}
+    must = must and not _allows_null(schema)
     live = _live(schema)
     if len(live) == 1 and live[0] is not schema:
         merged = {**{k: v for k, v in schema.items() if k not in ("anyOf", "oneOf")}, **live[0]}
-        return to_reply(merged)
+        return to_reply(merged, must)
     if len(live) > 1:
-        return {"anyOf": [to_reply(b) for b in live], **_desc(schema)}
+        return {"anyOf": [to_reply(b, False) for b in live], **_desc(schema)}
     ts = S.types_of(schema) - {"null"}
+    empty = [] if must else [""]
     if "const" in schema:
-        return {"type": "string", "enum": [str(schema["const"]), ""], **_desc(schema)}
+        return {"type": "string", "enum": [str(schema["const"])] + empty, **_desc(schema)}
     if S.is_object(schema) or ("object" in ts and "properties" in schema):
-        props = {k: to_reply(v) for k, v in (schema.get("properties") or {}).items()}
+        req, forced = set(schema.get("required") or []), _forced(schema, must)
+        props = {k: to_reply(v, k in forced or (must and k in req)) for k, v in (schema.get("properties") or {}).items()}
         return {"type": "object", "properties": props, "required": list(props), "additionalProperties": False,
                 **_desc(schema)}
     if "array" in ts or "items" in schema:
@@ -86,9 +96,9 @@ def to_reply(schema: Any) -> Any:
     enum = schema.get("enum")
     if isinstance(enum, list):
         vals = [str(v).lower() if isinstance(v, bool) else str(v) for v in enum if v is not None]
-        return {"type": "string", "enum": list(dict.fromkeys(vals + [""])), **_desc(schema)}
+        return {"type": "string", "enum": list(dict.fromkeys(vals + empty)) or [""], **_desc(schema)}
     if ts == {"boolean"}:
-        return {"type": "string", "enum": ["true", "false", ""], **_desc(schema)}
+        return {"type": "string", "enum": ["true", "false"] + empty, **_desc(schema)}
     if ts & {"number", "integer"} and "string" not in ts:
         return {"type": "string", **_desc(schema, "a number")}
     return {"type": "string", **_desc(schema)}
@@ -108,14 +118,22 @@ def from_reply(value: Any, schema: Any) -> Any:
             return None if value in ("", None) else value
         out = {k: from_reply(value.get(k), sub) for k, sub in schema["properties"].items()} | \
             {k: v for k, v in value.items() if k not in schema["properties"]}
-        # an optional object the document does not have comes back as null, as the user's schema allows
-        return None if nullable and _blank(out) else out
+        # an optional object the document does not have comes back as null, as the user's schema allows; its
+        # yes/no and enum fields that had to be answered (``_forced``) do not count as something found
+        forced = _forced(schema, False)
+        return None if nullable and _blank({k: v for k, v in out.items() if k not in forced}) else out
     if S.is_array(schema):
         if value in ("", None):
             return []
         if not isinstance(value, list):
             return value
-        return [from_reply(v, schema.get("items") or {}) for v in value]
+        items = schema.get("items") or {}
+        out = [from_reply(v, items) for v in value]
+        live = S.branch_for(items, {}) if isinstance(items, dict) else None
+        forced = _forced(live, False) if isinstance(live, dict) and S.is_object(live) else set()
+        if forced:  # an item holding only answers it was made to give is not an item the document has
+            out = [x for x in out if not (isinstance(x, dict) and _blank({k: v for k, v in x.items() if k not in forced}))]
+        return out
     if isinstance(value, str):
         v = value.strip()
         if not v:
@@ -141,6 +159,24 @@ def from_reply(value: Any, schema: Any) -> Any:
             return None
         return value  # numbers: S.conform converts "4,200" / "(1,200)" against the user's schema
     return value
+
+
+def _choice(node: Any) -> bool:
+    """A yes/no, enum or const field: one whose answer can be forced without making up a number or text."""
+    if not isinstance(node, dict):
+        return False
+    live = _live(node)
+    n = live[0] if len(live) == 1 else node
+    return isinstance(n, dict) and ("const" in n or isinstance(n.get("enum"), list)
+                                    or S.types_of(n) - {"null"} == {"boolean"})
+
+
+def _forced(obj: dict, must: bool) -> set:
+    """Fields of an object answered without a "" choice: required, not nullable, yes/no or enum. In an object that
+    may be absent and has nothing else to find, none are forced (forcing them would make the object up)."""
+    req, props = set(obj.get("required") or []), obj.get("properties") or {}
+    keys = {k for k, v in props.items() if k in req and isinstance(v, dict) and not _allows_null(v) and _choice(v)}
+    return keys if must or len(keys) < len(props) else set()
 
 
 def _allows_null(schema: dict) -> bool:
@@ -361,8 +397,10 @@ def add_alternatives(reply: dict, fields: Optional[list[str]]) -> dict:
                         "none." + which),
         "items": {"type": "object", "properties": {
             "field": {"type": "string", "description": "path of the field, e.g. contract.price or items[0].amount"},
-            "value": {"type": "string", "description": "the other value, as printed"},
+            "value": {"type": "string", "description": "the other value, written the way the field asks for its "
+                      "answer (same format as the answer: a date in the field's date format, a number as digits)"},
+            "printed": {"type": "string", "description": "the same value as printed in the document"},
             "note": {"type": "string", "description": "why it differs, in a few words"}},
-            "required": ["field", "value", "note"], "additionalProperties": False}}
+            "required": ["field", "value", "printed", "note"], "additionalProperties": False}}
     reply["required"] = list(reply.get("required", [])) + [ALT_FIELD]
     return reply
