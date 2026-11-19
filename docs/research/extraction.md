@@ -31,7 +31,7 @@ reads the answer key or the page's own words. Nothing here was judged by an AI m
 
 | Set | What it is | Scored by |
 |---|---|---|
-| Contract pack | 5 order forms from a user (Zenskar), 534 fields, a 20-type billing schema, planted ambiguities | The pack's own rules (`score.py`, read, not run, plus our copy) |
+| Contract pack | 5 order forms from a user, 534 fields, a 20-type billing schema, planted ambiguities | The pack's own rules (`score.py`, read, not run, plus our copy) |
 | ExtractBench | Contextual AI's benchmark: 35 documents, 2,076 pages, five schemas (10-Q, credit agreement, research paper, resume, swimming results), human-checked answers | The suite's own grader, with its Sonnet 5.5 judge for text fields |
 | ADP 10-Q | One ExtractBench document: 43 pages, about 90,000 tokens of text, a schema the API refuses as one call; 153 gold values | Our free scorer: metric, period, segment and value times scale within 1% |
 
@@ -289,7 +289,7 @@ stays fair (Reducto was scored the same way), but those absolute figures are too
 
 ## 10. Calls, thinking, and why a competitor needs only two calls
 
-The user's own pipeline (Zenskar) reported 2 calls and $0.008-0.013 per form. Ours, one contract-pack form:
+The user's own in-house pipeline reported 2 calls and $0.008-0.013 per form. Ours, one contract-pack form:
 
 | Step | Calls | Cost |
 |---|---|---|
