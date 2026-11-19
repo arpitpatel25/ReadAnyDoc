@@ -100,3 +100,16 @@ def test_every_listed_system_can_be_built_and_names_its_key():
 def test_the_catalogue_lists_licence_and_source_for_every_set():
     for s in catalog.SETS.values():
         assert s.licence and s.source.startswith("https://") and s.documents > 0 and s.default_limit > 0
+
+
+def test_small_invoice_sample_covers_hard_input_types():
+    from readanydoc.bench.catalog import _spread
+    meta = [{"category": c, "difficulty": d, "doc_id": f"{c}-{d}-{i}"}
+            for c in ["clean", "credit", "currency", "photo", "scan", "handwritten"]
+            for d in ["easy", "medium", "hard"] for i in range(2)]
+    three = _spread(meta, 3)
+    assert [m["category"] for m in three] == ["photo", "scan", "handwritten"]
+    assert len({m["difficulty"] for m in three}) == 3
+    every = _spread(meta, len(meta))
+    assert sorted(m["doc_id"] for m in every) == sorted(m["doc_id"] for m in meta)
+    assert {m["category"] for m in _spread(meta, 6)} == {"clean", "credit", "currency", "photo", "scan", "handwritten"}

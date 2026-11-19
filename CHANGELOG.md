@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 (2026-11-19)
+
+- `readanydoc bench`: a small sample now covers the set's hard documents (photos, scans, handwriting,
+  multi-page) and mixes difficulties, instead of the first clean PDFs.
+- BENCHMARKS.md: a 20-invoice extraction run against Reducto and a plain model.
+
 ## 0.4.0 (2026-11-19)
 
 Test it yourself: compare ReadAnyDoc with other systems on public test sets or your own documents.

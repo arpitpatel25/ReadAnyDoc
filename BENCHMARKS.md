@@ -41,6 +41,28 @@ What the differences mean, using the paired intervals:
   long extraction; level on RD-TableBench and FUNSD (differences inside the intervals); behind on layout (-6),
   formulas, header and footer removal, and speed.
 
+## Extraction: 20 invoices (`readanydoc bench`)
+
+Run with the shipped test suite (`readanydoc bench run invoices --limit 20`), 19 November 2026: one invoice of every
+kind in the set (phone photos, scans, handwritten invoice books, multi-page, several invoices in one file, freight,
+credit notes, VAT, six currencies, clean PDFs), scored by code against the set's answer key.
+
+| | Reducto Extract | Plain Haiku 5.5 (one call) | ReadAnyDoc 0.4 |
+|---|---|---|---|
+| Answer-key values found | **99.8%** | 96.6% | **99.8%** |
+| Output values right | 99.6% | 100% | 99.6% |
+| Documents fully right | 95% | 95% | 95% |
+| Failed documents | 0 | 1 (reply was not valid JSON) | 0 |
+| Values with a citation box | 100% | none | 89.5% |
+| Boxes that show the value | 87.9% | - | **94.9%** |
+| Cost per document | $0.027 (list price) | $0.0008 | $0.0045 |
+| Median seconds per document | **5.4** | 3.2 | 18.0 |
+
+Invoices are easy for all three: ReadAnyDoc and Reducto tie on accuracy. ReadAnyDoc costs about a sixth of
+Reducto's list price and is about three times slower; its boxes more often land on the value itself. A plain model
+call is the cheapest, but with nothing enforcing the shape one reply could not be read at all. Twenty documents is a
+small sample; run it yourself with more (`--limit 181`).
+
 ## Cost and speed
 
 | | Reducto r-1 | Model only | Engine |
