@@ -209,12 +209,23 @@ def amount_rows(content: str) -> int:
             cells = [" ".join(re.sub(r"<[^>]+>", " ", x).split()) for x in re.findall(r"<td\b[^>]*>(.*?)</td>", row, re.I | re.S)]
             if any(_SUMMARY_ROW.search(x) for x in cells if x) or not any(_AMOUNT.search(x) for x in cells if x):
                 continue
+            if cells and not cells[0]:  # no item name in the first column: a total under the items ("| Monthly | 5,800")
+                continue
             n += 1
         return n
     lines = [ln for ln in c.splitlines() if ln.strip().startswith("|")]
     body = [ln for ln in lines if not re.fullmatch(r"\s*\|?[\s:|-]+\|?\s*", ln)]
     body = body[1:] if len(body) < len(lines) else body
     return sum(1 for ln in body if not _SUMMARY_ROW.search(ln) and _AMOUNT.search(ln))
+
+
+def _category(leaf: Any) -> bool:
+    """An enum or const field: a category the model picks (a pricing model, a billing cadence code), which is not
+    printed on the page as such, so "not printed" says nothing about it."""
+    if not isinstance(leaf, dict):
+        return False
+    nodes = [leaf] + [b for b in (leaf.get("anyOf") or leaf.get("oneOf") or []) if isinstance(b, dict)]
+    return any("const" in n or isinstance(n.get("enum"), list) for n in nodes)
 
 
 def review(value: Any, schema: Any, cites: dict, ex: Any, *, conflicts: list, unreadable: set,
@@ -228,12 +239,12 @@ def review(value: Any, schema: Any, cites: dict, ex: Any, *, conflicts: list, un
         if item not in out:
             out.append(item)
 
-    for path, v, _ in S.iter_leaves(value, schema):
+    for path, v, _leaf in S.iter_leaves(value, schema):
         if not path or v is None or isinstance(v, bool):
             continue
         key = S.path_str(path)
         good = [c for c in cites.get(path) or [] if c.get("confidence") == "high"]
-        if not good:
+        if not good and not _category(_leaf):
             add(key, "not_found_on_page", "not printed in the document as returned: worked out, converted or assumed")
         for c in good[:1]:
             for flag, note in format_flags(v, c.get("content"), (c.get("parentBlock") or {}).get("content", "")):

@@ -4,6 +4,17 @@ One line per decision, with the reason, grouped by area in the order they were m
 earlier ones; the first section lists what changed for the first public release. Add a line here when you change
 the document format, a default, or a public interface.
 
+## Required yes/no and enum fields are answered (2026-11-19)
+
+- 0.3.0 kept every value the document does not give as null, also for a required field. A user's schema with a
+  required boolean then failed its own validation on 4 of 5 forms, against the "enforced output" promise.
+- Now a required, non-nullable yes/no or enum field has no "" choice in the reply schema (and is marked "always
+  answer" in the coded format): the model picks the value the document's terms mean (on these forms "Net 30" means
+  last_day_of_month = false, as in the answer key). Forced answers do not count as content: an optional section
+  with nothing else found is still null, and a list item with only forced answers is dropped.
+- Numbers and text are still never forced, since that would mean making a value up; a required one left empty is
+  reported in `warnings`.
+
 ## Test suite for users: `readanydoc bench` (2026-11-19)
 
 - Shipped in the package (no new dependency), separate from parsing and extraction: nothing runs unless called.

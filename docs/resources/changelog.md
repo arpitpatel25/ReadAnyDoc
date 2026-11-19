@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.2 (2026-11-19)
+
+From a user's test of 0.4.0 on a pack of 5 order forms (their scorer: 97.9% of fields right). After these fixes,
+one run: 534 of 534 fields right, $0.012-0.015 per form.
+
+- Required yes/no and enum fields come back in the schema's type. A field the schema requires and does not allow
+  null (a boolean, an enum) has no empty choice: the model has to answer it, so the output passes the schema's
+  own validation (4 of 5 forms returned null for a required boolean). In the coded format such fields are marked
+  "always answer". An optional section the document does not have is still null, and a list item is never made up
+  for such a field. Numbers and text are never forced: a required one the document does not give stays null, with
+  a warning.
+- Alternatives (`alternatives=True`) come back in the field's own format and type ("2026-03-01", 4500), with the
+  printed text kept as `printed`.
+- Review: no `not_found_on_page` for enum fields (a category the model picks is never printed as such); no
+  `list_may_be_incomplete` for a total row under the items; "&" in a name is matched against "&amp;" in the parsed
+  table (a printed name was flagged as not printed).
+
 ## 0.4.1 (2026-11-19)
 
 - `readanydoc bench`: a small sample now covers the set's hard documents (photos, scans, handwriting,

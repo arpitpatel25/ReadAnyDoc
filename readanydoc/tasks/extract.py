@@ -392,6 +392,16 @@ def _find_date(masked: str, value: str) -> list[tuple[int, int]]:
     return sorted(set(out))
 
 
+_ENTITY = re.compile(r"&(?:amp|lt|gt|quot|apos|nbsp|#3[49]|#160|#x2[67]|#xa0);", re.I)
+
+
+def _words(content: str) -> list:
+    """The block's words for matching a value: "&amp;" in the parsed HTML is the printed "&", not a word "amp"."""
+    if "&" in (content or ""):
+        content = _ENTITY.sub(lambda m: "<" + " " * (len(m.group(0)) - 2) + ">", content)
+    return tokenize(content)
+
+
 def _find_tokens(tokens: list, want: list[str]) -> list[tuple[int, int]]:
     n = len(want)
     if not n or n > len(tokens):
@@ -428,12 +438,12 @@ def spans(value: Any, ref: RegionRef) -> tuple[list[tuple[int, int]], bool]:
     if as_num is not None:
         found = _find_number(masked, as_num)
         if not found and not isinstance(value, (int, float)) and not _PLAIN_NUMBER.fullmatch(str(value).strip()):
-            found = _find_tokens(tokenize(content), norm_tokens(str(value)))  # "INV-2041": text that holds a number
+            found = _find_tokens(_words(content), norm_tokens(str(value)))  # "INV-2041": text that holds a number
         return found, True
     want = norm_tokens(str(value))
     if not want:
         return [], True
-    found = _find_tokens(tokenize(content), want)
+    found = _find_tokens(_words(content), want)
     if not found and _ISO_DATE.match(str(value)):
         found = _find_date(masked, str(value))
     if not found and len(want) >= 4:
@@ -2059,11 +2069,15 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
     if alt_cfg and use_reply:
         found: dict[str, list] = {}
         for a in alts:
-            item = {"value": str(a.get("value", "")).strip(), "note": str(a.get("note", "")).strip() or None}
-            if citations_on:
-                hit = ex.found_anywhere(item["value"])
-                item["citations"] = [_citation(hit[0][0], hit[0][1], 0.8, cit_cfg)] if hit else []
             key = str(a.get("field", "")).strip()
+            text = str(a.get("value", "")).strip()
+            printed = str(a.get("printed", "")).strip() or text
+            leaf = _schema_at(ex.strict, key)
+            item = {"value": _as_field(text, leaf), "printed": printed,
+                    "note": str(a.get("note", "")).strip() or None}
+            if citations_on:
+                hit = ex.found_anywhere(printed) or ex.found_anywhere(text)
+                item["citations"] = [_citation(hit[0][0], hit[0][1], 0.8, cit_cfg)] if hit else []
             if key and item not in found.setdefault(key, []):
                 found[key].append(item)
         extra_out["alternatives"] = found
@@ -2080,3 +2094,30 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
     return {"response_type": "v3_extract", "result": result, "usage": usage,
             "studio_link": None, "confidence": confidence, "confidence_reason": reason,
             "warnings": warnings, **extra_out}
+
+
+def _schema_at(schema: Any, key: str) -> Any:
+    """The user's schema for a field path as the model writes it ("contract.items[0].amount", or with a name in the
+    brackets), or None when the path does not lead to a field."""
+    node = schema
+    for name, bracket in re.findall(r"([^.\[\]]+)|\[([^\]]*)\]", key or ""):
+        live = S.branch_for(node, [] if bracket or not name else {}) if isinstance(node, dict) else None
+        if not isinstance(live, dict):
+            return None
+        if name:
+            if S.is_array(live) and not S.is_object(live):  # "items.amount" without an index
+                live = S.branch_for(live.get("items") or {}, {})
+            node = (live.get("properties") or {}).get(name) if S.is_object(live) else None
+        else:
+            node = live.get("items") if S.is_array(live) else None
+        if node is None:
+            return None
+    return node
+
+
+def _as_field(text: str, leaf: Any) -> Any:
+    """An alternative value in the field's own type ("4500" -> 4500 for a number), like the main value."""
+    if not isinstance(leaf, dict) or S.is_object(leaf) or S.is_array(leaf):
+        return text
+    v = S.conform(RS.from_reply(text, leaf), leaf)
+    return text if v is None else v
