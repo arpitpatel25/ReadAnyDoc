@@ -11,6 +11,7 @@ Each page has a complete, working example.
 |---|---|
 | [Extract data from invoices](invoices.md) | Turn PDF and scanned invoices into typed data (vendor, invoice number, dates, line items, totals) with a citation for every value, in Python, using Claude Haiku or any model. |
 | [Extract transactions from bank statements](bank-statements.md) | Parse bank statement PDFs into a list of transactions (date, description, amount, balance) with citations, using an open-source Reducto alternative. |
+| [Extract data from purchase orders, packing lists and bills of lading](purchase-orders.md) | Read scanned or digital purchase orders, packing lists and bills of lading into parties, numbers, dates, line items, weights and ports, with citations. |
 | [Extract data from receipts](receipts.md) | Read photos and scans of receipts into merchant, date, items, tax and total with citations, using Claude Haiku and an open-source parser. |
 | [Extract data from tax forms (W-2, W-9, 1099)](tax-forms.md) | Pull fields and checkboxes from US tax forms such as the W-2, W-9 and 1099, scanned or fillable, with word-level citations. |
 | [Extract tables from PDFs](tables-from-pdf.md) | Convert tables in PDFs and scans to HTML, Markdown or structured rows, including merged cells and tables that span pages, with Python. |
