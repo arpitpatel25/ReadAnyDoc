@@ -296,4 +296,10 @@ def review(value: Any, schema: Any, cites: dict, ex: Any, *, conflicts: list, un
                 lists(x, s["properties"].get(k, {}), path + (k,))
 
     lists(value, schema, ())
+    from . import coverage  # printed values the output did not take (code only)
+    pages_ = [{"number": p.number, "regions": [{"label": r.label, "type": r.region.type.value,
+                                                "content": r.region.content} for r in p.regions]}
+              for p in (getattr(ex, "pages", None) or [])]
+    for f in coverage.check(value, schema, pages_):
+        add(f["field"] or "", f["flag"], f["detail"])
     return out
