@@ -1,6 +1,6 @@
 """Extract on deep schemas with broken model replies: never a silent empty answer, never a wrong value.
 
-Background (Zenskar, 16 Nov 2026): a 22 KB billing-contract schema with 20 nested types came back as
+Background (a user report, 16 Nov 2026): a 22 KB billing-contract schema with 20 nested types came back as
 {"customer": null, "business_entity": null, "contract": null} with "not found in the document" warnings.
 Haiku had read everything correctly but wrote one closing bracket too many (inside a list) in the old
 {"v", "r"}-per-value citation format; the JSON reader kept the longest piece that parsed (the customer
@@ -27,7 +27,7 @@ from readanydoc.tasks import schema as S
 from readanydoc.tasks.llm import LLMResult
 from tests.tasks.conftest import make_doc
 
-# ---------------------------------------------------------------- a Zenskar-sized billing contract schema
+# ---------------------------------------------------------------- a large billing contract schema
 
 S_STR = {"type": "string"}
 S_NUM = {"type": "number"}
@@ -82,7 +82,7 @@ assert len(DEFS) >= 20
 
 BLOCKS = [
     ("Title", "Order Form OF-2026-118"),                                                    # r1
-    "Provider: Zenskar Inc, 500 Howard St, San Francisco, US, 94105",                       # r2
+    "Provider: Ledgerline Inc, 500 Howard St, San Francisco, US, 94105",                       # r2
     "Customer: Acme Robotics Ltd, 12 Harbour Road, Leeds, GB, LS1 4AB",                     # r3
     "Billing contact: Priya Shah, ap@acme-robotics.com, Accounts Payable",                  # r4
     "VAT number: GB 123 4567 89",                                                           # r5
@@ -100,7 +100,7 @@ TRUTH = {
                  "address": {"line1": "12 Harbour Road", "city": "Leeds", "country": "GB", "postal_code": "LS1 4AB"},
                  "billing_contact": {"name": "Priya Shah", "email": "ap@acme-robotics.com", "role": "Accounts Payable"},
                  "tax_id": {"scheme": "VAT", "value": "GB 123 4567 89"}},
-    "business_entity": {"name": "Zenskar Inc",
+    "business_entity": {"name": "Ledgerline Inc",
                         "address": {"line1": "500 Howard St", "city": "San Francisco", "country": "US",
                                     "postal_code": "94105"}},
     "contract": {
@@ -214,7 +214,7 @@ def _structural(text: str) -> list[int]:
 
 
 def _after_array_item(text: str, rng: random.Random) -> int:
-    """A position right after an object that is an item of a list (where Zenskar's extra "}" was)."""
+    """A position right after an object that is an item of a list (where the reported extra "}" was)."""
     stack, spots = [], []
     for i, c in L._scan_brackets(text):
         if c in "{[":
@@ -309,9 +309,9 @@ def check_invariants(doc_truth: dict, run):
     return "complete" if complete else "partial"
 
 
-# ---------------------------------------------------------------- the Zenskar case, exactly
+# ---------------------------------------------------------------- the reported case, exactly
 
-def test_zenskar_case_old_format_extra_bracket_in_a_list_is_read_in_full():
+def test_reported_case_old_format_extra_bracket_in_a_list_is_read_in_full():
     text = compact(wrapped())
     broken = mutate(text, "extra_closer_in_list", random.Random(0))
     with pytest.raises(json.JSONDecodeError):

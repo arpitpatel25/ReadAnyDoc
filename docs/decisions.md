@@ -388,14 +388,14 @@ Reading-quality additions after benchmark priorities changed (Parse Judge error 
 - Long lists: a segment whose item count is below half of the expected count (median items-per-table-row of the other segments; all rows when there is one segment) and whose tables have at least 10 rows is extracted again in halves; kept only when it finds more items; a remaining gap is a warning. Not run on the long-document benchmark (cost); unit-tested with a fake model.
 
 ## Extract replies that cannot be read (2026-11-17)
-Reported by a user (Zenskar): two order forms extracted into a 22 KB billing schema with 20 nested types came back
+Reported by a user: two order forms extracted into a 22 KB billing schema with 20 nested types came back
 as all nulls with "not found in the document" warnings, with citations on. Haiku had read everything; its reply had
 one `}` too many inside a list, and `parse_json` kept the longest piece that parsed (the customer block) as the
 whole answer. Changes, each with tests in `tests/tasks/test_extract_robust.py`:
 - `parse_json` never returns a fragment: a piece of JSON is used only when nothing around it is part of the answer
   (an object key, an unclosed bracket before it, a stray closer after it), and an object with a repeated key is
   broken JSON. Broken JSON is never repaired there.
-- `repair_brackets` removes a closer of the wrong kind (the Zenskar mistake). Extract uses it only when the repaired
+- `repair_brackets` removes a closer of the wrong kind (the mistake in that report). Extract uses it only when the repaired
   value has exactly the schema's shape with nothing moved, dropped or invalid, because the same text can come from a
   missing opener. Otherwise the model is asked again.
 - A reply that parses but lacks the schema's top-level fields is asked for again once, never used. A reply that keeps
@@ -410,7 +410,7 @@ whole answer. Changes, each with tests in `tests/tasks/test_extract_robust.py`:
 - Structured outputs on the Anthropic API adapter are on when the schema fits the published limits (24 optional
   fields, 16 union types) and uses only features the API supports (`api_schema`): every object closed, nothing made
   required that the user did not mark required, unsupported constraints dropped (validated by us anyway). A schema
-  the API refuses is remembered and sent without a format. Large schemas like Zenskar's do not fit; the changes above
+  the API refuses is remembered and sent without a format. Large schemas like that user's do not fit; the changes above
   cover them.
 - Checked with a property test (hypothesis: any JSON with one bracket added or removed, or a stray comma: the reader
   returns the whole original answer or nothing) and a seeded test of 14 kinds of model mistakes in three reply
@@ -419,7 +419,7 @@ whole answer. Changes, each with tests in `tests/tasks/test_extract_robust.py`:
   structured outputs on a small invoice schema. Not run on the benchmarks (cost); parse output is unchanged.
 
 ## Field report (2026-11-17)
-After the Zenskar report (an order form with $4,500 in the price table and "$4,200 for the first year" in special
+After that user's report (an order form with $4,500 in the price table and "$4,200 for the first year" in special
 terms), a review of what a bare value hides, for any document type. Each extracted field now has a status in
 `field_report` (`readanydoc/tasks/field_report.py`, tests in `tests/tasks/test_field_report.py`):
 - Conflicts: the model lists other values the document gives for a field; each is checked on the page in code and
