@@ -63,7 +63,11 @@ markdown_extensions:
   - tables
   - toc: {permalink: true}
   - pymdownx.details
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed: {alternate_style: true}
   - pymdownx.highlight: {anchor_linenums: true}
   - pymdownx.inlinehilite
@@ -86,6 +90,7 @@ nav:
       - Guide for coding agents: get-started/agents.md
     - Concepts:
       - How it works: concepts/how-it-works.md
+      - The whole product, end to end: concepts/product.md
       - Modes, engine and model only: concepts/modes.md
       - Choosing models: concepts/models.md
       - Citations and confidence: concepts/citations.md
