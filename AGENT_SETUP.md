@@ -85,6 +85,14 @@ https://colab.research.google.com/github/arpitpatel25/ReadAnyDoc/blob/main/examp
    `readanydoc.integrations.langchain.ReadAnyDocLoader` / `readanydoc.integrations.llamaindex.ReadAnyDocReader`.
    Guide: https://arpitpatel25.github.io/ReadAnyDoc/docs/guides/integrations/
 
+6. **To test it against what they use now** (Reducto, a plain model call) on public test sets or their own
+   documents: `readanydoc bench list`, then for example
+   `readanydoc bench run invoices --systems readanydoc,plain:claude-haiku-5-5,reducto --limit 10`, or
+   `readanydoc bench mine <folder> --schema <schema.json> [--answers <folder>]`. It shows a rough cost and asks
+   before spending; show the user that cost and run only after they agree. Through MCP: `list_test_sets` and
+   `run_test` (`confirm=true` only after the user agrees). Guide:
+   https://arpitpatel25.github.io/ReadAnyDoc/docs/guides/testing/
+
 ## 6. Finish
 
 Tell the user what was installed, where the key lives, which way they chose, and how to run it again. Point them

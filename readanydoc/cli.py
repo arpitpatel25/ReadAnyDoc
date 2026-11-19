@@ -4,6 +4,7 @@
     readanydoc extract invoice.pdf --schema schema.json [--instructions "..."]
     readanydoc serve [--port 8000]
     readanydoc cleanup
+    readanydoc bench list | run <set> [--systems a,b] [--limit N] | mine <folder> --schema s.json
 """
 
 from __future__ import annotations
@@ -120,6 +121,65 @@ def _mcp(args) -> int:
     return 0
 
 
+def _bench(args: argparse.Namespace) -> int:
+    from . import bench
+    if args.bench_cmd == "list":
+        rows = bench.sets()
+        if args.json:
+            print(json.dumps(rows, indent=1))
+            return 0
+        for r in rows:
+            print(f"{r['id']:20} {r['documents']:4} docs  {r['document_type']:28} {r['licence']}")
+            print(f"{'':20} {r['what_it_tests']}")
+        print("\nSystems: " + ", ".join(bench.systems.NAMES) + "   (your own keys: ANTHROPIC_API_KEY, REDUCTO_API_KEY)")
+        return 0
+    if args.bench_cmd == "rescore":
+        summary = bench.rescore(args.out)
+        for name, r in summary["systems"].items():
+            print(f"{name:28} values found {100 * (r.get('recall') or 0):.1f}%  right {100 * (r.get('precision') or 0):.1f}%")
+        print(f"Report: {summary['report']}")
+        return 0
+    specs = [s.strip() for s in args.systems.split(",") if s.strip()] if args.systems else None
+    if args.bench_cmd == "run":
+        plan = bench.prepare(args.set, specs, args.limit, args.out)
+    else:
+        instr = args.instructions
+        if instr and instr.startswith("@"):
+            instr = open(instr[1:]).read()
+        plan = bench.prepare(None, specs, args.limit, args.out, folder=args.folder, schema=args.schema,
+                             answers=args.answers, instructions=instr)
+    est = plan["estimate"]
+    print(f"{plan['title']}: {est['documents']} documents, {est['pages']} pages")
+    for name, usd in est["estimated_usd"].items():
+        why = plan["not_ready"].get(name)
+        print(f"  {name:28} about ${usd:.2f}" + (f"   SKIPPED: {why}" if why else ""))
+    print(f"  ({est['note']})")
+    if plan["info"]:
+        print(f"Licence: {plan['info']['licence']}")
+    if not args.yes:
+        if not sys.stdin.isatty():
+            print("Not run: add --yes to confirm the cost when there is no terminal to ask.")
+            return 2
+        if input("Run it? [y/N] ").strip().lower() not in ("y", "yes"):
+            return 1
+
+    def done(system: str, case: str, rec: dict) -> None:
+        sc = rec.get("score")
+        print(f"  {system:28} {case[:40]:40} " + (f"{100 * sc['recall']:5.1f}%" if sc else "     ") +
+              f"  ${rec.get('cost_usd') or 0:.4f}  {rec.get('seconds')} s" + (f"  ERROR {rec['error'][:80]}" if rec.get("error") else ""),
+              flush=True)
+    summary = bench.run_prepared(plan, budget_usd=args.budget, workers=args.workers, fresh=args.fresh, on_done=done)
+    print()
+    for name, r in summary["systems"].items():
+        rec = "" if r.get("recall") is None else f"values found {100 * r['recall']:.1f}%  right {100 * (r.get('precision') or 0):.1f}%  "
+        print(f"{name:28} {rec}cost/doc ${r.get('cost_per_document_usd') or 0:.4f}  median {r.get('median_seconds')} s  "
+              f"failed {r.get('failed', 0)}")
+    if summary.get("stopped_by_budget"):
+        print("Stopped early: the budget was reached.")
+    print(f"\nReport: {summary['report']}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="readanydoc", description="Parse and extract documents with vision models.",
                                  epilog="Docs: https://arpitpatel25.github.io/ReadAnyDoc/docs/  Questions: "
@@ -162,6 +222,31 @@ def main(argv: list[str] | None = None) -> int:
 
     m = sub.add_parser("mcp", help="run as an MCP server (stdio) for Claude, Cursor and other agents")
     m.set_defaults(fn=_mcp)
+
+    b = sub.add_parser("bench", help="test ReadAnyDoc against other systems on public test sets or your own documents")
+    bs = b.add_subparsers(dest="bench_cmd", required=True)
+    bl = bs.add_parser("list", help="the test sets and systems")
+    bl.add_argument("--json", action="store_true")
+    for name, hlp in (("run", "run a public test set"), ("mine", "run your own documents")):
+        q = bs.add_parser(name, help=hlp)
+        if name == "run":
+            q.add_argument("set", help="a test set id (readanydoc bench list)")
+        else:
+            q.add_argument("folder", help="a folder of documents")
+            q.add_argument("--schema", required=True, help="a JSON Schema file for every document")
+            q.add_argument("--answers", help="a folder of answer keys, <file stem>.json (optional)")
+            q.add_argument("--instructions", help="instructions for every system, or @file")
+        q.add_argument("--systems", help="comma-separated: readanydoc, readanydoc-one-stage, readanydoc-model-only, "
+                                         "plain:<model>, reducto (default: readanydoc,plain:claude-haiku-5-5)")
+        q.add_argument("--limit", type=int, help="number of documents (default: the set's sample size)")
+        q.add_argument("--budget", type=float, help="stop starting new documents once this many dollars are spent")
+        q.add_argument("--workers", type=int, default=4)
+        q.add_argument("--out", help="results folder (default: ./readanydoc-bench/<set>-<time>)")
+        q.add_argument("--fresh", action="store_true", help="run documents again even if results exist")
+        q.add_argument("--yes", action="store_true", help="do not ask before spending")
+    rs = bs.add_parser("rescore", help="score a finished run again and rewrite its report (no model call)")
+    rs.add_argument("out", help="the results folder of a run")
+    b.set_defaults(fn=_bench)
 
     args = ap.parse_args(argv)
     return args.fn(args)

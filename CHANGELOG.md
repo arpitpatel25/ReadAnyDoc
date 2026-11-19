@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- `readanydoc bench`: compare ReadAnyDoc with Reducto, a plain model call or its own other modes, on 8 public test
+  sets (invoices, receipts, quarterly reports, credit agreements, research papers, resumes, result tables, long
+  reports) or on your own documents, with your own keys. Cost estimate and confirmation before spending, a budget
+  cap, resumable runs, scoring by code against answer keys, and an HTML report with every system's citation boxes on
+  the page. Also as MCP tools (`list_test_sets`, `run_test`) and in Python (`readanydoc.bench`).
+
 ## 0.3.0 (2026-11-19)
 
 Every extraction call is enforced by the API, whatever the schema's size, and reads one cached copy of the

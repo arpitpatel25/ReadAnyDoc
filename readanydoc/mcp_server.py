@@ -19,7 +19,9 @@ INSTRUCTIONS = (
     "ReadAnyDoc reads PDFs, scans, photos and Office files. Use parse_document to get a document's text, tables "
     "and layout as Markdown. Use extract_fields with a JSON Schema to get typed values; every value comes with "
     "citations (the text and page box it was read from). Paths must be files on this computer. Confidence is "
-    "'high' or 'low'; check warnings before trusting a result."
+    "'high' or 'low'; check warnings before trusting a result. To test ReadAnyDoc against other systems (Reducto, "
+    "a plain model call) on public test sets or the user's own documents: list_test_sets, then run_test with "
+    "confirm=false to see the plan and its rough cost, and confirm=true only after the user agrees to the cost."
 )
 
 
@@ -68,6 +70,34 @@ def extract_fields(path: str, schema: dict[str, Any], instructions: Optional[str
             "cost_usd": res.usage.cost_usd, "seconds": res.usage.seconds}
 
 
+def list_test_sets() -> dict[str, Any]:
+    """The public test sets (invoices, receipts, financial reports, contracts, research papers, resumes, result
+    tables, long reports), with what each tests, its size and its licence, and the systems that can be compared."""
+    from . import bench
+    return {"sets": bench.sets(), "systems": bench.systems.NAMES,
+            "keys": "each system uses the user's own key: ANTHROPIC_API_KEY, REDUCTO_API_KEY"}
+
+
+def run_test(set_id: Optional[str] = None, systems: Optional[list[str]] = None, limit: Optional[int] = None,
+             folder: Optional[str] = None, schema_path: Optional[str] = None, answers_folder: Optional[str] = None,
+             budget_usd: Optional[float] = None, confirm: bool = False, out: Optional[str] = None) -> dict[str, Any]:
+    """Compare systems on a public test set (set_id) or on the user's own documents (folder + schema_path, and
+    answers_folder with <file stem>.json answer keys if they have them). Scored by code against the answer key.
+
+    With confirm=false (the default) nothing is spent: it returns the plan (documents, pages, rough cost per
+    system, systems that cannot run and why). Ask the user, then call again with confirm=true to run it. Returns
+    the scores per system and the path of an HTML report with a citation viewer for every document."""
+    from . import bench
+    plan = bench.prepare(set_id, systems, limit, out, folder=folder, schema=schema_path, answers=answers_folder)
+    head = {"title": plan["title"], "estimate": plan["estimate"], "cannot_run": plan["not_ready"],
+            "licence": (plan["info"] or {}).get("licence"), "results_folder": plan["out"]}
+    if not confirm:
+        return {**head, "status": "not run: show the user the rough cost and call again with confirm=true"}
+    summary = bench.run_prepared(plan, budget_usd=budget_usd)
+    return {**head, "status": "done", "summary": summary["systems"], "report": summary["report"],
+            "stopped_by_budget": summary.get("stopped_by_budget")}
+
+
 def build_server():
     try:
         from mcp.server.mcpserver import MCPServer
@@ -78,6 +108,8 @@ def build_server():
                        website_url="https://arpitpatel25.github.io/ReadAnyDoc/", version=readanydoc.__version__)
     server.tool()(parse_document)
     server.tool()(extract_fields)
+    server.tool()(list_test_sets)
+    server.tool()(run_test)
     return server
 
 
