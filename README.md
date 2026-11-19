@@ -178,6 +178,17 @@ from readanydoc.integrations.llamaindex import ReadAnyDocReader    # pip install
 
 One Markdown document per page with its page number. [Guide](https://arpitpatel25.github.io/ReadAnyDoc/docs/guides/integrations/).
 
+### Test it against what you use now
+
+```bash
+readanydoc bench list                                                      # invoices, receipts, filings, contracts, resumes...
+readanydoc bench run invoices --systems readanydoc,plain:claude-haiku-5-5,reducto --limit 10
+readanydoc bench mine ./my_docs --schema schema.json --answers ./answer_keys   # your own documents
+```
+
+Your own keys, a cost estimate before anything runs, scoring by code against answer keys, and an HTML report with
+every system's citations on the page. [Guide](https://arpitpatel25.github.io/ReadAnyDoc/docs/guides/testing/).
+
 ## How it works
 
 Each page goes through a fixed sequence of stages (`readanydoc/pipeline/`): intake (file type, pages), triage

@@ -1,4 +1,4 @@
-"""`readanydoc mcp`: the two tools are registered and check their input before any model call."""
+"""`readanydoc mcp`: the tools are registered and check their input before any model call."""
 import asyncio
 
 import pytest
@@ -17,7 +17,7 @@ def test_server_lists_parse_and_extract():
     pytest.importorskip("mcp")
     server = mcp_server.build_server()
     tools = asyncio.run(server.list_tools())
-    assert {t.name for t in tools} == {"parse_document", "extract_fields"}
+    assert {t.name for t in tools} == {"parse_document", "extract_fields", "list_test_sets", "run_test"}
 
 
 def test_cli_has_the_mcp_command():

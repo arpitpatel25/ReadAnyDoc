@@ -4,6 +4,22 @@ One line per decision, with the reason, grouped by area in the order they were m
 earlier ones; the first section lists what changed for the first public release. Add a line here when you change
 the document format, a default, or a public interface.
 
+## Test suite for users: `readanydoc bench` (2026-11-19)
+
+- Shipped in the package (no new dependency), separate from parsing and extraction: nothing runs unless called.
+- Sets are downloaded on demand into the cache and pinned to a revision, never redistributed; each lists its
+  licence. Chosen for a permissive licence and an answer key: invoices (CC-BY-4.0), CORD receipts (CC-BY-4.0),
+  ExtractBench's five schemas (MIT), LongExtract (CC-BY-4.0). FUNSD (non-commercial only) and RD-TableBench
+  (CC-BY-NC-ND) are left out of the user suite for their licences; the parsing benchmarks stay in `research/`.
+- Scoring is our own deterministic grader (numbers, dates and text compared by meaning; list items paired first),
+  applying a set's own rules where they matter (credit-note amounts compared by size). No AI judge, also where a
+  set's official grader uses one (ExtractBench's semantic fields).
+- A run shows a rough cost and asks before spending (MCP: `confirm=false` returns the plan only); `budget_usd`
+  stops new documents; results are saved per document, so a run resumes and can be rescored for free.
+- Systems use the user's own keys. Reducto's cost is its list price, labelled as such.
+- Smoke run (3 invoices, 2 receipts; readanydoc, one stage, plain Haiku, Reducto): every system ran; scores and
+  costs per document as measured (invoices: all four 100% of key values; receipts: Reducto 92.3%, others 100%).
+
 ## Extract: enforced at any size, cached document, citations by marks, one stage (2026-11-19)
 
 - A schema the API refuses as one structured-output call is asked in one fixed "coded" format
