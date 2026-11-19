@@ -4,6 +4,16 @@ One line per decision, with the reason, grouped by area in the order they were m
 earlier ones; the first section lists what changed for the first public release. Add a line here when you change
 the document format, a default, or a public interface.
 
+## Review flags values the output left out (2026-11-19)
+
+- The model sometimes drops a printed value (a billing contact) and review was silent. Now two code-only flags,
+  `printed_but_empty` and `row_not_extracted`, compare what the document prints with what the output took; they
+  replace `list_may_be_incomplete`, which only counted rows.
+- Flags, not fixes: the output is never changed. A model call that lists missing values was kept out (one more call
+  on every document); a re-ask for flagged fields only is possible later.
+- Measured on 47 documents of five kinds with planted misses; numbers in the extraction guide. No flag is not a
+  guarantee, and the docs say so.
+
 ## Required yes/no and enum fields are answered (2026-11-19)
 
 - 0.3.0 kept every value the document does not give as null, also for a required field. A user's schema with a

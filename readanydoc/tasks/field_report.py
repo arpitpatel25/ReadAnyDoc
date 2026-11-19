@@ -9,7 +9,10 @@ Each check names a field and a reason a reader should look at it:
 - ``segments_disagree``: two parts of a long document gave different values;
 - ``filled_because_required``: a number or text field filled because ``fill_required`` asks for it, and not
   printed in the document as returned: it may be a guess;
-- ``list_may_be_incomplete``: a list has fewer items than the rows with an amount in the table it was read from;
+- ``printed_but_empty``: a field is empty, but the document prints a value for it that nothing in the output took
+  (``coverage``);
+- ``row_not_extracted``: a list took some rows of a table, and another item row of it is in no output value
+  (``coverage``; replaces ``list_may_be_incomplete``);
 - ``unreadable``: the model's reply for the field could not be read.
 
 Nothing here changes a value.
@@ -275,27 +278,6 @@ def review(value: Any, schema: Any, cites: dict, ex: Any, *, conflicts: list, un
     for f in sorted(unreadable):
         add(f, "unreadable", "the model's reply for this field could not be read; it may be in the document")
 
-    def lists(v: Any, s: Any, path: tuple) -> None:
-        s = S.branch_for(s, v) if isinstance(s, dict) else s
-        if isinstance(v, list) and S.is_array(s):
-            if v and all(isinstance(it, dict) for it in v):
-                tables = {}
-                for p_, cs in cites.items():
-                    if len(p_) > len(path) and p_[:len(path)] == path:
-                        for c in cs:
-                            blk = c.get("parentBlock") or {}
-                            if blk.get("type") == "Table" and blk.get("content"):
-                                tables[blk["content"]] = True
-                rows = sum(amount_rows(t) for t in tables)
-                if rows >= 2 and len(v) < rows:
-                    add(S.path_str(path), "list_may_be_incomplete",
-                        f"{len(v)} items, but the table they come from has {rows} rows with an amount")
-            return  # lists inside list items cite the same table: not checked again
-        if isinstance(v, dict) and S.is_object(s):
-            for k, x in v.items():
-                lists(x, s["properties"].get(k, {}), path + (k,))
-
-    lists(value, schema, ())
     from . import coverage  # printed values the output did not take (code only)
     pages_ = [{"number": p.number, "regions": [{"label": r.label, "type": r.region.type.value,
                                                 "content": r.region.content} for r in p.regions]}

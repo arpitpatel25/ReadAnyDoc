@@ -124,12 +124,17 @@ def pieces(pages: Iterable[dict]) -> list[Piece]:
 
 
 _HEADER_WORDS = {"label", "value", "field", "key", "item", "description", "detail", "name"}
+_FORM_HEADER = {"label", "value", "field", "key", "detail", "information", "info"}
 
 
 def _pair_table(rows: list, width: int) -> bool:
     """A table of labels and their values: 2 or 4 columns, the label cells short text (or ending in ":")."""
     if width not in (2, 4):
         return False
+    if rows and all(th for _, th in rows[0]) and len(rows[0]) == width:
+        names = set().union(*(_words(v, _BASIC) for v, _ in rows[0]))
+        if names - _FORM_HEADER:
+            return False  # a header naming columns ("Item | Amount"): an item table, not a form
     body = [x for x in rows if not all(th for _, th in x) and len(x) == width]  # a narrower row is a heading
     if len(body) < 2:
         return False
@@ -300,6 +305,22 @@ def _field_words(schema: Any) -> dict[str, set[str]]:
     return out
 
 
+def _output_lists(value: Any, schema: Any) -> list[tuple[str, "_Used"]]:
+    """(path, its values) for every list of objects in the output: to name the list a table's rows belong to."""
+    out: list = []
+
+    def go(v: Any, s: Any, path: tuple) -> None:
+        s = S.branch_for(s, v) if isinstance(s, dict) else s
+        if isinstance(v, dict) and isinstance(s, dict) and S.is_object(s):
+            for k, x in v.items():
+                go(x, (s.get("properties") or {}).get(k, {}), path + (k,))
+        elif isinstance(v, list) and isinstance(s, dict) and S.is_array(s) and v and all(isinstance(i, dict) for i in v):
+            out.append((".".join(path), _Used(v, s)))
+
+    go(value, schema, ())
+    return out
+
+
 def _list_paths(schema: Any) -> set[str]:
     out: set = set()
 
@@ -409,13 +430,16 @@ def check(value: Any, schema: Any, pages: list[dict]) -> list[dict]:
     for p in found:
         if p.kind == "row" and p.table is not None:
             tables.setdefault(p.table, []).append(p)
+    lists_out = _output_lists(value, schema)
     for rows in tables.values():
         took = [r for r in rows if taken[id(r)]]
         if not took or len(took) == len(rows) or (len(took) < 2 and len(rows) > 3):
             continue  # one row matching by chance in a long table says nothing about that table
+        owner = max(lists_out, key=lambda kv: sum(kv[1].took_row(r.value.split(" | ")) for r in took),
+                    default=(None, None))[0]
         for r in rows:
             if r not in took:
-                out.append({"field": None, "flag": "row_not_extracted",
+                out.append({"field": owner, "flag": "row_not_extracted",
                             "detail": f'table row "{r.value[:80]}" (page {r.page}) is not in the output, though '
                                       f"{len(took)} other rows of its table are"})
     return out

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.4 (2026-11-19)
+
+- Review flags values the output left out, by code with no model call: `printed_but_empty` (a field is empty but
+  the document prints a value for it that nothing took, for example a dropped billing contact) and
+  `row_not_extracted` (a list took some rows of a table and left another out). They replace
+  `list_may_be_incomplete`. On planted misses in 47 documents: 84-100% of emptied lists and 89-95% of blanked
+  fields caught, about 0.1 flags per document on real outputs. What it does not catch, and the model-based option
+  we did not build, are in the extraction guide ("Values the output left out").
+
 ## 0.4.3 (2026-11-19)
 
 - `fill_required` (Python, CLI `--fill-required`, MCP, `settings.fill_required`): which required fields always get

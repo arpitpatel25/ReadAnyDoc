@@ -108,7 +108,7 @@ class ExtractResult(BaseModel):
     review: list[dict[str, Any]] = Field(default_factory=list,
                                          description="with review=True: values to check, each {field, flag, detail} "
                                                      "(not_found_on_page, ambiguous_date, struck_through, "
-                                                     "list_may_be_incomplete, ...); found by code, no model call")
+                                                     "printed_but_empty, row_not_extracted, ...); found by code, no model call")
     alternatives: dict[str, list[dict[str, Any]]] = Field(
         default_factory=dict, description="with alternatives=True (or a list of field paths): other values the "
                                           "document gives for a field, by path, each {value, note, citations}")
