@@ -377,29 +377,20 @@ write one. In the same run the model listed every current-liability line instead
 
 - Decisions here that rest on one run: the part size, the `_from` field's effect on accuracy, the names instruction.
 - One-stage runs spread over 8 values (102-110); two stages over 30.
-- Settling a difference of this size needs 2-3 runs per setting, about $0.25 each on this report.
+- Settling a difference of this size needs 2-3 runs per setting.
 
 ## 13. Mistakes and reversals
 
 | What happened | What we learned |
 |---|---|
 | Said the ADP report was ~22K-40K tokens; it is ~90K | Measure token counts; do not estimate from page counts |
-| A part-size test spent ~$0.30 reading the report, then failed: `part_tokens` was forwarded to the API as a model setting | Extract options and model options are different things; `part_tokens` is now an extract setting and an `extract()` argument |
+| A part-size test read the whole report, then failed: `part_tokens` was forwarded to the API as a model setting | Extract options and model options are different things; `part_tokens` is now an extract setting and an `extract()` argument |
 | First thought groups returning `{"values": []}` were failures | They were parts whose pages hold none of the group's fields (the 7-page tail of a 45K split); legitimate |
 | The stricter citation checker first called segment revenue rows "wrong row" | A checker's own limits must be ruled out before blaming the product |
 | Kept a run's cache folder to make later citation checks free | Only local work is cached there, not model reads; a rerun still pays to read the pages |
 | A test planned to show a guessed box for "2" | "2" was printed only once in the test page; boxing it was correct |
 
-## 14. Money spent
-
-| What | Approximate cost |
-|---|---|
-| ExtractBench and pack runs for 0.2.0 (ours $6.86, plain Haiku $3.01) | $9.87 |
-| Mode comparison on 12 documents (formats per group, caching) | $8.46 |
-| Coded format, instructions, page parts, citations, one stage (traced runs on the 10-Q and the pack, including ~$0.30 lost to the `part_tokens` bug) | ~$4.0 |
-| Reducto | Its own credits |
-
-## 15. Open
+## 14. Open
 
 - Pack the coded groups better: no call for 2 fields (about a quarter of the pack's extraction cost).
 - Measure medium effort for extraction: thinking is about 80% of the extraction cost.
