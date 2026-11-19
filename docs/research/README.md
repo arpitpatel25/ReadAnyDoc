@@ -4,8 +4,8 @@ How ReadAnyDoc was built and why it looks the way it does.
 
 | Page | What it answers |
 |---|---|
-| [../story.md](../story.md) | The short story: the bet, what we found, what we chose to build |
-| [journey.md](journey.md) | The full record, stage by stage (11-14 November 2026): every idea tested, kept or dropped and why, the sample results the full benchmarks overturned, and the 272-entry experiment ledger (Appendix D) |
+| [../story.md](../story.md) | The whole story in one page: the idea, how we measured, the parser, the extractor, two stages or one, where we stand, what we learned |
+| [journey.md](journey.md) | The full record, stage by stage (11-14 November 2026): every idea tested, kept or dropped and why, the sample results the full benchmarks overturned, and the 272-entry experiment ledger (Appendix C) |
 | [extraction.md](extraction.md) | Extraction research (15-19 November 2026): structured output at any schema size, cost and caching, page-part size, citations, one stage against two stages, with every measurement |
 | [../../BENCHMARKS.md](../resources/benchmarks.md) | The final results against Reducto r-1, with method and caveats |
 | [../../results/](https://github.com/arpitpatel25/ReadAnyDoc/tree/main/results) | Per-document scores behind those results |
@@ -17,5 +17,4 @@ Where to look in `journey.md` for common questions:
 - *Why no AI judge?* Section 16 and lesson 2.
 - *Why do some early results disagree with the final ones?* Section 23 and Appendix A (every reversal).
 - *What exactly does the shipped engine do?* Appendix B.
-- *What did it cost to build and measure?* Appendix C.
-- *Was idea X tried?* Appendix D, the experiment ledger.
+- *Was idea X tried?* Appendix C, the experiment ledger.
