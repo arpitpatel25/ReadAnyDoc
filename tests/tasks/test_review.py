@@ -115,15 +115,15 @@ def test_a_list_shorter_than_its_rows_with_an_amount_is_flagged_without_an_extra
     short = {"items": [{"item": "Servo", "amount": "400"}, {"item": "Board", "amount": "1100"}]}
     out, llm = run(short, ITEMS, LIST_SCHEMA, review=True)
     assert len(llm.calls) == 1
-    (r,) = [r for r in out["review"] if r["flag"] == "list_may_be_incomplete"]
-    assert r["field"] == "items" and "3 rows with an amount" in r["detail"]
+    (r,) = [r for r in out["review"] if r["flag"] == "row_not_extracted"]
+    assert r["field"] == "items" and "Shipping" in r["detail"]
 
 
 def test_a_complete_list_is_not_flagged_wrapped_lines_and_totals_do_not_count():
     full = {"items": [{"item": "Servo", "amount": "400"}, {"item": "Board", "amount": "1100"},
                       {"item": "Shipping", "amount": "75"}]}
     out, _ = run(full, ITEMS, LIST_SCHEMA, review=True)
-    assert not [r for r in out["review"] if r["flag"] == "list_may_be_incomplete"]
+    assert not [r for r in out["review"] if r["flag"] in ("row_not_extracted", "printed_but_empty")]
 
 
 @pytest.mark.parametrize("content,rows", [

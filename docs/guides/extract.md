@@ -114,13 +114,63 @@ acceptable. With `review=True`, a filled value that is not printed in the docume
 up to hold forced answers. CLI: `--fill-required` (every field), `--fill-required customer.tax_id` (those
 fields), `--fill-required none`.
 
+## Values the output left out
+
+**The issue.** The model sometimes leaves out something the document clearly prints. A user testing on their own
+order forms saw it: the line "Billing Contact: Priya Natarajan" was printed, but `contacts` came back `[]`. It does
+not happen every run (in another run a different form lost its contact), and nothing said so. For billing that is
+the worst kind of miss: the output looks complete, so nobody knows to check it. The parser had read the line; the
+model filling the schema skipped it.
+
+**What we do about it.** With `review=True`, code compares what the document prints with what the output holds,
+after extraction, with no model call:
+
+| Flag | When | Example |
+|---|---|---|
+| `printed_but_empty` | a field came back empty, and the document prints a label and value that no output value took, whose label matches the field (its name, title, description, the fields of a list's items, or the value's shape: an email for an email field, a date for a date field) | `customer.contacts`: "Billing Contact: Jordan Blake, Head of Procurement" is printed on page 1, and customer.contacts is empty |
+| `row_not_extracted` | a list took some rows of a table, and another item row of that table is in no output value | `items`: table row "Shipping \| $75.00" (page 1) is not in the output, though 2 other rows of its table are |
+
+A printed value counts as taken only if an output value matches it (as text, number or date), not because its box
+was cited: a contact whose email is also the customer's email is still caught. Labels whose words name something
+else do not match a field ("Credit Date" is not the due date). Headers, footers, total rows and table header rows
+are never flagged. The rules use only what the parser gives every document (form fields, tables) and your schema;
+there is no list of words for any document type.
+
+**How well it works.** Measured on 47 documents of five kinds (order forms, invoices, receipts, resumes, research
+papers), with misses planted on purpose in correct outputs (a list emptied, one item removed, one printed field
+blanked) and on fresh documents not used to build the rules:
+
+| | Order forms | Invoices | Receipts |
+|---|---|---|---|
+| Emptied list caught | 100% (9 of 9) | 84% (21 of 25) | 67% (2 of 3) |
+| Removed list item caught | - | 100% (23 of 23) | 67% (2 of 3) |
+| Blanked field caught | 95% (39 of 41) | 89% (56 of 63) | 80% (4 of 5) |
+| Flags per document on real outputs | 0.1 | 0.1 | 0 |
+
+On the real outputs it caught the model's own misses (a dropped contact; a resume with 10 of its 18 jobs), and
+raised 2 borderline flags in 47 documents (a date of the second invoice in one file, a payment row on a supplier
+statement).
+
+**What it does not catch.** No flag is not a guarantee that nothing is missing.
+
+- A label in words your schema does not use: "Provider" printed, the field called `business_entity.name`. Adding
+  the document's wording to the field's description ("the seller; printed as Provider") lets the check match it.
+- A whole list lost from a table without a header row (most receipts).
+- A value partly taken: an address whose first line is missing while its city and postcode are there.
+
+**A stronger fix we did not build.** A second model call could read the document and the answer and list what was
+left out. It would understand meaning, so it would catch the cases above, but it is a model too (it can miss), and
+it costs one more call on every document, nearly all of which miss nothing. A cheaper version would call the model
+only for a flagged field (the document is already cached), to fill it rather than only flag it. Neither is built:
+the flag tells a reviewer exactly where to look, at no cost.
+
 ## Extras
 
 All off by default; the response holds only what you ask for.
 
 | Option | Python / HTTP setting | What you get |
 |---|---|---|
-| Review | `review=True` / `settings.review: true` | `review`: values a reader should check, found by code (no model call, no extra output): `not_found_on_page` (worked out, converted or assumed), `ambiguous_date`, `parentheses`, `scale` ("in thousands"), `percent_scaled`, `struck_through`, `void_page`, `filled_because_required` (see above), `list_may_be_incomplete` (fewer items than the table's rows with an amount), `segments_disagree`, `unreadable` |
+| Review | `review=True` / `settings.review: true` | `review`: values a reader should check, found by code (no model call, no extra output): `not_found_on_page` (worked out, converted or assumed), `ambiguous_date`, `parentheses`, `scale` ("in thousands"), `percent_scaled`, `struck_through`, `void_page`, `filled_because_required` (see above), `printed_but_empty` and `row_not_extracted` (see "Values the output left out" below), `segments_disagree`, `unreadable` |
 | Alternatives | `alternatives=True` or a list of field paths / `settings.alternatives` | `alternatives`: other values the document gives for a field (a special term, an amendment, a crossed-out or second total), each with a note and, with citations on, where it is printed. The model writes them in one extra list, only when there are any |
 | Printed values only | `derived_values=False` / `settings.derived_values: false` | The model is told not to work out or assume values (an end date from a term, a country from an address); such fields come back null |
 

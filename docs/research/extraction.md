@@ -379,7 +379,29 @@ write one. In the same run the model listed every current-liability line instead
 - One-stage runs spread over 8 values (102-110); two stages over 30.
 - Settling a difference of this size needs 2-3 runs per setting.
 
-## 13. Mistakes and reversals
+## 13. Values the output left out (coverage)
+
+A user's test on their order forms: the printed billing contact came back as an empty list on one form, on another
+form in another run, and review said nothing. The miss is the model's (the parser read the line); the silence was
+ours: review only compared list lengths with table rows, and a contact is not in a table.
+
+- **Considered.** Match a field's name against labels (misses whenever the words differ); flag every printed value
+  the output did not use (too many flags: documents print far more than a schema asks); a second model call that
+  lists what is missing (general, but one more call on every document, and a model too).
+- **Built.** Two code rules (`readanydoc/tasks/coverage.py`): `printed_but_empty` and `row_not_extracted`. "Used"
+  is decided per printed value (an output value matches it), not per box, so one value printed in two places does
+  not hide a miss. Matching uses the schema's own words and the value's shape; no word lists.
+- **How it was kept general.** Rules were first written on order forms and invoices, then run unchanged on receipts,
+  resumes and research papers, and on 15 fresh documents. Every false alarm found there was fixed with a rule about
+  document structure (a header row, a row of label pairs, a table matched only to lists), never a special case.
+  Misses were planted in correct outputs to measure recall without waiting for the model to fail.
+- **Results.** Planted misses caught: emptied lists 84-100%, removed list items 100% on invoices, blanked fields
+  89-95%. About 0.1 flags per document on real outputs, 2 borderline in 47 documents. It caught one real dropped
+  contact. The table is in the extraction guide.
+- **Kept out.** The model call that lists missing values; a targeted re-ask for flagged fields (cheap with the cached
+  document, possible later as an option).
+
+## 14. Mistakes and reversals
 
 | What happened | What we learned |
 |---|---|
@@ -390,7 +412,7 @@ write one. In the same run the model listed every current-liability line instead
 | Kept a run's cache folder to make later citation checks free | Only local work is cached there, not model reads; a rerun still pays to read the pages |
 | A test planned to show a guessed box for "2" | "2" was printed only once in the test page; boxing it was correct |
 
-## 14. Open
+## 15. Open
 
 - Pack the coded groups better: no call for 2 fields (about a quarter of the pack's extraction cost).
 - Measure medium effort for extraction: thinking is about 80% of the extraction cost.
@@ -398,6 +420,7 @@ write one. In the same run the model listed every current-liability line instead
 - Ask the whole schema in one call in one-stage mode when the API accepts it (how plain Haiku did well on forms).
 - Measure the names instruction on the pack.
 - A `missing_fields` list naming every required field that came back null.
+- Coverage: match labels written in other words than the schema's; lists lost from headerless tables.
 
 Code: `readanydoc/tasks/coded.py` (coded format), `readanydoc/tasks/extract.py` (plan, parts, citations),
 `readanydoc/tasks/llm.py` (caching, PDF and image blocks), `readanydoc/model_limits.py`, `readanydoc/textlayer.py`
