@@ -108,6 +108,7 @@ nav:
     - Overview: use-cases/index.md
     - Real documents, end to end: examples/real-documents.md
     - Invoices: use-cases/invoices.md
+    - Purchase orders and shipping: use-cases/purchase-orders.md
     - Bank statements: use-cases/bank-statements.md
     - Receipts: use-cases/receipts.md
     - Tax forms: use-cases/tax-forms.md
