@@ -195,6 +195,124 @@ def _longextract(limit: Optional[int]) -> list[dict]:
     return out
 
 
+# ---------------------------------------------------------------- commercial contracts (CUAD, The Atticus Project, CC-BY-4.0)
+
+CUAD_REPO = "theatticusproject/cuad"
+_CUAD_CLAUSES = {  # schema field: (master_clauses.csv column, what the clause is, from CUAD's own category definitions)
+    "non_compete": ("Non-Compete-Answer", "restricts a party from competing with the other party or operating in a "
+                    "certain geography, business or technology"),
+    "exclusivity": ("Exclusivity-Answer", "an exclusive dealing commitment: a party must deal only with the other "
+                    "party, or a party is the exclusive provider in a territory or for a product"),
+    "termination_for_convenience": ("Termination For Convenience-Answer", "a party can terminate without cause, "
+                                    "solely by giving notice"),
+    "change_of_control": ("Change Of Control-Answer", "a party's rights change (termination, consent, notice) when "
+                          "the other party has a change of control, merger or sale of assets"),
+    "anti_assignment": ("Anti-Assignment-Answer", "assigning the contract requires consent or notice of the other "
+                        "party"),
+    "audit_rights": ("Audit Rights-Answer", "a party may audit the books, records or premises of the other party"),
+    "cap_on_liability": ("Cap On Liability-Answer", "a cap on liability, or a time limit on bringing claims"),
+    "uncapped_liability": ("Uncapped Liability-Answer", "a party's liability is uncapped for some breach or claim"),
+    "insurance": ("Insurance-Answer", "a party must maintain insurance"),
+    "license_grant": ("License Grant-Answer", "a license is granted by one party to the other"),
+    "ip_ownership_assignment": ("Ip Ownership Assignment-Answer", "intellectual property created by one party "
+                                "becomes the property of the other party"),
+    "most_favored_nation": ("Most Favored Nation-Answer", "if a third party gets better terms, the other party is "
+                            "entitled to those better terms"),
+}
+CUAD_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "document_name": {"type": ["string", "null"], "description": "the contract's title as printed, e.g. "
+                          "Distributor Agreement"},
+        "parties": {"type": "array", "items": {"type": "string"},
+                    "description": "the legal name of each party to the contract, without its role"},
+        "agreement_date": {"type": ["string", "null"], "format": "date",
+                           "description": "the date the contract is dated or signed"},
+        "effective_date": {"type": ["string", "null"], "format": "date",
+                           "description": "the date the contract takes effect"},
+        "expiration_date": {"type": ["string", "null"], "format": "date",
+                            "description": "the date the initial term ends, when the contract gives one or it "
+                                         "follows from the effective date and the term"},
+        "governing_law": {"type": ["string", "null"], "description": "the state or country whose law governs, the "
+                          "name only, e.g. Nevada, New York, England"},
+        "clauses": {"type": "object", "description": "whether the contract has each kind of clause",
+                    "properties": {k: {"type": "boolean", "description": f"the contract has a clause: {d}"}
+                                   for k, (_, d) in _CUAD_CLAUSES.items()},
+                    "required": list(_CUAD_CLAUSES)},
+    },
+    "required": ["document_name", "parties", "agreement_date", "effective_date", "expiration_date", "governing_law",
+                 "clauses"],
+}
+
+
+def _cuad_date(text: str) -> Optional[str]:
+    m = re.fullmatch(r"\s*(\d{1,2})/(\d{1,2})/(\d{2}|\d{4})\s*", text or "")
+    if not m:
+        return None
+    mo, d, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    y = y + (2000 if y < 50 else 1900) if y < 100 else y
+    return f"{y:04d}-{mo:02d}-{d:02d}" if 1 <= mo <= 12 and 1 <= d <= 31 else None
+
+
+def _cuad_gold(row: dict) -> dict:
+    """The lawyers' answers (master_clauses.csv) in the schema's shape; a field whose answer is not a plain value
+    (several dates, "Perpetual", a sentence) is left out of the key and not scored."""
+    g: dict = {}
+    name = (row.get("Document Name-Answer") or "").strip()
+    if name and len(name) <= 120:
+        g["document_name"] = name
+    parties = []
+    for part in (row.get("Parties-Answer") or "").split(";"):
+        part = re.sub(r"\(\s*[\"“][^)]*\)", "", part)  # the role in brackets: ("Licensor")
+        part = part.strip().strip('"“”').strip()
+        if len(part) > 3 and not re.fullmatch(r"(the )?(company|licensor|licensee|party|customer|supplier)s?", part, re.I):
+            parties.append(part)
+    if parties:
+        g["parties"] = parties
+    for key, col in (("agreement_date", "Agreement Date-Answer"), ("effective_date", "Effective Date-Answer"),
+                     ("expiration_date", "Expiration Date-Answer")):
+        d = _cuad_date(row.get(col) or "")
+        if d:
+            g[key] = d
+    law = (row.get("Governing Law-Answer") or "").strip()
+    if law and len(law) <= 40:
+        g["governing_law"] = law
+    cl = {k: (row.get(col) or "").strip().lower() == "yes" for k, (col, _) in _CUAD_CLAUSES.items()
+          if (row.get(col) or "").strip().lower() in ("yes", "no")}
+    if cl:
+        g["clauses"] = cl
+    return g
+
+
+def _cuad(limit: Optional[int]) -> list[dict]:
+    import csv
+    import hashlib
+    tree = fetch.hf_tree(CUAD_REPO)
+    pdfs = {Path(p).name.lower(): (p, size) for p, size in tree.items()
+            if p.startswith("CUAD_v1/full_contract_pdf/") and p.lower().endswith(".pdf")}
+    rows = list(csv.DictReader(open(fetch.hf_file(CUAD_REPO, "CUAD_v1/master_clauses.csv"), encoding="utf-8")))
+    # a fixed spread over contract types, each under ~600 KB (most such contracts are 5-30 pages): one contract per
+    # type in turn, in an order fixed by a hash of the file name
+    by_type: dict[str, list] = {}
+    for r in rows:
+        hit = pdfs.get((r.get("Filename") or "").lower())
+        if not hit or hit[1] > 600_000:
+            continue
+        kind = hit[0].split("/")[-2]
+        by_type.setdefault(kind, []).append((hashlib.sha1(r["Filename"].encode()).hexdigest(), hit[0], r))
+    queues = [sorted(v) for _, v in sorted(by_type.items())]
+    picked = []
+    while any(queues) and (not limit or len(picked) < limit):
+        for q in queues:
+            if q and (not limit or len(picked) < limit):
+                picked.append(q.pop(0))
+    out = []
+    for _, path, r in picked:
+        out.append({"id": re.sub(r"[^\w.-]+", "_", Path(path).stem)[:80], "file": str(fetch.hf_file(CUAD_REPO, path)),
+                    "schema": CUAD_SCHEMA, "gold": _cuad_gold(r)})
+    return out
+
+
 SETS: dict[str, TestSet] = {s.id: s for s in [
     TestSet("invoices", "Invoices", "invoices and credit notes",
             "digital PDFs in US/UK/EU/ZA formats, 6 currencies, VAT, credit notes, multi-page, freight, scans, phone "
@@ -224,6 +342,12 @@ SETS: dict[str, TestSet] = {s.id: s for s in [
             "every row of long repeated tables across many pages (statistics, budgets, utilisation reports)", 50,
             "CC-BY-4.0", f"https://huggingface.co/datasets/{LX_REPO}", 2, _longextract,
             note="Some documents run to thousands of pages; samples take the shortest first."),
+    TestSet("contracts", "Commercial contracts (CUAD)", "commercial contracts",
+            "title, parties, agreement, effective and expiry dates, governing law, and whether 12 kinds of clause are "
+            "present (non-compete, exclusivity, termination for convenience, change of control, caps on "
+            "liability...), against lawyers' answers", 510, "CC-BY-4.0 (The Atticus Project)",
+            f"https://huggingface.co/datasets/{CUAD_REPO}", 10, _cuad,
+            note="Answer key: CUAD's master_clauses.csv. Fields whose answer is not a plain value are not scored."),
 ]}
 
 

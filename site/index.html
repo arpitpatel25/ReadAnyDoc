@@ -74,7 +74,7 @@
     <p class="agent-hint">Using Claude Code, Codex or Cursor? <a href="#agent">Let your agent set it up</a> with one prompt.</p>
     
     <dl class="stats">
-      <div><dt>84.2</dt><dd>olmOCR-bench, best of the three</dd></div>
+      <div><dt>84.3</dt><dd>olmOCR-bench, against Reducto's 80.9</dd></div>
       <div><dt>½</dt><dd>about half Reducto's price per page</dd></div>
       <div><dt>1 URL</dt><dd>to switch from Reducto</dd></div>
     </dl>
@@ -240,47 +240,49 @@ out.citations[<span class="s">"loan_amount"</span>]
 <section class="section section-warm" id="benchmarks">
   <div class="container">
     <h2 class="display">Measured against Reducto, in public.</h2>
-    <p class="lead">Five public benchmarks, about 4,250 pages and 10 long documents. The same files went to all three
-      systems and each benchmark's own grader scored them. No AI judge. Higher is better unless marked.</p>
+    <p class="lead">Public benchmarks for parsing and extraction, ReadAnyDoc 0.4.5 against Reducto. The same files and
+      the same requests went to both; each benchmark's own grader or plain code scored them. No AI judge. Higher is
+      better unless marked.</p>
     <div class="charts">
       <figure class="chart">
-        <figcaption><b>olmOCR-bench</b><span>overall score, higher is better</span></figcaption>
+        <figcaption><b>olmOCR-bench</b><span>1,403 pages, overall score</span></figcaption>
         <div class="bar"><span>Reducto</span><i style="--v:80.9"></i><em>80.9</em></div>
-        <div class="bar"><span>Model only</span><i style="--v:82.2"></i><em>82.2</em></div>
-        <div class="bar us"><span>Engine</span><i style="--v:84.2"></i><em>84.2</em></div>
+        <div class="bar us"><span>ReadAnyDoc</span><i style="--v:84.3"></i><em>84.3</em></div>
       </figure>
       <figure class="chart">
-        <figcaption><b>Forms (FUNSD)</b><span>question and answer pairs found</span></figcaption>
-        <div class="bar"><span>Reducto</span><i style="--v:78.6"></i><em>78.6</em></div>
-        <div class="bar"><span>Model only</span><i style="--v:71.6"></i><em>71.6</em></div>
-        <div class="bar us"><span>Engine</span><i style="--v:77.4"></i><em>77.4</em></div>
+        <figcaption><b>Long reports</b><span>table rows extracted (LongExtract)</span></figcaption>
+        <div class="bar"><span>Reducto</span><i style="--v:9.1"></i><em>9.1%</em></div>
+        <div class="bar us"><span>ReadAnyDoc</span><i style="--v:56.4"></i><em>56.4%</em></div>
       </figure>
       <figure class="chart">
         <figcaption><b>Price per page</b><span>US dollars, lower is better</span></figcaption>
         <div class="bar"><span>Reducto</span><i style="--v:100"></i><em>$0.010</em></div>
-        <div class="bar"><span>Model only</span><i style="--v:15"></i><em>$0.0015</em></div>
-        <div class="bar us"><span>Engine</span><i style="--v:40"></i><em>$0.004</em></div>
+        <div class="bar us"><span>ReadAnyDoc</span><i style="--v:40"></i><em>$0.004</em></div>
       </figure>
     </div>
     <div class="table-wrap">
       <table class="bench">
         <thead>
-          <tr><th>Benchmark</th><th>Reducto</th><th>ReadAnyDoc<small>model only</small></th><th>ReadAnyDoc<small>engine</small></th></tr>
+          <tr><th>Benchmark</th><th>Reducto</th><th>ReadAnyDoc</th></tr>
         </thead>
         <tbody>
-          <tr><td><a href="https://huggingface.co/datasets/allenai/olmOCR-bench">olmOCR-bench</a><small>1,403 pages, overall score</small></td><td>80.9</td><td>82.2</td><td class="best">84.2</td></tr>
-          <tr><td><a href="https://github.com/opendatalab/OmniDocBench">OmniDocBench</a><small>1,651 pages, text error, lower is better</small></td><td>0.095</td><td class="best">0.081</td><td class="best">0.081</td></tr>
-          <tr><td><a href="https://huggingface.co/datasets/reducto/rd-tablebench">RD-TableBench</a><small>1,000 tables, Reducto's own benchmark</small></td><td class="best">88.9</td><td>88.2</td><td>88.2</td></tr>
-          <tr><td><a href="https://guillaumejaume.github.io/FUNSD/">FUNSD</a><small>199 scanned forms, question and answer pairs</small></td><td class="best">78.6</td><td>71.6</td><td>77.4</td></tr>
-          <tr><td><a href="https://github.com/opendatalab/OmniDocBench">OmniDocBench layout</a><small>block types right</small></td><td class="best">84.6</td><td>55.6</td><td>78.3</td></tr>
-          <tr><td><a href="https://github.com/micro1-research/longextract-bench">LongExtract</a><small>10 long documents, table rows extracted</small></td><td>53.9</td><td>75.4</td><td class="best">75.9</td></tr>
-          <tr class="price"><td>Price per page</td><td>$0.010</td><td class="best">$0.001–0.002</td><td>$0.003–0.005</td></tr>
+          <tr><td><a href="https://huggingface.co/datasets/allenai/olmOCR-bench">olmOCR-bench</a><small>1,403 pages, overall score</small></td><td>80.9</td><td class="best">84.3</td></tr>
+          <tr><td><a href="https://github.com/opendatalab/OmniDocBench">OmniDocBench</a><small>1,651 pages, text error, lower is better</small></td><td>0.095</td><td class="best">0.073</td></tr>
+          <tr><td><a href="https://huggingface.co/datasets/reducto/rd-tablebench">RD-TableBench</a><small>1,000 tables, Reducto's own benchmark</small></td><td>88.85</td><td>88.84</td></tr>
+          <tr><td><a href="https://guillaumejaume.github.io/FUNSD/">FUNSD</a><small>199 scanned forms, question and answer pairs</small></td><td class="best">78.6</td><td>77.4</td></tr>
+          <tr><td><a href="https://github.com/opendatalab/OmniDocBench">OmniDocBench layout</a><small>block types right</small></td><td class="best">84.6</td><td>79.0</td></tr>
+          <tr><td><a href="https://github.com/micro1-research/longextract-bench">LongExtract</a><small>6 long reports, table rows extracted</small></td><td>9.1%</td><td class="best">56.4%</td></tr>
+          <tr><td><a href="https://github.com/ContextualAI/extract-bench">ExtractBench 10-Q and 10-K</a><small>5 filings, answer-key values found</small></td><td>48.9%</td><td class="best">79.1%</td></tr>
+          <tr><td><a href="https://github.com/ContextualAI/extract-bench">ExtractBench credit agreements</a><small>3 agreements of 97-218 pages</small></td><td>83.3%</td><td>82.2%</td></tr>
+          <tr><td><a href="https://huggingface.co/datasets/drew-ipp/invoice-extraction-benchmark">Invoices</a><small>20: photos, scans, handwriting, credit notes</small></td><td>99.8%</td><td>99.8%</td></tr>
+          <tr class="price"><td>Price per page</td><td>$0.010</td><td class="best">$0.003–0.005</td></tr>
         </tbody>
       </table>
     </div>
     <div class="bench-foot">
-      <p>Reducto is still ahead on page layout, formulas, removing headers and footers, and speed (about 5 seconds a page
-        against 20 to 50). We publish those next to our wins.</p>
+      <p>Reducto is still ahead on page layout, formulas, removing headers and footers, precision on quarterly filings
+        (we write more values than the answer key holds), and speed (a few seconds a page against 20 to 50). We publish
+        those next to our wins.</p>
       <p class="links-row"><a href="https://github.com/arpitpatel25/ReadAnyDoc/blob/main/BENCHMARKS.md">Full results and method</a><a href="https://github.com/arpitpatel25/ReadAnyDoc/tree/main/results">Every score, document by document</a></p>
     </div>
   </div>

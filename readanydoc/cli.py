@@ -183,6 +183,8 @@ def _bench(args: argparse.Namespace) -> int:
     print()
     for name, r in summary["systems"].items():
         rec = "" if r.get("recall") is None else f"values found {100 * r['recall']:.1f}%  right {100 * (r.get('precision') or 0):.1f}%  "
+        if r.get("schema_valid") is not None:
+            rec += f"schema valid {100 * r['schema_valid']:.0f}%  "
         print(f"{name:28} {rec}cost/doc ${r.get('cost_per_document_usd') or 0:.4f}  median {r.get('median_seconds')} s  "
               f"failed {r.get('failed', 0)}")
     if summary.get("stopped_by_budget"):

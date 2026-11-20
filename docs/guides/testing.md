@@ -29,6 +29,7 @@ saved as each document finishes, so a stopped run picks up where it left off.
 | `resumes` | 7 | Experience, education, skills, certifications | MIT (ExtractBench) |
 | `sports-results` | 5 | Rankings, times and records from long result tables | MIT (ExtractBench) |
 | `long-documents` | 50 | Every row of long repeated tables in government and business reports (LongExtract) | CC-BY-4.0 |
+| `contracts` | 510 | Title, parties, agreement, effective and expiry dates, governing law, and whether 12 kinds of clause are present, against lawyers' answers (CUAD) | CC-BY-4.0 (The Atticus Project) |
 
 Each set is downloaded on first use into the ReadAnyDoc cache, pinned to a fixed revision. A run takes a sample by
 default (`--limit` to change it). Check a set's licence before using it.
@@ -60,8 +61,9 @@ still get cost, time, failures and each system's output side by side.
 
 `readanydoc-bench/<set>-<time>/report.html`:
 
-- **Per system:** answer-key values found, output values that are right, documents fully right, values with a citation,
-  citations whose box shows the value, cost per document and median time.
+- **Per system:** answer-key values found, output values that are right, documents fully right, outputs that pass the
+  JSON Schema (by the standard `jsonschema` validator, with `null` for a missing value accepted; strictly too), values
+  with a citation, citations whose box shows the value, cost per document and median time.
 - **Per document:** each system's score, cost and time, with any error.
 - **A page viewer for every document:** each system's citation boxes on the page, next to the answer key and each
   system's values. Click a value to see its box, or click a box to see its value.
