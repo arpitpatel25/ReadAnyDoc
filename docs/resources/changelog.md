@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.5 (2026-11-20)
+
+- Values the output left out are now warned about by default. `printed_but_empty` and `row_not_extracted` (code
+  only, no model call) are listed in `warnings` on every extraction, without `review`. Repeated hits on one field
+  (a date in every signature block) are one line with a count. Turn it off with `left_out_warnings=False`
+  (Python), `--no-left-out-warnings` (CLI) or `settings.left_out_warnings: false`. The noisier review flags
+  (`not_found_on_page` and the rest) stay behind `review`. On 52 saved real outputs the warning appears about 0.1
+  times per document, as measured for 0.4.4.
+
 ## 0.4.4 (2026-11-19)
 
 - Review flags values the output left out, by code with no model call: `printed_but_empty` (a field is empty but

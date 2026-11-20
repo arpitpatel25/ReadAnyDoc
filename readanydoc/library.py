@@ -151,7 +151,8 @@ def extract(source: Source, schema: Union[dict[str, Any], type[BaseModel]], *, i
             settings: Optional[dict[str, Any]] = None, timeout: Optional[float] = None, review: bool = False,
             alternatives: Union[bool, list[str]] = False, derived_values: bool = True,
             part_tokens: Optional[int] = None, parse: bool = True,
-            fill_required: Union[bool, str, list[str]] = "choices") -> ExtractResult:
+            fill_required: Union[bool, str, list[str]] = "choices",
+            left_out_warnings: bool = True) -> ExtractResult:
     """Extract the fields of ``schema`` (a JSON Schema dict or a pydantic model class) from a document.
 
     ``instructions`` is the system prompt for the extraction model. ``array_extract`` processes long documents in
@@ -172,6 +173,10 @@ def extract(source: Source, schema: Union[dict[str, Any], type[BaseModel]], *, i
     and these fields. ``False``: none, a value the document does not give stays null. Forcing numbers or text makes
     the model guess when the document does not give the value: each such value not printed in the document is
     flagged ``filled_because_required`` in ``review``. Not forced: a field stays null and is listed in ``warnings``.
+
+    ``left_out_warnings`` (default True): ``warnings`` also lists printed values the output left out, a field
+    that is empty while the document prints a value for it, or a table row missing from a list that took the
+    table's other rows. Found by code, no model call; ``False`` turns it off. The same checks are in ``review``.
     """
     from .tasks import extract as extract_task
     from .tasks.llm import get_llm
@@ -195,6 +200,7 @@ def extract(source: Source, schema: Union[dict[str, Any], type[BaseModel]], *, i
                          **({"review": True} if review else {}), **({"alternatives": alternatives} if alternatives else {}),
                          **({} if derived_values else {"derived_values": False}),
                          **({"part_tokens": part_tokens} if part_tokens else {}),
+                         **({} if left_out_warnings else {"left_out_warnings": False}),
                          **({} if fill_required == "choices" else {"fill_required": fill_required})},
         }
         llm = get_llm(make_spec(extract_model or model, extract_effort or effort, extract_options))

@@ -91,7 +91,8 @@ def _extract(args: argparse.Namespace) -> int:
     alts = True if alts == [] else (alts or False)
     result = extract(args.input, schema, instructions=instructions, citations=not args.no_citations,
                      extract_model=args.extract_model, review=args.review, alternatives=alts,
-                     derived_values=not args.printed_only, fill_required=_fill(args.fill_required), **_common(args))
+                     derived_values=not args.printed_only, fill_required=_fill(args.fill_required),
+                     left_out_warnings=not args.no_left_out_warnings, **_common(args))
     _warn(result.warnings)
     out = {"data": result.data, "citations": {k: [c.model_dump() for c in v] for k, v in result.citations.items()},
            **({"review": result.review} if args.review else {}),
@@ -213,6 +214,8 @@ def main(argv: list[str] | None = None) -> int:
     x.add_argument("--review", action="store_true",
                    help="also list values to check (not printed as returned, ambiguous dates, crossed out, lists "
                         "shorter than their table); found by code, no extra model call")
+    x.add_argument("--no-left-out-warnings", action="store_true",
+                   help="do not warn about printed values the output left out (on by default; code only)")
     x.add_argument("--alternatives", nargs="*", metavar="FIELD",
                    help="also return other values the document gives for a field (a special term, an amendment); "
                         "for every field, or only the fields named")

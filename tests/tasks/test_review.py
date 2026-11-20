@@ -275,3 +275,32 @@ def test_a_value_whose_words_have_no_box_is_placed_from_the_page_words():
 def test_printed_dates_are_matched_in_any_common_form(text, value, hit):
     found = extract._find_date(text, value)
     assert [text[a:b] for a, b in found] == ([hit] if hit else [])
+
+
+def test_left_out_values_are_warned_by_default_without_review():
+    short = {"items": [{"item": "Servo", "amount": "400"}, {"item": "Board", "amount": "1100"}]}
+    out, llm = run(short, ITEMS, LIST_SCHEMA)
+    assert len(llm.calls) == 1 and "review" not in out
+    (w,) = [w for w in out["warnings"] if "may be missing" in w]
+    assert w.startswith("items: may be missing a table row") and "Shipping" in w
+
+
+def test_left_out_warnings_can_be_turned_off_and_stay_in_review():
+    short = {"items": [{"item": "Servo", "amount": "400"}, {"item": "Board", "amount": "1100"}]}
+    out, _ = run(short, ITEMS, LIST_SCHEMA, left_out_warnings=False, review=True)
+    assert not [w for w in out["warnings"] if "may be missing" in w]
+    assert [r for r in out["review"] if r["flag"] == "row_not_extracted"]
+
+
+def test_a_complete_answer_gets_no_left_out_warning():
+    full = {"items": [{"item": "Servo", "amount": "400"}, {"item": "Board", "amount": "1100"},
+                      {"item": "Shipping", "amount": "75"}]}
+    out, _ = run(full, ITEMS, LIST_SCHEMA)
+    assert not [w for w in out["warnings"] if "may be missing" in w]
+
+
+def test_repeated_left_out_flags_on_one_field_are_one_warning():
+    found = [{"field": "items[].start_date", "flag": "printed_but_empty", "detail": '"Date: February 2" on page 2'},
+             {"field": "items[].start_date", "flag": "printed_but_empty", "detail": '"Date: February 3" on page 2'}]
+    (w,) = FR.left_out_warnings(found)
+    assert "February 2" in w and "(and 1 more like it)" in w
