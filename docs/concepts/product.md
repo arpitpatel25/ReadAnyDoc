@@ -226,8 +226,8 @@ flowchart TD
 |---|---|---|
 | What the extraction model sees | The parsed pages as labelled blocks | The PDF itself, or page images |
 | Citations | Block labels plus word positions from the parse | Words from the PDF's text layer, local OCR (Tesseract, else RapidOCR) for scans and images, native text for Office files |
-| Cost and speed (43-page 10-Q) | about $0.23, about 270 s | about $0.12, about 110 s |
-| Accuracy (same 10-Q, 153 values) | 99-129 found over two runs | 102-110 found |
+| Cost per document (benchmark sets) | the default | about a third as much |
+| Accuracy (benchmark sets, values found) | invoices 99.8%, contracts 86.5%, research papers 68.4% | invoices 99.8%, contracts 84.8%, research papers 48.0% |
 | Use it for | accuracy, the default | simpler documents where cost and speed matter more |
 
 ### 4.2 How each call is asked

@@ -33,7 +33,9 @@ def write(out: str, cases: list[dict], systems: list[str], title: str, summary: 
         r = summary["systems"].get(s, {})
         rows.append(f"<tr><td><b>{E(s)}</b></td><td>{r.get('ran', 0)}</td><td>{r.get('failed', 0)}</td>"
                     f"<td>{_pct(r.get('recall'))}</td><td>{_pct(r.get('precision'))}</td>"
-                    f"<td>{_pct(r.get('exact_documents'))}</td><td>{_pct(r.get('values_with_citation'))}</td>"
+                    f"<td>{_pct(r.get('exact_documents'))}</td><td>{_pct(r.get('schema_valid'))}"
+                    f"{' <span class=muted>(' + _pct(r.get('schema_valid_strict')) + ' strict)</span>' if r.get('schema_valid_strict') is not None and r.get('schema_valid_strict') != r.get('schema_valid') else ''}</td>"
+                    f"<td>{_pct(r.get('values_with_citation'))}</td>"
                     f"<td>{_pct(r.get('citations_showing_value'))}</td><td>{_usd(r.get('cost_per_document_usd'))}"
                     f"{' <span class=muted>(' + E(r['cost_note']) + ')</span>' if r.get('cost_note') else ''}</td>"
                     f"<td>{r.get('median_seconds') or ''}</td></tr>")
@@ -61,7 +63,7 @@ def write(out: str, cases: list[dict], systems: list[str], title: str, summary: 
     page = f"""<!doctype html><html><head><meta charset=utf-8><title>{E(title)}</title><style>{_CSS}</style></head><body>
 <h1>{E(title)}</h1>{about}
 <table><tr><th>System</th><th>Documents</th><th>Failed</th><th>Answer-key values found</th><th>Output values right</th>
-<th>Documents fully right</th><th>Values with a citation</th><th>Citations showing the value</th><th>Cost per document</th>
+<th>Documents fully right</th><th>Pass the JSON Schema</th><th>Values with a citation</th><th>Citations showing the value</th><th>Cost per document</th>
 <th>Median seconds</th></tr>{''.join(rows)}</table>
 <p class=muted>Scored by code against the answer key (ReadAnyDoc's grader: numbers, dates and text compared after
 normalising their printed form; list items paired before comparing). No model judges the output. A failed document

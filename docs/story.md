@@ -22,17 +22,18 @@ the records linked at the end; nothing is estimated unless it says so.
 
 **Where it stands**
 
-| | Reducto | Plain Haiku | ReadAnyDoc |
+| | Reducto | Plain Haiku | ReadAnyDoc 0.4.5 |
 |---|---|---|---|
-| General pages (olmOCR-bench, 1,403 pages) | 80.9 | 82.2 | **84.2** |
-| Tables (RD-TableBench, 1,000 tables) | **88.9** | 88.2 | 88.2 |
-| Text error, lower is better (OmniDocBench, 1,651 pages) | 0.095 | **0.081** | **0.081** |
-| Layout block types (OmniDocBench) | **84.6** | 55.6 | 78.3 |
+| General pages (olmOCR-bench, 1,403 pages) | 80.9 | 82.2 | **84.3** |
+| Tables (RD-TableBench, 1,000 tables) | 88.85 | 88.20 | 88.84 |
+| Text error, lower is better (OmniDocBench, 1,651 pages) | 0.095 | 0.081 | **0.073** |
+| Layout block types (OmniDocBench) | **84.6** | 55.6 | 79.0 |
 | Form question paired with its answer (FUNSD, 199 forms) | **78.6** | 71.6 | 77.4 |
-| Extraction, 35 documents (ExtractBench, its own grader) | 0.803 | 0.860 | **0.878** |
-| Extraction, a 43-page quarterly report: values found of 153 | 72 | 111 | **129** (best run) |
-| Extraction, 5 contract order forms: fields right | 93.3% | 98.3% | **99.1%** |
-| Extracted numbers whose citation sits on the right row (the report) | 81% | no citations | **93-94%** |
+| Long reports: table rows extracted (LongExtract, 6 documents) | 9.1% | - | **56.4%** |
+| Quarterly filings: answer-key values found (ExtractBench, 5 10-Qs/10-Ks) | 48.9% | - | **79.1%** |
+| Credit agreements: values found (ExtractBench, 3 of 97-218 pages) | 83.3% | - | 82.2% |
+| Invoices: values found (20, including photos, scans and handwriting) | 99.8% | 96.6% | 99.8% |
+| Citation boxes that show the value (credit agreements) | 78.3% | no citations | **85.5%** |
 | Parse price per page | $0.010 | $0.001-0.002 | $0.003-0.005 |
 | Parse time per page (median) | **4-6 s** | 8-28 s | 20-50 s |
 

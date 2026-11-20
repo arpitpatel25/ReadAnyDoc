@@ -113,3 +113,32 @@ def test_small_invoice_sample_covers_hard_input_types():
     every = _spread(meta, len(meta))
     assert sorted(m["doc_id"] for m in every) == sorted(m["doc_id"] for m in meta)
     assert {m["category"] for m in _spread(meta, 6)} == {"clean", "credit", "currency", "photo", "scan", "handwritten"}
+
+
+def test_schema_validity_strict_and_with_null_for_missing():
+    from readanydoc.bench import grade as G
+    schema = {"type": "object", "required": ["a"], "properties": {
+        "a": {"type": "string"}, "b": {"type": "array", "items": {"type": "object", "properties": {
+            "c": {"type": "string", "enum": ["x"]}}}}}}
+    out = {"a": None, "b": [{"c": None}]}
+    assert G.schema_errors(out, schema)  # strict: null is not a string
+    assert G.schema_errors(out, schema, nulls_ok=True) == []
+    assert G.schema_errors({"a": 1}, schema, nulls_ok=True)  # a wrong type is still an error
+    assert G.schema_errors({}, schema, nulls_ok=True)  # a missing required field too
+    assert G.schema_errors(None, schema) == ["no output"]
+
+
+def test_cuad_answer_key_from_the_lawyers_sheet():
+    from readanydoc.bench import catalog as C
+    row = {"Document Name-Answer": "DISTRIBUTOR AGREEMENT",
+           "Parties-Answer": 'Acme Corp ("Supplier"); Beta Ltd. ("Distributor"); the Company',
+           "Agreement Date-Answer": "2/10/14", "Effective Date-Answer": "Perpetual",
+           "Expiration Date-Answer": "12/31/1999", "Governing Law-Answer": "Nevada",
+           "Non-Compete-Answer": "Yes", "Exclusivity-Answer": "No"}
+    g = C._cuad_gold(row)
+    assert g["document_name"] == "DISTRIBUTOR AGREEMENT"
+    assert g["parties"] == ["Acme Corp", "Beta Ltd."]
+    assert g["agreement_date"] == "2014-02-10" and g["expiration_date"] == "1999-12-31"
+    assert "effective_date" not in g  # not a plain value: not scored
+    assert g["clauses"] == {"non_compete": True, "exclusivity": False}
+    assert C.SETS["contracts"].documents == 510

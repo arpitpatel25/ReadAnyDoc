@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.6 (2026-11-20)
+
+- `readanydoc bench` scores schema validity: the share of outputs that pass the task's JSON Schema, checked by the
+  standard `jsonschema` validator (independent of ReadAnyDoc's own code), counting `null` for a value the document
+  does not give as valid; a strict figure is reported next to it. Shown in the report and the command-line summary.
+- New test set `contracts`: 510 commercial contracts from CUAD (The Atticus Project, CC-BY-4.0), scored against
+  the lawyers' answers: title, parties, dates, governing law and 12 kinds of clause.
+- Benchmarks page rewritten with ReadAnyDoc against Reducto on parsing and extraction (long reports, quarterly
+  filings, credit agreements, research papers, invoices, contracts...), modes, schema validity, split, classify and
+  edit. Per-document results in `results/extraction.csv`.
+
 ## 0.4.5 (2026-11-20)
 
 - Values the output left out are now warned about by default. `printed_but_empty` and `row_not_extracted` (code
