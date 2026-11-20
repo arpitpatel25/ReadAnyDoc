@@ -20,12 +20,12 @@
 <meta name="twitter:title" content="ReadAnyDoc: the open-source alternative to Reducto">
 <meta name="twitter:description" content="Parse and extract PDFs, scans and forms with Claude or any vision model, with a citation for every value. Same API as Reducto. Open source.">
 <meta name="twitter:image" content="https://arpitpatel25.github.io/ReadAnyDoc/og.png">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "ReadAnyDoc", "applicationCategory": "DeveloperApplication", "operatingSystem": "macOS, Linux, Windows", "description": "Open-source document parsing and extraction: PDFs, scans and forms to Markdown, tables and typed data with a citation for every value. Claude Haiku or any vision model. Reducto-compatible API.", "url": "https://arpitpatel25.github.io/ReadAnyDoc/", "downloadUrl": "https://pypi.org/project/readanydoc/", "codeRepository": "https://github.com/arpitpatel25/ReadAnyDoc", "license": "https://www.apache.org/licenses/LICENSE-2.0", "softwareVersion": "0.1.2", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "image": "https://arpitpatel25.github.io/ReadAnyDoc/og.png"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "ReadAnyDoc", "applicationCategory": "DeveloperApplication", "operatingSystem": "macOS, Linux, Windows", "description": "Open-source document parsing and extraction: PDFs, scans and forms to Markdown, tables and typed data with a citation for every value. Claude Haiku or any vision model. Reducto-compatible API.", "url": "https://arpitpatel25.github.io/ReadAnyDoc/", "downloadUrl": "https://pypi.org/project/readanydoc/", "codeRepository": "https://github.com/arpitpatel25/ReadAnyDoc", "license": "https://www.apache.org/licenses/LICENSE-2.0", "softwareVersion": "0.4.6", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "image": "https://arpitpatel25.github.io/ReadAnyDoc/og.png"}</script>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
 
@@ -34,6 +34,7 @@
     <a class="brand" href="./"><img src="logo-mark.svg" alt="" width="26" height="26">ReadAnyDoc</a>
     <nav class="nav-links" aria-label="Main">
       <a href="#product">Product</a>
+      <a href="#extraction">Extraction</a>
       <a href="#benchmarks">Benchmarks</a>
       <a href="build/">How we built it</a>
       <a href="docs/">Docs</a>
@@ -74,8 +75,9 @@
     <p class="agent-hint">Using Claude Code, Codex or Cursor? <a href="#agent">Let your agent set it up</a> with one prompt.</p>
     
     <dl class="stats">
-      <div><dt>84.3</dt><dd>olmOCR-bench, against Reducto's 80.9</dd></div>
-      <div><dt>½</dt><dd>about half Reducto's price per page</dd></div>
+      <div><dt>6&times;</dt><dd>more table rows than Reducto on long reports</dd></div>
+      <div><dt>79%</dt><dd>of values found on 10-Q filings, Reducto 49%</dd></div>
+      <div><dt>4&ndash;14&times;</dt><dd>cheaper per document than Reducto</dd></div>
       <div><dt>1 URL</dt><dd>to switch from Reducto</dd></div>
     </dl>
   </div>
@@ -205,6 +207,104 @@
   </div>
 </section>
 
+<section class="section section-line" id="extraction">
+  <div class="container">
+    <h2 class="display">Long documents, read to the last row.</h2>
+    <p class="lead">Give it a schema, as a pydantic class or a JSON Schema. ReadAnyDoc reads every page, asks the model
+      for every field, and returns your exact shape with the place on the page each value came from. Below is one real
+      run, step by step: ADP's 43-page quarterly report.</p>
+
+    <div class="xflow" data-step="1">
+      <div class="xflow-steps" role="tablist" aria-label="One extraction, step by step">
+        <button role="tab" id="xs-1" aria-selected="true" aria-controls="xp-1" data-s="1"><b>1</b>Read the pages</button>
+        <button role="tab" id="xs-2" aria-selected="false" aria-controls="xp-2" data-s="2" tabindex="-1"><b>2</b>Split into parts</button>
+        <button role="tab" id="xs-3" aria-selected="false" aria-controls="xp-3" data-s="3" tabindex="-1"><b>3</b>Group the fields</button>
+        <button role="tab" id="xs-4" aria-selected="false" aria-controls="xp-4" data-s="4" tabindex="-1"><b>4</b>Ask the model</button>
+        <button role="tab" id="xs-5" aria-selected="false" aria-controls="xp-5" data-s="5" tabindex="-1"><b>5</b>Merge and check</button>
+        <button role="tab" id="xs-6" aria-selected="false" aria-controls="xp-6" data-s="6" tabindex="-1"><b>6</b>Cite every value</button>
+      </div>
+
+      <div class="xflow-stage">
+        <div class="xf-doc" aria-hidden="true">
+          <div class="xf-head"><b>ADP, quarterly report (10-Q)</b><span>43 pages</span></div>
+          <div class="xf-pages"></div>
+          <div class="xf-legend"><span class="p1">Part 1</span><span class="p2">Part 2</span><span class="p3">Part 3</span><span class="p4">Part 4</span></div>
+        </div>
+
+        <div class="xf-work">
+          <div class="xf-pane" id="xp-1" role="tabpanel" aria-labelledby="xs-1">
+            <h3>Every page is read first.</h3>
+            <p>Claude reads up to 16 pages at a time. A small layout model on your CPU marks the tables and forms, so each
+              page comes back as typed blocks with their positions. Page 3, for example:</p>
+            <div class="xf-block"><span>Table</span>
+              <table><tr><td>Revenues, other than interest on funds held for clients and PEO revenues</td><td>3,114.8</td></tr>
+                <tr><td>Interest on funds held for clients</td><td>272.8</td></tr>
+                <tr><td>PEO revenues</td><td>1,660.8</td></tr></table></div>
+          </div>
+
+          <div class="xf-pane" id="xp-2" role="tabpanel" aria-labelledby="xs-2" hidden>
+            <h3>Long documents are cut into parts.</h3>
+            <p>Accuracy drops when a model reads too much at once, so the pages are split into parts of about 30,000
+              tokens. This report becomes four parts.</p>
+            <ul class="xf-partlist">
+              <li class="p1"><b>Part 1</b>pages 1 to 12</li><li class="p2"><b>Part 2</b>pages 13 to 24</li>
+              <li class="p3"><b>Part 3</b>pages 25 to 36</li><li class="p4"><b>Part 4</b>pages 37 to 43</li>
+            </ul>
+          </div>
+
+          <div class="xf-pane" id="xp-3" role="tabpanel" aria-labelledby="xs-3" hidden>
+            <h3>Your schema is split into groups of fields.</h3>
+            <p>This schema asks for the company, the balance sheet, the income statement, cash flows and other
+              disclosures, each by period and segment. It is too big for one call, so it becomes 12 groups of up to 40
+              fields. Every group answers in the same small format, which the model API enforces.</p>
+            <div class="xf-groups"></div>
+          </div>
+
+          <div class="xf-pane" id="xp-4" role="tabpanel" aria-labelledby="xs-4" hidden>
+            <h3>Every part is asked about every group.</h3>
+            <p>Four parts times twelve groups: 48 calls. The first call of each part stores that part in the prompt
+              cache; the other 44 read it from there at a tenth of the price.</p>
+            <div class="xf-matrix"></div>
+            <div class="xf-key"><span class="w">stores the part</span><span class="r">reads it from the cache</span></div>
+          </div>
+
+          <div class="xf-pane" id="xp-5" role="tabpanel" aria-labelledby="xs-5" hidden>
+            <h3>The answers become your exact schema.</h3>
+            <p>Code puts every answer back in its place, keeps a row found in two parts once, and checks the result
+              against your schema.</p>
+<pre class="xf-json"><code>"income_statement": {
+  "revenue": [
+    { "value": "5048.4", "unit": "USD", "scale": 1000000,
+      "data_period": "FY2025 Q2", "segment_type": "company" },
+    <span class="c">... 15 more rows, by period and segment</span>
+  ],</code></pre>
+            <ul class="xf-checks">
+              <li class="ok">Passes your JSON Schema</li>
+              <li class="ok">Rows found in two parts kept once</li>
+              <li class="warn">Warning: required field 'other_disclosures' was not found in the document</li>
+            </ul>
+          </div>
+
+          <div class="xf-pane" id="xp-6" role="tabpanel" aria-labelledby="xs-6" hidden>
+            <h3>Every value points back to the page.</h3>
+            <p>Citations are found by code in the page's own words, not written by the model. Click a value in your
+              app and land on the table it came from.</p>
+            <div class="xf-cite">
+              <div class="xf-mini" aria-hidden="true"><i></i><i></i><i></i><i class="t"></i><i class="t"></i><i class="t"></i><i></i><i></i><b class="box"></b></div>
+              <div class="xf-cite-val"><code>income_statement.revenue[0].value</code><strong>5048.4</strong><span>page 3, the revenues table</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="xflow-foot">
+        <button class="btn btn-line btn-sm xf-play" type="button">Play all steps</button>
+        <p>This run: 43 pages, 48 model calls, $0.23, about 4 minutes. Reducto's Extract on the same report: $0.86.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="section section-line" id="real">
   <div class="container">
     <h2 class="display">A real document, unedited.</h2>
@@ -240,26 +340,43 @@ out.citations[<span class="s">"loan_amount"</span>]
 <section class="section section-warm" id="benchmarks">
   <div class="container">
     <h2 class="display">Measured against Reducto, in public.</h2>
-    <p class="lead">Public benchmarks for parsing and extraction, ReadAnyDoc 0.4.5 against Reducto. The same files and
-      the same requests went to both; each benchmark's own grader or plain code scored them. No AI judge. Higher is
-      better unless marked.</p>
+    <p class="lead">ReadAnyDoc against Reducto on public test sets, the same files and the same requests to both.
+      Each benchmark's own grader or plain code scored the output. No AI judge. Higher is better unless marked.</p>
     <div class="charts">
       <figure class="chart">
-        <figcaption><b>olmOCR-bench</b><span>1,403 pages, overall score</span></figcaption>
-        <div class="bar"><span>Reducto</span><i style="--v:80.9"></i><em>80.9</em></div>
-        <div class="bar us"><span>ReadAnyDoc</span><i style="--v:84.3"></i><em>84.3</em></div>
-      </figure>
-      <figure class="chart">
-        <figcaption><b>Long reports</b><span>table rows extracted (LongExtract)</span></figcaption>
+        <figcaption><b>Long reports</b><span>table rows extracted, 6 reports (LongExtract)</span></figcaption>
         <div class="bar"><span>Reducto</span><i style="--v:9.1"></i><em>9.1%</em></div>
         <div class="bar us"><span>ReadAnyDoc</span><i style="--v:56.4"></i><em>56.4%</em></div>
       </figure>
       <figure class="chart">
-        <figcaption><b>Price per page</b><span>US dollars, lower is better</span></figcaption>
-        <div class="bar"><span>Reducto</span><i style="--v:100"></i><em>$0.010</em></div>
-        <div class="bar us"><span>ReadAnyDoc</span><i style="--v:40"></i><em>$0.004</em></div>
+        <figcaption><b>10-Q and 10-K filings</b><span>answer-key values found, 5 filings (ExtractBench)</span></figcaption>
+        <div class="bar"><span>Reducto</span><i style="--v:48.9"></i><em>48.9%</em></div>
+        <div class="bar us"><span>ReadAnyDoc</span><i style="--v:79.1"></i><em>79.1%</em></div>
+      </figure>
+      <figure class="chart">
+        <figcaption><b>Cost per filing</b><span>US dollars, lower is better</span></figcaption>
+        <div class="bar"><span>Reducto</span><i style="--v:100"></i><em>$1.24</em></div>
+        <div class="bar us"><span>ReadAnyDoc</span><i style="--v:27"></i><em>$0.34</em></div>
       </figure>
     </div>
+    <h3 class="bench-h">Extraction</h3>
+    <div class="table-wrap">
+      <table class="bench">
+        <thead>
+          <tr><th>Test set</th><th>Reducto</th><th>ReadAnyDoc</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><a href="https://github.com/micro1-research/longextract-bench">Long reports</a><small>6 reports, table rows extracted</small></td><td>9.1%</td><td class="best">56.4%</td></tr>
+          <tr><td><a href="https://github.com/ContextualAI/extract-bench">10-Q and 10-K filings</a><small>5 filings of 43 to 82 pages, values found</small></td><td>48.9%</td><td class="best">79.1%</td></tr>
+          <tr><td><a href="https://github.com/ContextualAI/extract-bench">Research papers</a><small>3 papers, values found</small></td><td>49.9%</td><td class="best">68.4%</td></tr>
+          <tr><td><a href="https://github.com/ContextualAI/extract-bench">Credit agreements</a><small>3 agreements of 97 to 218 pages</small></td><td>83.3%</td><td>82.2%</td></tr>
+          <tr><td><a href="https://huggingface.co/datasets/drew-ipp/invoice-extraction-benchmark">Invoices</a><small>20: photos, scans, handwriting, credit notes</small></td><td>99.8%</td><td>99.8%</td></tr>
+          <tr><td><a href="https://huggingface.co/datasets/theatticusproject/cuad">Commercial contracts (CUAD)</a><small>10 contracts, against lawyers' answers</small></td><td>not run</td><td>86.5%</td></tr>
+          <tr class="price"><td>Cost per document</td><td>$0.027 to $2.83</td><td class="best">$0.0045 to $0.44</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3 class="bench-h">Parsing</h3>
     <div class="table-wrap">
       <table class="bench">
         <thead>
@@ -271,11 +388,7 @@ out.citations[<span class="s">"loan_amount"</span>]
           <tr><td><a href="https://huggingface.co/datasets/reducto/rd-tablebench">RD-TableBench</a><small>1,000 tables, Reducto's own benchmark</small></td><td>88.85</td><td>88.84</td></tr>
           <tr><td><a href="https://guillaumejaume.github.io/FUNSD/">FUNSD</a><small>199 scanned forms, question and answer pairs</small></td><td class="best">78.6</td><td>77.4</td></tr>
           <tr><td><a href="https://github.com/opendatalab/OmniDocBench">OmniDocBench layout</a><small>block types right</small></td><td class="best">84.6</td><td>79.0</td></tr>
-          <tr><td><a href="https://github.com/micro1-research/longextract-bench">LongExtract</a><small>6 long reports, table rows extracted</small></td><td>9.1%</td><td class="best">56.4%</td></tr>
-          <tr><td><a href="https://github.com/ContextualAI/extract-bench">ExtractBench 10-Q and 10-K</a><small>5 filings, answer-key values found</small></td><td>48.9%</td><td class="best">79.1%</td></tr>
-          <tr><td><a href="https://github.com/ContextualAI/extract-bench">ExtractBench credit agreements</a><small>3 agreements of 97-218 pages</small></td><td>83.3%</td><td>82.2%</td></tr>
-          <tr><td><a href="https://huggingface.co/datasets/drew-ipp/invoice-extraction-benchmark">Invoices</a><small>20: photos, scans, handwriting, credit notes</small></td><td>99.8%</td><td>99.8%</td></tr>
-          <tr class="price"><td>Price per page</td><td>$0.010</td><td class="best">$0.003–0.005</td></tr>
+          <tr class="price"><td>Price per page</td><td>$0.010</td><td class="best">$0.003&ndash;0.005</td></tr>
         </tbody>
       </table>
     </div>
@@ -409,7 +522,7 @@ client = Reducto(api_key=<span class="s">"..."</span>,
   </div>
 </footer>
 
-<script src="site.js?v=11"></script>
+<script src="site.js?v=12"></script>
 <script data-goatcounter="https://readanydoc.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </body>
 </html>

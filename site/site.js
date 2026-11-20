@@ -111,3 +111,79 @@ fetch("https://api.github.com/repos/arpitpatel25/ReadAnyDoc")
   window.addEventListener("scroll", onScroll, { passive: true });
   card.querySelectorAll("[data-star-close]").forEach((el) => el.addEventListener("click", () => { card.hidden = true; }));
 })();
+
+// Extraction walkthrough: one real run (ADP 10-Q, 43 pages, 4 parts, 12 field groups), one step at a time.
+(() => {
+  const root = document.querySelector(".xflow");
+  if (!root) return;
+  const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const PARTS = [[1, 12], [13, 24], [25, 36], [37, 43]];
+  const pages = root.querySelector(".xf-pages");
+  for (let n = 1; n <= 43; n++) {
+    const i = document.createElement("i");
+    const part = PARTS.findIndex(([a, b]) => n >= a && n <= b) + 1;
+    i.className = "p" + part + (n === 3 ? " hit" : "");
+    pages.appendChild(i);
+  }
+  const groups = root.querySelector(".xf-groups");
+  for (let g = 1; g <= 12; g++) groups.insertAdjacentHTML("beforeend", `<span>Group ${g}<small>up to 40 fields</small></span>`);
+  const matrix = root.querySelector(".xf-matrix");
+  PARTS.forEach((_, p) => {
+    matrix.insertAdjacentHTML("beforeend", `<em>Part ${p + 1}</em>`);
+    for (let g = 0; g < 12; g++) matrix.insertAdjacentHTML("beforeend", `<i class="${g === 0 ? "w" : "r"}" data-p="${p}" data-g="${g}"></i>`);
+  });
+  const tiles = [...pages.children], cells = [...matrix.querySelectorAll("i")];
+  const tabs = [...root.querySelectorAll('[role="tab"]')], panes = [...root.querySelectorAll('[role="tabpanel"]')];
+  let timers = [];
+  const later = (fn, ms) => timers.push(setTimeout(fn, still ? 0 : ms));
+  const clear = () => { timers.forEach(clearTimeout); timers = []; };
+
+  function enter(step) {
+    clear();
+    if (step === 1) {  // pages are read 16 at a time
+      tiles.forEach((t) => t.classList.remove("read"));
+      tiles.forEach((t, k) => later(() => t.classList.add("read"), 120 + Math.floor(k / 16) * 520 + (k % 16) * 18));
+    } else tiles.forEach((t) => t.classList.add("read"));
+    if (step === 4) {  // the first call of each part writes the cache, then the rest go together
+      cells.forEach((c) => c.classList.remove("on"));
+      cells.filter((c) => c.dataset.g === "0").forEach((c, k) => later(() => c.classList.add("on"), 150 + k * 60));
+      cells.filter((c) => c.dataset.g !== "0").forEach((c) => later(() => c.classList.add("on"), 900 + +c.dataset.g * 45 + +c.dataset.p * 25));
+    } else cells.forEach((c) => c.classList.add("on"));
+  }
+  function show(step, focus) {
+    root.dataset.step = step;
+    tabs.forEach((t) => {
+      const on = +t.dataset.s === step;
+      t.setAttribute("aria-selected", on); t.tabIndex = on ? 0 : -1;
+      if (on && focus) t.focus();
+    });
+    panes.forEach((p, k) => (p.hidden = k + 1 !== step));
+    enter(step);
+  }
+  let playing = null;
+  const play = root.querySelector(".xf-play");
+  function stop() { clearInterval(playing); playing = null; play.textContent = "Play all steps"; }
+  tabs.forEach((t) => {
+    t.addEventListener("click", () => { stop(); show(+t.dataset.s); });
+    t.addEventListener("keydown", (e) => {
+      const k = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+      if (k) { e.preventDefault(); stop(); show(((+t.dataset.s - 1 + k + 6) % 6) + 1, true); }
+      if (e.key === "Home") { e.preventDefault(); stop(); show(1, true); }
+      if (e.key === "End") { e.preventDefault(); stop(); show(6, true); }
+    });
+  });
+  play.addEventListener("click", () => {
+    if (playing) return stop();
+    let s = 1; show(s); play.textContent = "Pause";
+    playing = setInterval(() => { s += 1; if (s > 6) return stop(); show(s); }, 3400);
+  });
+  show(1);
+  // the page reading plays once, when the walkthrough first comes into view
+  if ("IntersectionObserver" in window && !still) {
+    tiles.forEach((t) => t.classList.remove("read")); clear();
+    const io = new IntersectionObserver((es) => {
+      if (es.some((e) => e.isIntersecting)) { io.disconnect(); if (root.dataset.step === "1") enter(1); }
+    }, { threshold: 0.35 });
+    io.observe(root);
+  }
+})();
