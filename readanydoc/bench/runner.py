@@ -130,6 +130,15 @@ def summarize(out: str, cases: list[dict], systems: list[System]) -> dict:
                "cost_per_document_usd": round(sum(costs) / len(costs), 4) if costs else None,
                "cost_note": next((r.get("cost_note") for r in recs if r.get("cost_note")), None),
                "median_seconds": round(statistics.median(secs), 1) if secs else None}
+        by_id = {c["id"]: c for c in cases}
+        with_schema = [r for r in recs if r.get("case") in by_id and by_id[r["case"]].get("schema")]
+        if with_schema:
+            for key, ok in (("schema_valid", True), ("schema_valid_strict", False)):
+                checked = [(r, grade.schema_errors(None if r.get("error") else r.get("data"),
+                                                   by_id[r["case"]]["schema"], nulls_ok=ok)) for r in with_schema]
+                row[key] = sum(1 for _, e in checked if not e) / len(checked)
+                if ok:
+                    row["schema_errors"] = {r["case"]: e[:5] for r, e in checked if e}
         if cc:
             v = sum(x["values"] for x in cc)
             row["values_with_citation"] = sum(x["with_box"] for x in cc) / v if v else None

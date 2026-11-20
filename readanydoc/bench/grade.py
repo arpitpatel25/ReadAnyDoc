@@ -15,7 +15,12 @@ equal leaves, so a list in another order is not penalised. Scores:
 
 - ``recall``: answer-key values found (the share of the key that is right in the output);
 - ``precision``: output values that are right (the share of the output that is in the key);
-- ``exact_documents``: documents with every answer-key value right.
+- ``exact_documents``: documents with every answer-key value right;
+- ``schema_valid`` (``schema_errors``): outputs that pass the task's JSON Schema, checked by the standard
+  ``jsonschema`` validator (types, required fields, enums, patterns, ranges). A failed run counts as not valid;
+- ``schema_valid_strict``: the same, except that ``null`` for a value the document does not give is also an error
+  when the schema's type does not allow null (many schemas declare optional fields as plain ``string``; every system
+  tested, Reducto included, returns ``null`` there). ``schema_valid`` accepts that ``null`` and nothing else.
 
 ``alternatives`` in an answer key (``{"path": [other accepted values]}``) are accepted too.
 """
@@ -204,3 +209,46 @@ def summarize(per_doc: list[dict]) -> dict:
             "recall": right / expected if expected else None,
             "precision": correct_out / written if written else None,
             "exact_documents": sum(d["score"]["exact"] for d in per_doc) / len(per_doc)}
+
+
+def _nullable(schema: Any) -> Any:
+    """The schema with null allowed wherever a type or enum is given (for ``schema_valid``)."""
+    if isinstance(schema, list):
+        return [_nullable(x) for x in schema]
+    if not isinstance(schema, dict):
+        return schema
+    out = {}
+    for k, v in schema.items():
+        if k in ("properties", "patternProperties", "$defs", "definitions") and isinstance(v, dict):
+            out[k] = {kk: _nullable(vv) for kk, vv in v.items()}
+        elif k in ("items", "additionalProperties", "anyOf", "oneOf", "allOf", "not", "prefixItems"):
+            out[k] = _nullable(v)
+        else:
+            out[k] = v
+    t = out.get("type")
+    if isinstance(t, str) and t != "null":
+        out["type"] = [t, "null"]
+    elif isinstance(t, list) and "null" not in t:
+        out["type"] = t + ["null"]
+    if isinstance(out.get("enum"), list) and None not in out["enum"]:
+        out["enum"] = out["enum"] + [None]
+    return out
+
+
+def schema_errors(data: Any, schema: Any, nulls_ok: bool = False) -> list[str]:
+    """What breaks the JSON Schema in an output, by the standard validator (``jsonschema``), as "path: message".
+    Not ReadAnyDoc's own checker, so the score does not depend on the code under test."""
+    import jsonschema
+    if not isinstance(schema, dict) or data is None:
+        return ["no output"] if data is None else []
+    if nulls_ok:
+        schema = _nullable(schema)
+    cls = jsonschema.validators.validator_for(schema, default=jsonschema.Draft202012Validator)
+    try:
+        cls.check_schema(schema)
+    except jsonschema.SchemaError:
+        cls = jsonschema.Draft202012Validator  # a schema with a non-standard keyword is still checked for the rest
+    out = []
+    for e in cls(schema).iter_errors(data):
+        out.append(("/".join(str(p) for p in e.absolute_path) or "(root)") + ": " + e.message[:160])
+    return out
