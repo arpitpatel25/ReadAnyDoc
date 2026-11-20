@@ -4,6 +4,16 @@ One line per decision, with the reason, grouped by area in the order they were m
 earlier ones; the first section lists what changed for the first public release. Add a line here when you change
 the document format, a default, or a public interface.
 
+## Left-out values are warned by default (2026-11-20)
+
+- `printed_but_empty` and `row_not_extracted` go into `warnings` on every extraction, not only with `review`:
+  a silent miss is the worst case for a user, the check is code only (no model call, no cost), and it fires
+  about 0.1 times per document on real outputs. One line per field and flag, with a count for repeats.
+- The rest of review stays opt-in: `not_found_on_page` fires on every value worked out by rule (about 5 per
+  contract), which is noise for most callers.
+- `left_out_warnings: false` turns it off. The response shape is unchanged (only `warnings` lines are added), so a
+  Reducto client is unaffected.
+
 ## Review flags values the output left out (2026-11-19)
 
 - The model sometimes drops a printed value (a billing contact) and review was silent. Now two code-only flags,

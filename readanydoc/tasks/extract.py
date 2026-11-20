@@ -1851,6 +1851,8 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
         segments = _token_parts(pages, budget, int(opts.get("segment_overlap", 1)),
                                 PDF_PAGE_TOKENS if (opts.get("direct") or {}) else 0)
     review_on = bool(settings.get("review"))  # code-only checks on the answer, returned under "review"
+    # printed values the output left out (code only): listed in "warnings" unless turned off
+    left_out_on = settings.get("left_out_warnings", True) is not False
     alt_cfg = settings.get("alternatives")  # other values the document gives for a field (true or a list of paths)
     derived_ok = settings.get("derived_values", True) is not False
     fill = RS.fill_policy(settings.get("fill_required"))  # which required fields must be answered (reply_schema)
@@ -1903,7 +1905,7 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
         "parts": len(segments), "pages_per_part": [len(sg) for sg in segments], "forced_parts": forced,
         "fields_per_group": int(opts.get("coded_group_leaves", 40)), "max_output_tokens": ex.opts.get("max_tokens"),
         "citations": citations_on, "deep_extract": deep, "array_extract": bool(settings.get("array_extract")),
-        "review": review_on, "alternatives": bool(alt_cfg), "derived_values": derived_ok,
+        "review": review_on, "left_out_warnings": left_out_on, "alternatives": bool(alt_cfg), "derived_values": derived_ok,
         "fill_required": sorted(fill) if isinstance(fill, set) else fill,
         "include_images": bool(settings.get("include_images")), "page_range": settings.get("page_range"),
         "relevance_filter": bool(settings.get("relevance_filter")), "pages": len(pages),
@@ -2086,6 +2088,10 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
             if key and item not in found.setdefault(key, []):
                 found[key].append(item)
         extra_out["alternatives"] = found
+    if left_out_on and value is not None:
+        found = FR.left_out(value, ex.strict, ex)
+        trace.event("left_out_check", flags=len(found))
+        warnings += FR.left_out_warnings(found)
     if review_on:
         extra_out["review"] = FR.review(value, ex.strict, cites, ex, conflicts=conflicts, unreadable=set(still),
                                         filled=RS.forced_paths(ex.prompt_schema, fill) if use_reply else set(),

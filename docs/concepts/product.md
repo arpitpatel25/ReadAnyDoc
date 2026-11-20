@@ -360,7 +360,7 @@ flowchart LR
 | 415 | A file type with no converter on the machine; the message names the program to install |
 | 501 | A Reducto feature not implemented (`/pipeline`) |
 | 502 | Every model call failed (cut off or unreadable), so the answer would have been empty |
-| `warnings` | Empty required fields, unreadable replies (with their pages), lists that look short, copied examples, parse problems by stage |
+| `warnings` | Empty required fields, unreadable replies (with their pages), lists that look short, printed values the output left out (on by default; `left_out_warnings: false` turns it off), copied examples, parse problems by stage |
 
 ## 8. Defaults in one place
 

@@ -278,10 +278,29 @@ def review(value: Any, schema: Any, cites: dict, ex: Any, *, conflicts: list, un
     for f in sorted(unreadable):
         add(f, "unreadable", "the model's reply for this field could not be read; it may be in the document")
 
-    from . import coverage  # printed values the output did not take (code only)
+    for f in left_out(value, schema, ex):
+        add(f["field"] or "", f["flag"], f["detail"])
+    return out
+
+
+def left_out(value: Any, schema: Any, ex: Any) -> list[dict]:
+    """Printed values the output did not take (``coverage``, code only): [{"field", "flag", "detail"}]."""
+    from . import coverage
     pages_ = [{"number": p.number, "regions": [{"label": r.label, "type": r.region.type.value,
                                                 "content": r.region.content} for r in p.regions]}
               for p in (getattr(ex, "pages", None) or [])]
-    for f in coverage.check(value, schema, pages_):
-        add(f["field"] or "", f["flag"], f["detail"])
+    return coverage.check(value, schema, pages_)
+
+
+def left_out_warnings(found: list[dict]) -> list[str]:
+    """One ``warnings`` line per field and flag of ``left_out``: these are on by default, so a field the
+    document prints many times (a date in every signature block) is reported once, with a count."""
+    groups: dict[tuple, list[str]] = {}
+    for f in found:
+        groups.setdefault((f["flag"], f["field"] or ""), []).append(f["detail"])
+    out = []
+    for (flag, field), details in groups.items():
+        more = f" (and {len(details) - 1} more like it)" if len(details) > 1 else ""
+        what = "may be missing a printed value" if flag == "printed_but_empty" else "may be missing a table row"
+        out.append(f"{field or 'output'}: {what}: {details[0]}{more}")
     return out

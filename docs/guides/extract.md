@@ -122,8 +122,10 @@ not happen every run (in another run a different form lost its contact), and not
 the worst kind of miss: the output looks complete, so nobody knows to check it. The parser had read the line; the
 model filling the schema skipped it.
 
-**What we do about it.** With `review=True`, code compares what the document prints with what the output holds,
-after extraction, with no model call:
+**What we do about it.** On every extraction, code compares what the document prints with what the output holds,
+after extraction, with no model call. What it finds is listed in `warnings` (on by default since 0.4.5; one line per
+field, with a count when a field is hit more than once; `left_out_warnings: false` turns it off) and, with
+`review=True`, as flags in `review`:
 
 | Flag | When | Example |
 |---|---|---|
@@ -182,7 +184,7 @@ These are opt-in; a client that sends none of them behaves as on Reducto, plus t
 
 | Field | What it does |
 |---|---|
-| `warnings` (response) | One line per required field that came back empty, at any depth, and parts whose reply could not be read |
+| `warnings` (response) | One line per required field that came back empty, at any depth, parts whose reply could not be read, and printed values the output left out (`printed_but_empty`, `row_not_extracted`; on by default, `left_out_warnings: false` turns it off) |
 | `review`, `alternatives`, `derived_values` (settings) | See "Extras" above |
 | `instructions.examples` | Up to 5 example outputs, shown to the model as format examples. A returned value that equals an example and is not in the document is removed and reported |
 | `settings.relevance_filter: true` | For documents of 4+ pages, one cheap call picks the pages that matter for your schema first. 80% cheaper with the same answers on an 86-page packet |
