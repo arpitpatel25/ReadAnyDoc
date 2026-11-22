@@ -353,6 +353,12 @@ PROFILES["engine-final-4"] = (
     .with_stage("read", forms="fillable,kv_lines:join,kv_rules:rows,kv_guard", handwriting_print_ocr=True)
     .model_copy(update={"profile": "engine-final-4"}))
 
+# 2026-11-22: the page read labels page furniture itself (prompts.FURNITURE_TAG_RULE, generic wording); the
+# tagged lines become Header / Footer / Page Number blocks in mdblocks. Same one page read, no extra calls.
+PROFILES["engine-final-5"] = (
+    PROFILES["engine-final-4"].with_stage("read", page_prompt="PAGE_PROMPT_LABELLED_FILE")
+    .model_copy(update={"profile": "engine-final-5"}))
+
 
 # the cheaper sibling of each engine configuration (served for settings.model = r-1-mini / legacy)
 CHEAPER = {name: "vanilla-api" for name in ("engine-final", "engine-api", "layout-api", "layout-best-api", "engine-final-2",

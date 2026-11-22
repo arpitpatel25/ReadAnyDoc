@@ -22,9 +22,9 @@ the records linked at the end; nothing is estimated unless it says so.
 
 **Where it stands**
 
-| | Reducto | Plain Haiku | ReadAnyDoc 0.4.5 |
+| | Reducto | Plain Haiku | ReadAnyDoc |
 |---|---|---|---|
-| General pages (olmOCR-bench, 1,403 pages) | 80.9 | 82.2 | **84.3** |
+| General pages (olmOCR-bench, 1,403 pages) | 80.9 | 82.2 | **85.4** (0.4.7) |
 | Tables (RD-TableBench, 1,000 tables) | 88.85 | 88.20 | 88.84 |
 | Text error, lower is better (OmniDocBench, 1,651 pages) | 0.095 | 0.081 | **0.073** |
 | Layout block types (OmniDocBench) | **84.6** | 55.6 | 79.0 |

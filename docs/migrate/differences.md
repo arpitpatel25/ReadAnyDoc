@@ -9,8 +9,8 @@ What is different from Reducto, so nothing surprises you after switching.
 | Speed | about 5 s a page | 20 to 50 s a page with the engine, 8 to 28 s model only; pages of one document are read in parallel |
 | Page layout | ahead by about 6 points on OmniDocBench block types | 79.0 against 84.6 |
 | Formulas | ahead | behind (formula edit distance 0.155 against 0.133) |
-| Headers and footers left out | 90.1 | 81.1 |
-| Text, multi-column pages | | ahead (olmOCR-bench 84.3 against 80.9) |
+| Headers and footers left out | 90.1 | 90.3 |
+| Text, multi-column pages | | ahead (olmOCR-bench 85.4 against 80.9) |
 | Long documents (extraction) | returns a few rows of long tables | ahead (LongExtract rows 56.4% against 9.1%; 10-Q values 79.1% against 48.9%) |
 | Very large images | accepted | a page image over 10 MB, 8,000 pixels a side or 50 megapixels fails (not shrunk first) |
 | Pages the provider will not return | not applicable | about 1% of pages in large public sets are declined by the model provider (content filtering). They fall back to plain OCR text at `low` confidence, or to a second model with `READANYDOC_REFUSAL_READER`. The response says so in `warnings` |

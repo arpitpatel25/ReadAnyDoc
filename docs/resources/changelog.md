@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.7 (2026-11-22)
+
+- Running page headers, footers, page numbers and margin line numbers are labelled by the page read itself in the
+  `engine` mode: the read wraps them in `<page-header>`, `<page-footer>`, `<page-number>`, `<line-number>`, and they
+  come back as Header / Footer / Page Number blocks with the tags removed. The text is kept, only typed. Before, a
+  one-page document had no repetition to detect them by, and letterheads, running titles merged into a paragraph
+  and footer lines inside other blocks were left in the body. Same one model call per page, no extra cost.
+- olmOCR-bench (1,403 pages, official tests): 84.3 -> 85.4; headers and footers 81.1 -> 90.3 (Reducto 90.1). On the
+  1,263 pages never used in development: 84.0 -> 85.2. Tables 92.2 -> 89.8, mostly run-to-run variation (one
+  screenshot of a table now reads as a figure). The other benchmarks are unchanged from 0.4.5. Details in
+  `docs/decisions.md`.
+- `model-only` is unchanged.
+
 ## 0.4.6 (2026-11-20)
 
 - `readanydoc bench` scores schema validity: the share of outputs that pass the task's JSON Schema, checked by the

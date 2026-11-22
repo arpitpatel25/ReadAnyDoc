@@ -500,3 +500,31 @@ terms), a review of what a bare value hides, for any document type. Each extract
 Also in this release: Python 3.13 (CI tests 3.12 and 3.13), `--instructions @file`, and the "figure blocks could not
 be located" note is a warning only when the request asked for figure images, descriptions or chart data.
 
+
+## Page furniture labelled by the page read (2026-11-22, engine-final-5)
+The olmOCR-bench failures were analysed test by test with the Haiku engine and with the same engine on Sonnet 5.5
+(Batch API, 1,275 pages): Sonnet scored the same (84.34 against 84.31) and both fail the same tests in nearly every
+category, so the remaining failures are mostly the engine's output, not the reading. The largest product-side one:
+running headers and footers left in the body (144 failed `absent` tests), because a single-page document has no
+repetition to detect them by and the position bands miss letterheads, running titles merged into a paragraph and
+footer lines inside other blocks. Widening the bands (offline, on the saved outputs) gained +0.03 overall.
+- Change: the engine's page prompt is `PAGE_PROMPT_LABELLED_FILE` (`prompts.FURNITURE_TAG_RULE`): the read wraps
+  running headers, footers, page numbers and margin line numbers in `<page-header>`, `<page-footer>`,
+  `<page-number>`, `<line-number>`; `mdblocks.split_markdown` makes each one a Header / Footer / Page Number block
+  and removes the tags (a stray tag is removed, its text kept). The text is kept, only typed. Wording is generic on
+  purpose: a first draft that named letterheads and URL lines (taken from benchmark examples) was dropped.
+  `model-only` is unchanged.
+- Cost: the same one page read per page, no extra calls ($3.83 for the 1,403 olmOCR-bench pages).
+- olmOCR-bench, full: 84.34 -> 85.37 (headers/footers 81.1 -> 90.3). Pages not used in development (1,263):
+  83.95 -> 85.15 (headers/footers 80.7 -> 89.8). Tables 92.2 -> 89.8: re-running the 11 pages that lost table tests
+  with the old and the new prompt shows mostly run-to-run variation; one page (a screenshot of a report card)
+  is read as a figure with the new prompt every time. Placing the rule at the end of the prompt did not change that,
+  so the measured placement (first rule) is kept. Other categories move within run-to-run variation
+  (330 arxiv_math pages: 39 tests lost, 14 gained, none because text was labelled furniture).
+- Not changed, not measured again: OmniDocBench, RD-TableBench, FUNSD and the extraction sets in BENCHMARKS.md are
+  0.4.5 numbers.
+- Tried and not kept (offline, no model calls): joining sentences split across paragraphs (+0.00), removing bold and
+  italic markers (-0.17). Multi-column and old-scan failures are mostly near-miss text (a character, a dash or
+  ellipsis style, answer-key typos), not order (5 of 165 multi-column failures are order); maths failures are
+  formula content, not rendering (403 of 403). Scripts and notes: exp/2026-11-22_header_labels_sonnet/ in the
+  workspace.

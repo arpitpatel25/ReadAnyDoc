@@ -34,6 +34,16 @@ def test_split_markdown_keeps_every_character_of_each_block():
     assert squash("".join(b.text for b in blocks)) == squash(md)
 
 
+def test_split_markdown_types_labelled_furniture():
+    md = ("<page-header>Journal of Things, Vol. 3</page-header>\nIntro text runs on.\n\n"
+          "<line-number>12</line-number>\n\nBody <page-footer>broken tag\n\n<page-number>7</page-number>\n")
+    blocks = split_markdown(md)
+    assert [(b.type, b.text) for b in blocks] == [
+        (RegionType.HEADER, "Journal of Things, Vol. 3"), (RegionType.TEXT, "Intro text runs on."),
+        (RegionType.PAGE_NUMBER, "12"), (RegionType.TEXT, "Body broken tag"), (RegionType.PAGE_NUMBER, "7")]
+    assert all("<page-" not in b.text and "<line-" not in b.text for b in blocks)
+
+
 def test_parse_table_cells_spans():
     html = ('<table><tr><th rowspan="2">A</th><th colspan="2">B</th></tr>'
             "<tr><td>c</td><td>d</td></tr></table>")
@@ -200,9 +210,9 @@ def test_multi_page_pdf_with_page_range(five_pages, tmp_path):
 
 def test_shipped_profiles_are_the_benchmarked_configurations():
     """`engine` and `model-only` are written out in readanydoc/profiles.py; they must stay identical to the
-    configurations that were benchmarked (engine-final-4 and vanilla-api in research/)."""
+    configurations that were benchmarked (engine-final-5 and vanilla-api in research/)."""
     from readanydoc.profiles import get_profile
-    for shipped, measured in (("engine", "engine-final-4"), ("model-only", "vanilla-api")):
+    for shipped, measured in (("engine", "engine-final-5"), ("model-only", "vanilla-api")):
         a = get_profile(shipped).model_dump(exclude={"profile"})
         b = get_profile(measured).model_dump(exclude={"profile"})
         b["reader"] = b["reader"].replace("anthropic_api:haiku", "anthropic_api:claude-haiku-5-5")
