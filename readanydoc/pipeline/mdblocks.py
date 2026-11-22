@@ -86,8 +86,36 @@ def _strip_wrappers(text: str) -> str:
 MAX_KEY_VALUE_CHARS = 1500  # a merged Key Value block stays about the size of a form section
 
 
+_FURNITURE_TAGS = {"page-header": RegionType.HEADER, "page-footer": RegionType.FOOTER,
+                   "page-number": RegionType.PAGE_NUMBER, "line-number": RegionType.PAGE_NUMBER}
+_FURNITURE_SPAN = re.compile(r"(<(page-header|page-footer|page-number|line-number)>.*?</\2\s*>)", re.S | re.I)
+_FURNITURE_BLOCK = re.compile(r"^\s*<(page-header|page-footer|page-number|line-number)>\s*(.*?)\s*</\1\s*>\s*$",
+                              re.S | re.I)
+_FURNITURE_ANY = re.compile(r"</?(?:page-header|page-footer|page-number|line-number)\s*>", re.I)
+
+
 def split_markdown(md: str, split_lists: bool = True, merge_key_values: bool = True) -> list[MdBlock]:
-    """Blocks are separated by blank lines; an HTML table or fenced code block is never split."""
+    """Blocks are separated by blank lines; an HTML table or fenced code block is never split.
+
+    Furniture the page read labelled (``<page-header>``, ``<page-footer>``, ``<page-number>``, ``<line-number>``,
+    see prompts.FURNITURE_TAG_RULE) becomes its own Header / Footer / Page Number block with the tags removed;
+    a stray or unclosed tag is removed and its text kept as body text."""
+    if "<" in md and _FURNITURE_ANY.search(md):
+        md = _FURNITURE_SPAN.sub(r"\n\n\1\n\n", md)
+        typed: list[MdBlock] = []
+        for b in _split_markdown(md, split_lists, merge_key_values):
+            m = _FURNITURE_BLOCK.match(b.text)
+            if m and m.group(2).strip():
+                typed.append(MdBlock(text=m.group(2), type=_FURNITURE_TAGS[m.group(1).lower()]))
+            elif not m:
+                b.text = _FURNITURE_ANY.sub("", b.text)
+                if b.text.strip():
+                    typed.append(b)
+        return typed
+    return _split_markdown(md, split_lists, merge_key_values)
+
+
+def _split_markdown(md: str, split_lists: bool = True, merge_key_values: bool = True) -> list[MdBlock]:
     blocks: list[str] = []
     cur: list[str] = []
     depth = 0  # open <table> tags

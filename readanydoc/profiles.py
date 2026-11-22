@@ -34,7 +34,8 @@ ENGINE = PipelineConfig.model_validate({
         # layout regions are used as evidence; they never replace the model's text
         "layout": {"options": {"detect_only": True}},
         "read": {"options": {
-            "page_prompt": "PAGE_PROMPT_FULL_FILE",
+            # the page read labels running headers/footers/page and line numbers (engine-final-5, 2026-11-22)
+            "page_prompt": "PAGE_PROMPT_LABELLED_FILE",
             "table_select_no_layout": False,
             "page_workers": 16,
             # scanned pages: a token is corrected only when two zoomed reads agree against the page read

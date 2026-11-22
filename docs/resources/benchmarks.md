@@ -3,7 +3,8 @@
 !!! tip "Every score, document by document"
     Per-document scores for both systems are in [`results/`](https://github.com/arpitpatel25/ReadAnyDoc/tree/main/results), and the scripts that ran them in [`research/benchmarks/`](https://github.com/arpitpatel25/ReadAnyDoc/tree/main/research/benchmarks) and [`readanydoc/bench/`](https://github.com/arpitpatel25/ReadAnyDoc/tree/main/readanydoc/bench).
 
-ReadAnyDoc 0.4.5 against Reducto on the same documents with the same requests (November 2026):
+ReadAnyDoc against Reducto on the same documents with the same requests (November 2026): olmOCR-bench with 0.4.7,
+the other benchmarks with 0.4.5 (0.4.7 changes only how running headers, footers and page numbers are labelled):
 
 - **Reducto**: Reducto's hosted API, default settings (r-1 for parsing, Extract for extraction).
 - **ReadAnyDoc**: the default `engine` mode with Claude Haiku 5.5 (Sonnet 5.5 on handwritten pages). A test in
@@ -17,12 +18,12 @@ be repeated with `readanydoc bench run <set>`.
 
 | Benchmark | Measure | Reducto | ReadAnyDoc |
 |---|---|---|---|
-| [olmOCR-bench](https://github.com/allenai/olmocr), 1,403 pages | official score, % | 80.9 | **84.3** |
-| | multi-column | 65.6 | **81.3** |
-| | long tiny text | 84.2 | **93.9** |
-| | headers and footers | **90.1** | 81.1 |
-| | old scans | 49.0 | **51.1** |
-| | tables | **92.7** | 92.2 |
+| [olmOCR-bench](https://github.com/allenai/olmocr), 1,403 pages | official score, % | 80.9 | **85.4** |
+| | multi-column | 65.6 | **80.9** |
+| | long tiny text | 84.2 | **94.1** |
+| | headers and footers | 90.1 | **90.3** |
+| | old scans | 49.0 | **52.9** |
+| | tables | **92.7** | 89.8 |
 | [OmniDocBench](https://github.com/opendatalab/OmniDocBench), 1,651 pages | text edit distance (lower is better) | 0.095 | **0.073** |
 | | table TEDS, % | **87.9** | 87.0 |
 | | reading-order edit distance (lower) | **0.161** | 0.162 |
@@ -32,9 +33,10 @@ be repeated with `readanydoc bench run <set>`.
 | [RD-TableBench](https://huggingface.co/datasets/reducto/rd-tablebench), 1,000 tables | Reducto's own table score | 88.85 | 88.84 |
 | [FUNSD](https://guillaumejaume.github.io/FUNSD/), 199 forms | question/answer links found, % | **78.6** | 77.4 |
 
-ReadAnyDoc is ahead on general page reading (olmOCR-bench +3.4, mostly multi-column pages and small print) and on
+ReadAnyDoc is ahead on general page reading (olmOCR-bench +4.5, mostly multi-column pages and small print) and on
 OmniDocBench text; level on tables (RD-TableBench, OmniDocBench TEDS), reading order and forms (differences inside
-the intervals); behind on layout (block types -5.6), formulas, and removing headers and footers.
+the intervals); behind on layout (block types -5.6), formulas and olmOCR-bench tables (89.8 against 92.7). Headers and
+footers are level since 0.4.7 (90.3 against 90.1; 81.1 in 0.4.5), where the page read labels them itself.
 
 ## Extraction
 
@@ -130,6 +132,7 @@ Scanned pages with tables and handwritten pages cost more (up to about $0.03 a p
 - Parsing: olmOCR-bench with its official tests; RD-TableBench with Reducto's published grading code; OmniDocBench
   with its official evaluation code; FUNSD with a script that applies the benchmark's definitions. Parsing answers
   were produced on 14-20 November; every page whose code path changed since was parsed again with 0.4.5.
+  olmOCR-bench was parsed again with 0.4.7 on 22 November (all 1,403 pages, through the library, 16 pages at a time).
 - Extraction samples are small on the long sets (3 to 6 documents) and are fixed by each set's sampler, so anyone
   running `readanydoc bench run <set> --limit <n>` gets the same documents.
 - The ExtractBench sets are scored here with our code grader, not ExtractBench's own scorer (which asks a model to

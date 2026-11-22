@@ -36,6 +36,16 @@ PAGE_RULES_FULL = (
 PAGE_PROMPT_FULL_FILE = ("Read the document page image at {img} and transcribe it to Markdown, "
                          "in natural reading order. " + PAGE_RULES_FULL)
 
+# ---- engine (2026-11-22): the page read labels page furniture itself; mdblocks turns the tags into block types ----
+# Generic wording on purpose (no document-specific cases). The text is kept, only typed (docs/decisions.md).
+FURNITURE_TAG_RULE = (
+    "Running page headers, running footers, page numbers and line numbers printed in a page margin are page "
+    "furniture, not body text: write each one on its own line, separated from other text by blank lines, wrapped "
+    "as <page-header>...</page-header>, <page-footer>...</page-footer>, <page-number>...</page-number> or "
+    "<line-number>...</line-number>, with its text exactly as printed. Everything else on the page, including "
+    "titles, headings, footnotes and captions, is body text. ")
+PAGE_PROMPT_LABELLED_FILE = PAGE_PROMPT_FULL_FILE.replace("Rules: ", "Rules: " + FURNITURE_TAG_RULE, 1)
+
 TABLE_CROP_STRICT_FILE = (
     "Read the image at {img}. It is an enlarged crop of one table from a document page. Transcribe the table as "
     "one HTML <table>: one <tr> per printed row, one cell per printed cell, rowspan/colspan where cells are merged, "
