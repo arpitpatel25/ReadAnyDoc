@@ -1,12 +1,12 @@
 ---
-title: LangChain and LlamaIndex
-description: Use ReadAnyDoc as a document loader in LangChain and a reader in LlamaIndex to load PDFs, scans and Office files as clean Markdown with page metadata for RAG.
+title: LangChain, LlamaIndex and Haystack
+description: Load PDFs, scans and Office files as Markdown with page metadata in LangChain, LlamaIndex and Haystack.
 ---
 
-# LangChain and LlamaIndex
+# LangChain, LlamaIndex and Haystack
 
-ReadAnyDoc plugs into both frameworks as a loader. Each page becomes one document by default, as Markdown with tables
-in HTML, and carries its page number, so answers can point back to the page.
+Each page becomes one document by default, as Markdown with tables in HTML. The page number in the metadata lets
+answers point back to the page.
 
 ## LangChain
 
@@ -36,6 +36,26 @@ docs = SimpleDirectoryReader("contracts/", file_extractor={".pdf": reader, ".doc
 index = VectorStoreIndex.from_documents(docs)
 ```
 
+## Haystack
+
+```bash
+pip install "readanydoc[engine,haystack]"
+```
+
+```python
+from haystack import Pipeline
+from readanydoc.integrations.haystack import ReadAnyDocConverter
+
+pipeline = Pipeline()
+pipeline.add_component("converter", ReadAnyDocConverter())
+result = pipeline.run({"converter": {"sources": ["report.pdf", "appendix.docx"]}})
+docs = result["converter"]["documents"]
+print(docs[0].content, docs[0].meta)
+```
+
+Pass local file paths in `sources` and set `split` and parse options on the converter. If a source fails to parse,
+the converter surfaces the error, as the other adapters do.
+
 ## Options
 
 | Argument | Values |
@@ -44,5 +64,4 @@ index = VectorStoreIndex.from_documents(docs)
 | any `readanydoc.parse` argument | `mode="model-only"`, `model=...`, `pages=[1, 2]`, ... |
 
 The first document of a file carries `warnings` in its metadata when there are any (a page the provider declined,
-an illegible value). Typed extraction with citations is not part of the loaders; call
-[`readanydoc.extract`](extract.md) for that.
+an illegible value). For typed extraction with citations, call [`readanydoc.extract`](extract.md).

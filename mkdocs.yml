@@ -103,7 +103,7 @@ nav:
       - Async jobs and webhooks: guides/jobs-webhooks.md
       - File types: guides/file-types.md
       - Test it yourself: guides/testing.md
-      - LangChain and LlamaIndex: guides/integrations.md
+      - LangChain, LlamaIndex and Haystack: guides/integrations.md
   - Use cases:
     - Overview: use-cases/index.md
     - Real documents, end to end: examples/real-documents.md

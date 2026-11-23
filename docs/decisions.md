@@ -4,6 +4,11 @@ One line per decision, with the reason, grouped by area in the order they were m
 earlier ones; the first section lists what changed for the first public release. Add a line here when you change
 the document format, a default, or a public interface.
 
+## Haystack document conversion
+
+- `ReadAnyDocConverter` uses the shared chunking helper so Haystack receives the same Markdown, split modes and
+  source metadata as the other adapters.
+
 ## Left-out values are warned by default (2026-11-20)
 
 - `printed_but_empty` and `row_not_extracted` go into `warnings` on every extraction, not only with `review`:

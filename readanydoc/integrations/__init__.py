@@ -2,6 +2,7 @@
 
     from readanydoc.integrations.langchain import ReadAnyDocLoader      # pip install "readanydoc[langchain]"
     from readanydoc.integrations.llamaindex import ReadAnyDocReader     # pip install "readanydoc[llamaindex]"
+    from readanydoc.integrations.haystack import ReadAnyDocConverter    # pip install "readanydoc[haystack]"
 """
 
 from __future__ import annotations
