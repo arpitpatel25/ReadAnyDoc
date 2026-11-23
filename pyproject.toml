@@ -47,9 +47,10 @@ Changelog = "https://github.com/arpitpatel25/ReadAnyDoc/blob/main/CHANGELOG.md"
 engine = ["onnxruntime>=1.18", "numpy>=1.26", "rapidocr>=3.10"]
 # kept for older install commands; the MCP server is part of the base install since 0.1.5
 mcp = []
-# document loaders for LangChain and LlamaIndex (readanydoc/integrations/)
+# document adapters for LangChain, LlamaIndex and Haystack (readanydoc/integrations/)
 langchain = ["langchain-core>=0.3"]
 llamaindex = ["llama-index-core>=0.12"]
+haystack = ["haystack-ai>=2.0"]
 
 [project.scripts]
 readanydoc = "readanydoc.cli:main"
