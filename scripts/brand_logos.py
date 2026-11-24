@@ -5,7 +5,7 @@ Runs on the assembled site in the Pages workflow, so the source HTML and Markdow
     python scripts/brand_logos.py _site
 
 Text inside code, scripts, SVG, the docs navigation and the search box is left alone. A name gets its logo once per
-paragraph, list item, table cell or heading, so a sentence that names Reducto three times shows one logo.
+section of the landing page and once per page elsewhere (docs, build story), in running text only, never in headings.
 Logos live in site/logos/ (Simple Icons, CC0, plus each project's own mark).
 """
 
@@ -34,10 +34,9 @@ MONO = {"openai.svg", "github.svg", "anthropic.svg", "ollama.svg", "cursor.svg",
 LOGO = dict(BRANDS)
 NAME_RE = re.compile(r"(?<![\w./-])(" + "|".join(re.escape(n) for n, _ in BRANDS) + r")(?![\w-]*\.(?:com|ai|io|org)\b)(?!\w)((?:['’]s|-[A-Za-z][\w-]*)?)")
 
-SKIP_TAGS = {"code", "pre", "script", "style", "title", "head", "svg", "textarea", "option", "select", "kbd", "samp"}
-SKIP_CLASS = re.compile(r"\b(md-nav|md-search|md-header|md-source|md-tabs|headerlink|md-footer__link|no-logos)\b")
-BLOCKS = {"p", "li", "td", "th", "h1", "h2", "h3", "h4", "h5", "h6", "dd", "dt", "figcaption", "blockquote",
-          "summary", "button", "div", "section", "caption", "label"}
+SKIP_TAGS = {"nav", "h1", "h2", "h3", "h4", "h5", "h6", "code", "pre", "script", "style", "title", "head", "svg", "textarea", "option", "select", "kbd", "samp"}
+SKIP_CLASS = re.compile(r"\b(md-nav|md-search|md-header|md-source|md-tabs|headerlink|md-footer__link|menu|nav-links|no-logos)\b")
+CONTAINERS = {"section", "header", "footer", "article", "nav"}
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
 
 STYLE = ("<style id=\"brand-logos\">.bl{white-space:nowrap}.bl img{height:.95em;width:auto;vertical-align:-.13em;"
@@ -55,7 +54,7 @@ def logo(name, tail=""):
             f'decoding="async">{name}{tail}</span>')
 
 
-def transform(text):
+def transform(text, per_section=True):
     if 'id="brand-logos"' in text:
         return text  # already done
     out, stack, seen = [], [], set()
@@ -71,7 +70,7 @@ def transform(text):
             elif not selfclose and name not in VOID:
                 skip = name in SKIP_TAGS or bool(SKIP_CLASS.search(attrs))
                 stack.append((name, skip))
-            if name in BLOCKS:
+            if per_section and name in CONTAINERS and not closing:
                 seen = set()
             out.append(tok)
             continue
@@ -97,7 +96,7 @@ def main(root):
         if p.name.startswith("google"):
             continue
         t = p.read_text(encoding="utf-8")
-        new = transform(t)
+        new = transform(t, per_section=(p.parent == Path(root)))  # landing page: once per section; others: once per page
         if new != t:
             p.write_text(new, encoding="utf-8")
             n += 1
