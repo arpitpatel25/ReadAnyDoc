@@ -462,3 +462,7 @@ code{font-family:var(--mono)}
   .xf-cite{grid-template-columns:110px 1fr}
   .xf-work,.xf-doc{padding:22px}
 }
+
+/* Brand logos (added at deploy by scripts/brand_logos.py) */
+.btn-green .bl-mono img{filter:invert(1)}
+.section-dark .bl img{background:#fff;border-radius:3px;padding:1.5px;box-sizing:content-box}
