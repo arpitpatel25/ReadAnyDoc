@@ -1,9 +1,10 @@
 // Headline: reveal word by word, once, on load.
 document.querySelectorAll(".reveal").forEach((el) => {
-  const words = el.textContent.trim().split(/\s+/);
+  // Split on spaces outside tags, so a logo-with-name (.bl) stays one word.
+  const list = el.innerHTML.trim().replace(/\s+/g, " ").split(/ (?![^<]*>)/);
   el.setAttribute("aria-label", el.textContent.trim());
-  el.innerHTML = words
-    .map((w, i) => `<span class="w" aria-hidden="true" style="animation-delay:${0.08 + i * 0.07}s">${w}${i < words.length - 1 ? " " : ""}</span>`)
+  el.innerHTML = list
+    .map((w, i) => `<span class="w" aria-hidden="true" style="animation-delay:${0.08 + i * 0.07}s">${w}${i < list.length - 1 ? " " : ""}</span>`)
     .join("");
 });
 
