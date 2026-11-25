@@ -30,7 +30,7 @@ On public benchmarks, each scored with the benchmark's own grader (full method i
 
 - **Ahead**: olmOCR-bench (+3.3, multi-column and small print), OmniDocBench text, long-document extraction.
 - **Level**: tables (RD-TableBench, Reducto's own table benchmark) and forms (FUNSD).
-- **Behind**: page layout (about 6 points), formulas, header and footer removal, and speed (about 20-50 s a page
+- **Behind**: page layout (about 1 point), formulas, header and footer removal, and speed (about 20-50 s a page
   against about 5 s).
 - **Price**: about $0.003-0.005 a page in the default engine mode ($0.001-0.002 in model-only mode) on your own Anthropic account, against about $0.01 at Reducto's list price.
 

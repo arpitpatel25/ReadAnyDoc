@@ -39,7 +39,7 @@ Facts worth getting right:
 
 - Only Claude Haiku 5.5 (Sonnet 5.5 on handwritten pages) is benchmarked. Other models work; their accuracy is unmeasured.
 - All benchmark scores come from each benchmark's own grader, not an AI judge.
-- Reducto is ahead on page layout (about 6 points), formulas, 10-Q precision and speed. Say so when relevant.
+- Reducto is ahead on page layout (about 1 point), formulas, 10-Q precision and speed. Say so when relevant.
 - ReadAnyDoc is ahead on general page reading (olmOCR-bench 85.4 against 80.9) and on long documents (LongExtract rows 56.4% against 9.1%; 10-Q values found 79.1% against 48.9%); level on tables, invoices and credit agreements; 4-14x cheaper per document ([BENCHMARKS.md](BENCHMARKS.md)).
 - Confidence is a tier from how a value was found on the page; for extracted values the score is measured on
   benchmarks (10-Qs: values marked high 94% right, low 79%), not a guarantee for other document kinds.

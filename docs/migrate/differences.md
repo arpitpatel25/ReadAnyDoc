@@ -7,7 +7,7 @@ What is different from Reducto, so nothing surprises you after switching.
 | Area | Reducto | ReadAnyDoc |
 |---|---|---|
 | Speed | about 5 s a page | 20 to 50 s a page with the engine, 8 to 28 s model only; pages of one document are read in parallel |
-| Page layout | ahead by about 6 points on OmniDocBench block types | 79.0 against 84.6 |
+| Page layout | ahead by about 1 point on OmniDocBench block types | 83.4 against 84.6 |
 | Formulas | ahead | behind (formula edit distance 0.155 against 0.133) |
 | Headers and footers left out | 90.1 | 90.3 |
 | Text, multi-column pages | | ahead (olmOCR-bench 85.4 against 80.9) |

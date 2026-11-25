@@ -1,7 +1,7 @@
 # Benchmarks
 
 ReadAnyDoc against Reducto on the same documents with the same requests (November 2026): olmOCR-bench with 0.4.7,
-the other benchmarks with 0.4.5 (0.4.7 changes only how running headers, footers and page numbers are labelled):
+OmniDocBench with 0.4.8, the other benchmarks with 0.4.5 (0.4.7 and 0.4.8 do not change what they measure):
 
 - **Reducto**: Reducto's hosted API, default settings (r-1 for parsing, Extract for extraction).
 - **ReadAnyDoc**: the default `engine` mode with Claude Haiku 5.5 (Sonnet 5.5 on handwritten pages). A test in
@@ -21,18 +21,19 @@ be repeated with `readanydoc bench run <set>`.
 | | headers and footers | 90.1 | **90.3** |
 | | old scans | 49.0 | **52.9** |
 | | tables | **92.7** | 89.8 |
-| [OmniDocBench](https://github.com/opendatalab/OmniDocBench), 1,651 pages | text edit distance (lower is better) | 0.095 | **0.073** |
-| | table TEDS, % | **87.9** | 87.0 |
-| | reading-order edit distance (lower) | **0.161** | 0.162 |
-| | formula edit distance (lower) | **0.133** | 0.155 |
-| | layout: block type right, % | **84.6** | 79.0 |
-| | layout: block found at IoU >= 0.5, % | **67.2** | 61.5 |
+| [OmniDocBench](https://github.com/opendatalab/OmniDocBench), 1,651 pages | text edit distance (lower is better) | 0.095 | **0.050** |
+| | table TEDS, % | 87.9 | **88.1** |
+| | reading-order edit distance (lower) | 0.161 | **0.142** |
+| | formula edit distance (lower) | **0.133** | 0.152 |
+| | layout: block type right, % | **84.6** | 83.4 |
+| | layout: block found at IoU >= 0.5, % | **67.2** | 64.4 |
 | [RD-TableBench](https://huggingface.co/datasets/reducto/rd-tablebench), 1,000 tables | Reducto's own table score | 88.85 | 88.84 |
 | [FUNSD](https://guillaumejaume.github.io/FUNSD/), 199 forms | question/answer links found, % | **78.6** | 77.4 |
 
 ReadAnyDoc is ahead on general page reading (olmOCR-bench +4.5, mostly multi-column pages and small print) and on
-OmniDocBench text; level on tables (RD-TableBench, OmniDocBench TEDS), reading order and forms (differences inside
-the intervals); behind on layout (block types -5.6), formulas and olmOCR-bench tables (89.8 against 92.7). Headers and
+OmniDocBench text and reading order (0.050 against 0.095; 0.142 against 0.161); level on tables (RD-TableBench,
+OmniDocBench TEDS 88.1 against 87.9) and forms (differences inside the intervals); behind on layout (block types
+-1.2), formulas and olmOCR-bench tables (89.8 against 92.7). Headers and
 footers are level since 0.4.7 (90.3 against 90.1; 81.1 in 0.4.5), where the page read labels them itself.
 
 ## Extraction

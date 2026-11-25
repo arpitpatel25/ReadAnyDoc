@@ -26,7 +26,7 @@ the records linked at the end; nothing is estimated unless it says so.
 |---|---|---|---|
 | General pages (olmOCR-bench, 1,403 pages) | 80.9 | 82.2 | **85.4** (0.4.7) |
 | Tables (RD-TableBench, 1,000 tables) | 88.85 | 88.20 | 88.84 |
-| Text error, lower is better (OmniDocBench, 1,651 pages) | 0.095 | 0.081 | **0.073** |
+| Text error, lower is better (OmniDocBench, 1,651 pages) | 0.095 | 0.081 | **0.050** |
 | Layout block types (OmniDocBench) | **84.6** | 55.6 | 79.0 |
 | Form question paired with its answer (FUNSD, 199 forms) | **78.6** | 71.6 | 77.4 |
 | Long reports: table rows extracted (LongExtract, 6 documents) | 9.1% | - | **56.4%** |
@@ -384,7 +384,7 @@ openness (self-hosted, your model account, the model as a setting).
 
 - **Speed:** Reducto 4-6 s per page, ours 20-50 s; on whole documents the gap is larger. This is the trade-off we
   accepted at the start.
-- **Fine layout** (about 6 points), **formulas**, **header and footer removal.**
+- **Fine layout** (about 1 point), **formulas**, **header and footer removal.**
 - **Pages the model provider declines to return** (content filtering: 1.5-3% of pages on some benchmarks) come back
   empty with a warning.
 
