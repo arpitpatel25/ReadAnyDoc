@@ -13,6 +13,7 @@ from typing import Optional
 
 import httpx
 
+from .. import replay
 from ..model import RegionType
 from . import prompts
 from .base import (ImageInput, ReadContext, Reader, ReaderError, ReadResult, Usage, image_bytes,
@@ -37,7 +38,7 @@ class OpenAICompatibleReader(Reader):
         self.max_retries = max_retries
         self.api_key_env = api_key_env
         self.extra_body = extra_body or {}
-        self._client = client or httpx.Client(timeout=timeout)
+        self._client = client or replay.client(timeout)
 
     def build_request(self, data: bytes, prompt: str, max_tokens: int) -> dict:
         url = f"data:{media_type(data)};base64,{base64.standard_b64encode(data).decode('ascii')}"

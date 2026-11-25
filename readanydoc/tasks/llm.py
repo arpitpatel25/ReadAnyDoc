@@ -37,6 +37,7 @@ from typing import Any, Callable, Optional, Sequence, Union
 
 import httpx
 
+from .. import replay
 from .. import trace
 
 MODELS = {"haiku": "claude-haiku-5-5", "sonnet": "claude-sonnet-5-5", "opus": "claude-opus-5-5"}
@@ -505,7 +506,7 @@ class AnthropicAPILLM(LLM):
         self.structured_outputs = structured_outputs
         self._rejected_formats: set[str] = set()  # schemas the API refused to compile: sent without a format
         self._accepted_formats: set[str] = set()  # schemas the API compiled (format_ok)
-        self._client = client or httpx.Client(timeout=timeout)
+        self._client = client or replay.client(timeout)
 
     def max_output(self) -> int:
         """The model's output allowance from its public limits (MAX_OUTPUT when the model is not listed)."""
@@ -699,7 +700,7 @@ class OpenAILLM(LLM):
         self.api_key_env = api_key_env
         self.token_field = token_field
         self.extra = dict(extra or {})
-        self._client = client or httpx.Client(timeout=timeout)
+        self._client = client or replay.client(timeout)
 
     def output_format(self, json_schema: Optional[dict]) -> Optional[dict]:
         if json_schema is None or not self.structured_outputs:
