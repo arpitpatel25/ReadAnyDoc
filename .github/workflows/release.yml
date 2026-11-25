@@ -33,6 +33,8 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true  # a re-run (workflow_dispatch) finishes the later steps
 
   # Lists the new version in the official MCP Registry (registry.modelcontextprotocol.io), which MCP clients and
   # directories read. GitHub OIDC proves the io.github.arpitpatel25 namespace; no token is stored.
