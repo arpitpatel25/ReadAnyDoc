@@ -31,3 +31,17 @@ def test_page_number_pattern():
     ok = ["12", "- 7 -", "Page 3", "iv", "3 / 10", "第 5 页"]
     bad = ["Total 12 items", "2026-11-25", "12.5", "Chapter 3"]
     assert all(labels.PAGE_NUMBER.match(s) for s in ok) and not any(labels.PAGE_NUMBER.match(s) for s in bad)
+
+
+def test_page_number_from_text_layer_without_ocr(monkeypatch):
+    from readanydoc.model import Word
+    d = _doc([RegionType.TEXT])
+    p = d.pages[0]
+    p.text_layer_usable = True
+    p.words["pdf"] = [Word(text="Body", bbox=BBox(left=0.1, top=0.1, width=0.2, height=0.02, page=0), source="pdf", line=0),
+                      Word(text="17", bbox=BBox(left=0.48, top=0.95, width=0.03, height=0.015, page=0), source="pdf", line=1)]
+    monkeypatch.setattr(labels, "_page_image", lambda *a: (_ for _ in ()).throw(AssertionError("OCR path used")))
+    st = labels.tidy(d)
+    assert st["page_numbers_added"] == 1
+    pn = [r for r in p.regions if r.type == RegionType.PAGE_NUMBER]
+    assert pn[0].content == "17" and pn[0] is p.regions[-1]

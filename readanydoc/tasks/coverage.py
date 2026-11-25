@@ -392,6 +392,13 @@ def check(value: Any, schema: Any, pages: list[dict]) -> list[dict]:
     # A. printed_but_empty: the most specific empty field whose words the free label shares
     empty = _empty_fields(value, schema)
     lists_ = _list_paths(schema)
+    # A word the schema gives to many lists ("period", "segment" on every metric of a financial schema) cannot tell
+    # one list's table from another's: it does not count when a table is matched to a list.
+    df: dict[str, int] = {}
+    for f in lists_:
+        for w in words.get(f, set()):
+            df[w] = df.get(w, 0) + 1
+    common = {w for w, n in df.items() if n > max(2, len(lists_) // 5)}
     flagged_tables: set = set()
     for p in free:
         if p.kind == "row" and (p.table in flagged_tables or not p.label):
@@ -404,6 +411,8 @@ def check(value: Any, schema: Any, pages: list[dict]) -> list[dict]:
                 continue  # a table's rows are the items of a list, never one single value
             fw = words.get(f, set())
             own = _words(f.rsplit(".", 1)[-1], _BASIC)
+            if p.kind == "row":
+                fw, own = fw - common, own - common
             hit = len(lw & fw) + len(_words(p.label, _BASIC) & own)  # the field's own name counts twice, and
             # there a common word ("Total", "Date") counts: the field is empty and is named exactly that
             if lw and not lw & (fw | own) and not (shape in ("email", "url", "phone") and shape in own):

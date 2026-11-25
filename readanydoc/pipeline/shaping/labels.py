@@ -4,7 +4,8 @@
   starts with a bold label, "**Damage:** Slam 1d8+1"). Measured on all 1,651 OmniDocBench pages (+0.8 layout type
   recall) with FUNSD form links unchanged (77.4%). Decision record: docs/decisions.md.
 - A page number the page read left out (common: readers skip a bare "12" in the margin) is added as a Page Number
-  block when local OCR finds one in the top or bottom tenth of the page that no block covers. OmniDocBench
+  block when the page's text layer (or, on scans and photos, local OCR) has one in the top or bottom tenth of the
+  page that no block covers. OmniDocBench
   page-number recall 72% -> 86%, layout type recall +0.5, precision unchanged.
 """
 
@@ -32,6 +33,31 @@ def _page_image(doc: Document, page: Page) -> Optional[str]:
         return None
 
 
+class _Line:
+    def __init__(self, text: str, bbox: BBox, score: float):
+        self.text, self.bbox, self.score = text, bbox, score
+
+
+def _layer_lines(page: Page) -> Optional[list]:
+    """Lines of a usable PDF text layer (words grouped by their line number), or None when there is none, so a
+    digital page never pays for OCR."""
+    words = page.words.get("pdf") if page.text_layer_usable else None
+    if not words:
+        return None
+    by: dict = {}
+    for w in words:
+        if w.bbox is not None:
+            by.setdefault(w.line, []).append(w)
+    out = []
+    for ws in by.values():
+        x0 = min(w.bbox.left for w in ws); y0 = min(w.bbox.top for w in ws)
+        x1 = max(w.bbox.left + w.bbox.width for w in ws); y1 = max(w.bbox.top + w.bbox.height for w in ws)
+        ws.sort(key=lambda w: w.bbox.left)
+        out.append(_Line(" ".join(w.text for w in ws), BBox(left=x0, top=y0, width=x1 - x0, height=y1 - y0,
+                                                              page=ws[0].bbox.page), 1.0))
+    return out
+
+
 def tidy(doc: Document, kv_min: int = 3, page_numbers: bool = True, margin: float = 0.1) -> dict:
     stats = {"kv_to_text": 0, "page_numbers_added": 0}
     from ...intake.sniff import NATIVE_KINDS
@@ -46,16 +72,18 @@ def tidy(doc: Document, kv_min: int = 3, page_numbers: bool = True, margin: floa
             stats["kv_to_text"] += len(kv)
         if not page_numbers or any(r.type == RegionType.PAGE_NUMBER for r in page.regions):
             continue
-        img = _page_image(doc, page)
-        if not img:
-            continue
-        try:
-            from ..grounding import ocr
-            if not ocr.available():
+        lines = _layer_lines(page)
+        if lines is None:  # no usable text layer: local OCR (the same cached run the citations use)
+            img = _page_image(doc, page)
+            if not img:
                 continue
-            lines = ocr.ocr_lines(img, page.index)
-        except Exception:
-            continue
+            try:
+                from ..grounding import ocr
+                if not ocr.available():
+                    continue
+                lines = ocr.ocr_lines(img, page.index)
+            except Exception:
+                continue
         boxes = [r.bbox for r in page.regions if r.bbox is not None]
         for ln in lines:
             b = ln.bbox
