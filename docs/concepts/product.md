@@ -279,7 +279,7 @@ Citations are found by code after the answer; the model doesn't write them.
   - A worked-out value is boxed on the printed words its `_from` mark names.
 - **What is never boxed.** A category (enum) value is never boxed somewhere it isn't printed, and a short repeated value is never boxed at a guess.
 - **What each citation gives.** The printed text, its box (page and position as fractions of the page) and a confidence: `high`, or `low` when the value is printed in several places.
-- **Confidence means evidence, not probability.** The tiers come from how the value was found, not from a calibrated probability (`concepts/citations.md`).
+- **Confidence means evidence, measured where we can.** The tiers come from how the value was found; extracted values' scores are measured on benchmarks, and a value that conflicts with another for the same thing is marked low (`concepts/citations.md`).
 
 ### 4.6 Review flags (`review=True`)
 

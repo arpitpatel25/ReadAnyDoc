@@ -218,7 +218,8 @@ independent evidence. Design decisions and their reasons: [docs/decisions.md](ht
 - About 1.5-3% of pages in large public benchmarks are declined by the model provider (content filtering). Those
   pages fall back to plain OCR text at `low` confidence, or to a second model if you set
   `READANYDOC_REFUSAL_READER`; the response says so in `warnings`.
-- Confidence values are tiers from how a value was found on the page, not calibrated probabilities.
+- Confidence is a tier from how a value was found on the page; for extracted values the score is measured on
+  benchmarks (10-Qs: values marked high 94% right, low 79%), not a guarantee for other document kinds.
 
 ## Documentation
 

@@ -4,6 +4,38 @@ One line per decision, with the reason, grouped by area in the order they were m
 earlier ones; the first section lists what changed for the first public release. Add a line here when you change
 the document format, a default, or a public interface.
 
+## Quality round: what competitors point at, measured one by one (2026-11-25)
+
+Eight weak spots a competitor's blog posts point at. Each change was kept only if a full benchmark set improved and
+nothing else got worse; extraction requests were held identical (replayed) so only the change moved the numbers.
+
+- **Oversized pages: kept.** Images over 50 MP or 15,000 px are shrunk to a working copy (the model reads at most
+  about 1.5 MP anyway); an image over the API's 5 MB or 8,000 px is resized before sending. The 37 OmniDocBench
+  pages that failed now parse: text edit 0.073 -> 0.050, tables (TEDS) 87.0 -> 88.1, reading order 0.162 -> 0.142.
+- **Layout labels: kept** (`pipeline/shaping/labels.py`). Key Value only on pages with 3+ of them (a bold lead-in in
+  prose is Text); a page number the read left out is added from the text layer, or local OCR on scans. All 1,651
+  OmniDocBench pages: layout recall 82.1 -> 83.4, precision 85.7 -> 86.3; FUNSD form links unchanged (77.4%); text
+  and reading order unchanged. Parse output only: extraction prompts are unchanged.
+- **Charts: kept.** Line, area and scatter series without data labels are sampled densely (25+ points). Chart
+  benchmark (58 charts): 0.71 -> 0.83, series found 79% -> 93%, value error unchanged (4.7%), about $0.001 more a chart.
+- **Calibrated confidence: kept** (`tasks/confidence.py`). The raw citation score barely predicts a wrong value
+  (10-Qs: 95% right either way). A value that conflicts with another for the same metric, period and segment is the
+  signal: 2,601 values on 16 10-Qs (XBRL) and 100 CUAD contracts, held out by document, 10-Q "high" values are
+  94.3% right and "low" 79.3% (before: 89.2% "high", almost nothing "low"). Labels are only lowered; a low label
+  that means "box may be in the wrong place" is kept.
+- **Left-out warnings on financial filings: fixed** (`tasks/coverage.py`). On 10-Qs only 8% of "may be missing"
+  warnings were real (vs XBRL). A table row is now flagged only when one list took most of that table's rows (an
+  invoice's items, not a statement read metric by metric), and words the schema gives to many lists no longer tie
+  a table to a list. Planted-miss tests unchanged.
+- **10-Q conflicting values: flagged, not deleted.** 147 of 228 conflicts are all real printed numbers (a sub-line
+  filed under the total); deleting the extras lowers values found (92.7% -> 83.4%). Accounting identities settle
+  only 10 of 228. They become "low" confidence instead.
+- **Cross-page tables: no change.** The linker re-joins 99.7% of split tables that repeat their header and 90.4%
+  without; 1,224 of 1,226 merges exact. A stricter number check lost recall.
+- **Degraded scans: no change.** Image cleanup before OCR moved olmOCR old-scans by less than run-to-run noise.
+- **Contract cross-references: no change.** On 100 CUAD contracts (86.6% recall, as before) the misses are clause
+  yes/no judgements the labels disagree with, not references to other sections.
+
 ## Left-out values are warned by default (2026-11-20)
 
 - `printed_but_empty` and `row_not_extracted` go into `warnings` on every extraction, not only with `review`:
