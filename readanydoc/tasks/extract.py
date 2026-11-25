@@ -2070,6 +2070,8 @@ def run(document: Any, config: dict, *, llm: LLM, options: Optional[dict] = None
             trace.event("citation_marks", objects=len(hints), with_block=sum(1 for m in hints.values() if m.get("block")),
                         with_from=sum(1 for m in hints.values() if m.get("from")))
             cites = code_citations(value, ex, cit_cfg, hints)
+        from . import confidence as CF
+        cites = CF.calibrate(value, cites)
     result: Any = (S.map_leaves(value, ex.strict, lambda path, v, s: {"value": v, "citations": cites.get(path, [])})
                    if citations_on else [value])
     extra_out: dict = {}

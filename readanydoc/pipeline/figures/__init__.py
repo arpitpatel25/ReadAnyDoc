@@ -58,6 +58,9 @@ CHART_PROMPT = (
     '"series": [{"label": str, "type": "bar|line|area|pie|scatter", "corresponding_y": "primary|secondary", '
     '"color": "#rrggbb"|null, "data": [{"x": str, "value": number|null}]}], "estimated": true|false}\n'
     "For a pie chart use one series whose data points are the slices. Use null for a value you cannot read. "
+    "A line, area or scatter series without printed data labels: sample it densely so the shape can be redrawn "
+    "from your points: a point at every x tick, at every peak, trough and crossing, and at even steps in between, "
+    "at least 25 points per line or area series; for a scatter, every visible point. "
     '"estimated" is true when values were read off the axis rather than from printed labels. '
     'If the image is not a data chart (a logo, a photo, a diagram, a seal), return {"is_chart": false}.')
 DESCRIBE_SYSTEM = ("You look at one figure cut from a document page and answer the instruction about it. "

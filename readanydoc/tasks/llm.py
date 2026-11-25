@@ -70,6 +70,8 @@ def pdf_mark(data: bytes) -> str:
 
 def image_mark(images: list[bytes]) -> str:
     """A placeholder for page images (a scan or photo), sent as image blocks in page order."""
+    from ..readers.base import fit_for_api
+    images = [fit_for_api(b) for b in images]
     blocks = [{"type": "image", "source": {"type": "base64", "media_type": _media_type(b),
                                            "data": base64.standard_b64encode(b).decode("ascii")}} for b in images]
     return _mark(blocks, b"".join(images))
@@ -570,6 +572,8 @@ class AnthropicAPILLM(LLM):
         content: list[dict] = []
         for img in images or []:
             data = img if isinstance(img, bytes) else Path(img).read_bytes()
+            from ..readers.base import fit_for_api
+            data = fit_for_api(data)
             content.append({"type": "image", "source": {"type": "base64", "media_type": _media_type(data),
                                                         "data": base64.standard_b64encode(data).decode("ascii")}})
         pdf = PDF_MARK.search(user)

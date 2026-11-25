@@ -20,7 +20,7 @@ from .. import replay
 from ..model import RegionType
 from . import prompts
 from .base import (ImageInput, ReadContext, Reader, ReaderError, ReadResult, Usage, image_bytes,
-                   media_type, strip_code_fence)
+                   media_type, strip_code_fence, fit_for_api)
 
 MODELS = {"haiku": "claude-haiku-5-5", "sonnet": "claude-sonnet-5-5", "opus": "claude-opus-5-5"}
 # USD per 1M tokens (input, output); used only for cost estimates in Usage.
@@ -82,6 +82,7 @@ class AnthropicAPIReader(Reader):
         self._client = client or replay.client(timeout)
 
     def build_request(self, data: bytes, prompt: str, max_tokens: int) -> dict:
+        data = fit_for_api(data)
         body: dict = {
             "model": self.model,
             "max_tokens": max_tokens,
