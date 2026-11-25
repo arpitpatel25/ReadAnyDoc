@@ -94,7 +94,7 @@ def run(cases: list[dict], systems: list[System], out: str, budget_usd: Optional
         rec = {"case": c["id"], "system": s.name, "file": c["file"], "pages": pages_of(c["file"]),
                "meta": c.get("meta") or {}, **r}
         if c.get("gold") is not None:
-            rec["score"] = grade.score(c["gold"], r.get("data"), c.get("alternatives"), c.get("only"))
+            rec["score"] = grade.score_case(c, r.get("data"))
         rec["citation_check"] = citation_check(c, r)
         dest.write_text(json.dumps(rec, default=str))
         if on_done:
@@ -144,5 +144,25 @@ def summarize(out: str, cases: list[dict], systems: list[System]) -> dict:
             row["values_with_citation"] = sum(x["with_box"] for x in cc) / v if v else None
             wb = sum(x["with_box"] for x in cc)
             row["citations_showing_value"] = sum(x["box_shows_value"] for x in cc) / wb if wb else None
+        conf = confidence_check(scored)
+        if conf:
+            row["confidence_check"] = conf
         res["systems"][s.name] = row
     return res
+
+
+def confidence_check(recs: list[dict]) -> Optional[dict]:
+    """How often values labelled high and low were right (answer-key values with a citation label). A useful
+    label has "high" right more often than "low"; a code change that breaks that shows up here."""
+    st = {"high": [0, 0], "low": [0, 0]}
+    for r in recs:
+        cites = r.get("citations") or {}
+        for f in (r.get("score") or {}).get("fields") or []:
+            cs = cites.get(f.get("path")) or []
+            lab = cs[0].get("confidence") if cs and isinstance(cs[0], dict) else None
+            if lab in st and f.get("got") is not None:
+                st[lab][0] += 1
+                st[lab][1] += bool(f.get("ok"))
+    if not any(n for n, _ in st.values()):
+        return None
+    return {f"{k}_values": n for k, (n, _) in st.items()} | {f"{k}_right": (ok / n if n else None) for k, (n, ok) in st.items()}

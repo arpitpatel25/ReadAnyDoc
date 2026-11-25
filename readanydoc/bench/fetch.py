@@ -21,12 +21,12 @@ def root() -> Path:
     return d
 
 
-def _get(url: str, dest: Path) -> Path:
+def _get(url: str, dest: Path, headers: Optional[dict] = None) -> Path:
     if dest.exists() and dest.stat().st_size > 0:
         return dest
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(dest.suffix + ".part")
-    with httpx.stream("GET", url, follow_redirects=True, timeout=300) as r:
+    with httpx.stream("GET", url, follow_redirects=True, timeout=300, headers=headers) as r:
         r.raise_for_status()
         with open(tmp, "wb") as f:
             for chunk in r.iter_bytes():
@@ -98,3 +98,12 @@ def hf_rows_one(repo: str, split: str, idx: int, config: str = "default") -> dic
     r = httpx.get(url, timeout=120)
     r.raise_for_status()
     return r.json()["rows"][0]["row"]
+
+
+def sec_companyfacts(cik: int) -> dict:
+    """A company's XBRL facts from the SEC's data API (public domain). The SEC asks automated clients to name
+    themselves in the User-Agent; set READANYDOC_SEC_USER_AGENT to add your contact."""
+    ua = os.environ.get("READANYDOC_SEC_USER_AGENT") or "ReadAnyDoc-benchmark/0.1 (open-source research)"
+    p = _get(f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik:010d}.json",
+             root() / "sec" / f"CIK{cik:010d}.json", headers={"User-Agent": ua})
+    return json.loads(p.read_text())

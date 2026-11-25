@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.9 (2026-11-25)
+
+- `readanydoc bench run sec-filings`: 16 companies' 10-Qs checked against the numbers each company tagged in its SEC
+  filing (XBRL), so the answer key needs no hand labels. Scored by code (`readanydoc/bench/sec.py`): tagged values
+  found, and extracted values the company also tagged. 0.4.8 scores 93.9% found, 89.2% right.
+- `--replay DIR` and `--replay-only` on `readanydoc bench`: re-test a code change on the same model answers, paying
+  only for calls whose request changed, or nothing at all.
+- Bench reports show how often values labelled high and low confidence were right.
+- `research/benchmarks/charts.py`: ChartParse-Bench (58 charts) run and scored in one script.
+
 ## 0.4.8 (2026-11-25)
 
 - Very large page images (over 50 MP or 15,000 px, and any image the API would refuse) are shrunk before reading

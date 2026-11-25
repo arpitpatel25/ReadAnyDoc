@@ -252,3 +252,11 @@ def schema_errors(data: Any, schema: Any, nulls_ok: bool = False) -> list[str]:
     for e in cls(schema).iter_errors(data):
         out.append(("/".join(str(p) for p in e.absolute_path) or "(root)") + ": " + e.message[:160])
     return out
+
+
+def score_case(case: dict, pred: Any) -> dict:
+    """A case's own scorer when it names one (``"scorer": "sec"``), else ``score``."""
+    if case.get("scorer") == "sec":
+        from . import sec
+        return sec.score(case["gold"], pred)
+    return score(case["gold"], pred, case.get("alternatives"), case.get("only"))
