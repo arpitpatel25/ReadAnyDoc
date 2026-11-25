@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.8 (2026-11-25)
+
+- Very large page images (over 50 MP or 15,000 px, and any image the API would refuse) are shrunk before reading
+  instead of failing. OmniDocBench (1,651 pages): text error 0.073 -> 0.050, tables (TEDS) 87.0 -> 88.1, reading-order
+  error 0.162 -> 0.142, now ahead of Reducto on all three.
+- Block labels tidied after reading, no model call: Key Value only on form-like pages (3+ of them), page numbers the
+  read left out added from the text layer (or local OCR on scans), picture captions in Chinese recognised as figures.
+  OmniDocBench layout: block types right 82.1 -> 83.4 (Reducto 84.6), precision 85.7 -> 86.3; forms unchanged.
+- Charts: line, area and scatter series without data labels are sampled densely. Chart benchmark (58 charts): score
+  0.71 -> 0.83, series found 79% -> 93%, value error unchanged.
+- Extraction confidence is measured: a number that disagrees with another value for the same thing (same metric,
+  period, segment) is marked `low`, and `extract_confidence` is the share of such values that were right on the
+  benchmarks. 10-Qs: values marked high 94.5% right, low 78.0% (before: nearly all high, 89.2%). Labels are only
+  ever lowered. Extracted values themselves are unchanged.
+- Tested and not changed: cross-page tables, degraded scans, contract cross-references, removing conflicting
+  10-Q values. Details in `docs/decisions.md`.
+
 ## 0.4.7 (2026-11-22)
 
 - Running page headers, footers, page numbers and margin line numbers are labelled by the page read itself in the

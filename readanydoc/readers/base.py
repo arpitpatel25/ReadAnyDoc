@@ -104,6 +104,38 @@ def image_bytes(image: ImageInput) -> bytes:
     return Path(image).read_bytes()
 
 
+API_MAX_BYTES = 5 * 1024 * 1024  # the API refuses images over 10 MB (base64) or 8,000 px a side; keep a margin
+API_MAX_SIDE = 8000
+
+
+def fit_for_api(data: bytes) -> bytes:
+    """``data`` unchanged when the API accepts it; otherwise the image at the largest size the model keeps
+    (``sizing.native_size``: Claude reads at most 2,576 px a side), as PNG, or JPEG if PNG is still too big.
+    Only images the API would refuse are touched, so every other request stays byte-for-byte the same."""
+    if len(data) <= API_MAX_BYTES:
+        try:
+            from PIL import Image
+            import io
+            with Image.open(io.BytesIO(data)) as im:
+                if max(im.size) <= API_MAX_SIDE:
+                    return data
+        except Exception:
+            return data
+    from PIL import Image
+    import io
+    from .sizing import native_size
+    Image.MAX_IMAGE_PIXELS = max(Image.MAX_IMAGE_PIXELS or 0, 200_000_000)
+    with Image.open(io.BytesIO(data)) as im:
+        im = im.convert("RGB")
+        im = im.resize(native_size(*im.size), Image.LANCZOS)
+        buf = io.BytesIO()
+        im.save(buf, "PNG", optimize=True)
+        if buf.tell() > API_MAX_BYTES:
+            buf = io.BytesIO()
+            im.save(buf, "JPEG", quality=92)
+        return buf.getvalue()
+
+
 def media_type(data: bytes) -> str:
     if data[:8] == b"\x89PNG\r\n\x1a\n":
         return "image/png"

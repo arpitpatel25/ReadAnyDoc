@@ -46,5 +46,10 @@ Rules ReadAnyDoc follows:
 ## Confidence
 
 Confidence is a tier, `high` or `low`, from how a value was found: agreement between independent reads, a match in
-the PDF's own text, a checked total. It is **not** a calibrated probability. Use it to decide what a person should
-look at first, not as a percentage.
+the PDF's own text, a checked total. Use it to decide what a person should look at first.
+
+For extracted values, `granular_confidence.extract_confidence` is also measured: for the common cases it is the
+share of such values that were right on our benchmarks (16 10-Q filings checked against their XBRL facts, 100 CUAD
+contracts). A number that disagrees with another value for the same thing (same metric, period and segment) is
+marked `low`: on 10-Qs those are right about 79% of the time, against 94% for values marked `high`. It is a guide
+measured on these document kinds, not a guarantee for yours.

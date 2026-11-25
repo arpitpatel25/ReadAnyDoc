@@ -38,6 +38,10 @@ _NOT_FIGURE = re.compile(r"^\W*(illegible|signature|signed|redacted|blank|x| )\W
 _FIGURE_WORD = re.compile(r"\b(logo|figure|image|photo|picture|chart|graph|diagram|illustration|seal|emblem|"
                           r"icon|qr code|barcode|map|drawing|plot|stamp|crest|coat of arms)\b", re.I)
 
+# the same in Chinese: "[图：两名工作人员…]", "*图片：…*" (the reader describes pictures in the page's language)
+_CJK_FIGURE_WORD = re.compile(r"(图片|照片|插图|示意图|图像|图表|图示|配图|徽标|标志|印章|二维码|条形码|地图|^\W*图\s*[：:])")
+_CJK_LEAD = re.compile(r"^\s*[*_]?\s*\[?\s*(图片|照片|插图|示意图|图像|图表|图)\s*[：:]")
+
 _DESCRIBES = re.compile(r"\b(pie|bar|line|stacked|area|scatter)?\s*(charts?|graphs?|diagrams?|plots?|maps?|"
                         r"illustrations?|photographs?|photos?|logos?)\s+(shows?|showing|of|depicts?|depicting|"
                         r"displays?|illustrates?|compares?|plots?)\b", re.I)
@@ -54,6 +58,9 @@ CHART_PROMPT = (
     '"series": [{"label": str, "type": "bar|line|area|pie|scatter", "corresponding_y": "primary|secondary", '
     '"color": "#rrggbb"|null, "data": [{"x": str, "value": number|null}]}], "estimated": true|false}\n'
     "For a pie chart use one series whose data points are the slices. Use null for a value you cannot read. "
+    "A line, area or scatter series without printed data labels: sample it densely so the shape can be redrawn "
+    "from your points: a point at every x tick, at every peak, trough and crossing, and at even steps in between, "
+    "at least 25 points per line or area series; for a scatter, every visible point. "
     '"estimated" is true when values were read off the axis rather than from printed labels. '
     'If the image is not a data chart (a logo, a photo, a diagram, a seal), return {"is_chart": false}.')
 DESCRIBE_SYSTEM = ("You look at one figure cut from a document page and answer the instruction about it. "
@@ -82,7 +89,9 @@ def is_figure(region: Region) -> bool:
     c = region.content
     if _PLACEHOLDER.match(c):
         inner = c.strip().strip("*_").strip("[]")
-        return not _NOT_FIGURE.match(inner) and bool(_FIGURE_WORD.search(inner))
+        return not _NOT_FIGURE.match(inner) and bool(_FIGURE_WORD.search(inner) or _CJK_FIGURE_WORD.search(inner))
+    if _CJK_LEAD.match(c):
+        return True
     # the reader's one-line description of a drawing, written as a whole block in italics
     return region.type == RegionType.TEXT and bool(_ITALIC_LINE.match(c)) and bool(_DESCRIBES.search(c))
 

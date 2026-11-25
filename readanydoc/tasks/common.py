@@ -52,6 +52,8 @@ class DocView:
             for p in d.pages:
                 pref = PageRef(number=len(self.pages) + 1, page=p, doc=d)
                 for r in sorted(p.regions, key=lambda r: r.order):
+                    if r.meta.get("added_by") == "page_number_from_ocr":  # parse output only (shaping/labels.py)
+                        continue
                     n += 1
                     ref = RegionRef(label=f"r{n}", region=r, page=pref)
                     pref.regions.append(ref)
@@ -179,7 +181,9 @@ def render_pages(pages: Sequence[PageRef], *, labels: bool = True, truncate_tabl
                 continue
             if truncate_tables and r.type == RegionType.TABLE:
                 content = truncate_table(content)
-            blocks.append(f"[{ref.label}|{r.type.value}] {content}" if labels else content)
+            # the type the page read gave; the parse output's label tidying (shaping/labels.py) does not reach prompts
+            kind = r.meta.get("type_before_labels") or r.type.value
+            blocks.append(f"[{ref.label}|{kind}] {content}" if labels else content)
         if max_chars_per_page is not None and sum(len(b) for b in blocks) > max_chars_per_page:
             # over budget: keep the head and the tail of the page (titles are at the top; totals, signatures
             # and holder / addressee blocks are at the bottom) and drop the middle

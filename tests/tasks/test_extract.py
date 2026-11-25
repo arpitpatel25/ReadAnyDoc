@@ -202,7 +202,7 @@ def test_citations_wrap_every_leaf_and_result_is_an_object(invoice_doc):
     assert set(c) == {"type", "content", "bbox", "confidence", "granular_confidence", "parentBlock",
                       "image_url", "chart_data", "extra"}  # the keys of a citation in Reducto's real responses
     assert c["type"] == "Text" and c["content"] == "1,575.00" and c["confidence"] == "high"
-    assert c["granular_confidence"] == {"extract_confidence": 0.95, "parse_confidence": 0.97}
+    assert c["granular_confidence"] == {"extract_confidence": 0.925, "parse_confidence": 0.97}  # calibrated (tasks/confidence.py)
     assert c["parentBlock"]["content"] == "Total Due: $1,575.00" and c["parentBlock"]["type"] == "Text"
     assert c["bbox"]["page"] == 1 and c["bbox"]["original_page"] == 1
 
@@ -244,7 +244,7 @@ def test_no_citation_is_ever_fabricated(invoice_doc):
     assert [c["confidence"] for c in res["po_number"]["citations"]] == ["low"]
     (c,) = res["invoice_number"]["citations"]
     assert c["content"] == "INV-2041"
-    assert c["confidence"] == "high" and c["granular_confidence"]["extract_confidence"] == 0.95  # printed once
+    assert c["confidence"] == "high" and c["granular_confidence"]["extract_confidence"] == 0.925  # printed once (0.95), calibrated
 
 
 def test_citation_options_bbox_only_and_no_numeric_confidence(invoice_doc):
@@ -527,7 +527,7 @@ def test_repeated_values_in_a_table_are_cited_in_their_own_row():
                             if abs(w.bbox.left - c["bbox"]["left"]) < 1e-3)
     assert starts(ann["dept"]["citations"][0]) < table.index("Bob") < starts(bob["dept"]["citations"][0])
     assert starts(ann["bonus"]["citations"][0]) < table.index("Bob") < starts(bob["bonus"]["citations"][0])
-    assert bob["dept"]["citations"][0]["granular_confidence"]["extract_confidence"] == 0.9  # placed by its row
+    assert bob["dept"]["citations"][0]["granular_confidence"]["extract_confidence"] == 0.954  # placed by its row (0.9), calibrated
 
 
 def test_page_range_refers_to_source_pages_even_on_a_pre_filtered_document():

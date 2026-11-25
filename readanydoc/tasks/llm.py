@@ -37,6 +37,7 @@ from typing import Any, Callable, Optional, Sequence, Union
 
 import httpx
 
+from .. import replay
 from .. import trace
 
 MODELS = {"haiku": "claude-haiku-5-5", "sonnet": "claude-sonnet-5-5", "opus": "claude-opus-5-5"}
@@ -69,6 +70,8 @@ def pdf_mark(data: bytes) -> str:
 
 def image_mark(images: list[bytes]) -> str:
     """A placeholder for page images (a scan or photo), sent as image blocks in page order."""
+    from ..readers.base import fit_for_api
+    images = [fit_for_api(b) for b in images]
     blocks = [{"type": "image", "source": {"type": "base64", "media_type": _media_type(b),
                                            "data": base64.standard_b64encode(b).decode("ascii")}} for b in images]
     return _mark(blocks, b"".join(images))
@@ -505,7 +508,7 @@ class AnthropicAPILLM(LLM):
         self.structured_outputs = structured_outputs
         self._rejected_formats: set[str] = set()  # schemas the API refused to compile: sent without a format
         self._accepted_formats: set[str] = set()  # schemas the API compiled (format_ok)
-        self._client = client or httpx.Client(timeout=timeout)
+        self._client = client or replay.client(timeout)
 
     def max_output(self) -> int:
         """The model's output allowance from its public limits (MAX_OUTPUT when the model is not listed)."""
@@ -569,6 +572,8 @@ class AnthropicAPILLM(LLM):
         content: list[dict] = []
         for img in images or []:
             data = img if isinstance(img, bytes) else Path(img).read_bytes()
+            from ..readers.base import fit_for_api
+            data = fit_for_api(data)
             content.append({"type": "image", "source": {"type": "base64", "media_type": _media_type(data),
                                                         "data": base64.standard_b64encode(data).decode("ascii")}})
         pdf = PDF_MARK.search(user)
@@ -699,7 +704,7 @@ class OpenAILLM(LLM):
         self.api_key_env = api_key_env
         self.token_field = token_field
         self.extra = dict(extra or {})
-        self._client = client or httpx.Client(timeout=timeout)
+        self._client = client or replay.client(timeout)
 
     def output_format(self, json_schema: Optional[dict]) -> Optional[dict]:
         if json_schema is None or not self.structured_outputs:

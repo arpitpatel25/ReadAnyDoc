@@ -96,6 +96,8 @@ class Citation(BaseModel):
     content: str
     bbox: Optional[BoundingBox] = None
     confidence: Optional[str] = None
+    score: Optional[float] = Field(default=None, description="how likely the value is right, 0-1 (the API's "
+                                   "granular_confidence.extract_confidence)")
 
 
 class ExtractResult(BaseModel):
@@ -318,7 +320,8 @@ def _unwrap(value: Any, with_citations: bool, path: str = "") -> tuple[Any, dict
     citations (keyed by field path)."""
     cites: dict[str, list[Citation]] = {}
     if isinstance(value, dict) and with_citations and set(value) <= {"value", "citations"} and "value" in value:
-        found = [Citation(content=c.get("content") or "", bbox=_bbox(c.get("bbox")), confidence=c.get("confidence"))
+        found = [Citation(content=c.get("content") or "", bbox=_bbox(c.get("bbox")), confidence=c.get("confidence"),
+                          score=(c.get("granular_confidence") or {}).get("extract_confidence"))
                  for c in value.get("citations") or []]
         if found:
             cites[path] = found
