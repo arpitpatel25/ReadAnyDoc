@@ -23,10 +23,11 @@ nothing else got worse; extraction requests were held identical (replayed) so on
   signal: 2,601 values on 16 10-Qs (XBRL) and 100 CUAD contracts, held out by document, 10-Q "high" values are
   94.3% right and "low" 79.3% (before: 89.2% "high", almost nothing "low"). Labels are only lowered; a low label
   that means "box may be in the wrong place" is kept.
-- **Left-out warnings on financial filings: fixed** (`tasks/coverage.py`). On 10-Qs only 8% of "may be missing"
-  warnings were real (vs XBRL). A table row is now flagged only when one list took most of that table's rows (an
-  invoice's items, not a statement read metric by metric), and words the schema gives to many lists no longer tie
-  a table to a list. Planted-miss tests unchanged.
+- **Left-out warnings on financial filings: no change yet.** On 10-Qs only 8% of "may be missing" warnings point at
+  a value the filing tagged and the output lacks (10 of 120), about 13 a filing. Two code fixes were tried (ignore
+  words many lists share; flag a table row only when one list owns the table): warnings fell 207 -> 168 but caught
+  fewer real misses (37% -> 22%), so both were reverted. Most of the noise is the row rule on statements read
+  metric by metric; still open.
 - **10-Q conflicting values: flagged, not deleted.** 147 of 228 conflicts are all real printed numbers (a sub-line
   filed under the total); deleting the extras lowers values found (92.7% -> 83.4%). Accounting identities settle
   only 10 of 228. They become "low" confidence instead.

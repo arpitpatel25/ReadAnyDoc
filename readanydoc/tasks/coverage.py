@@ -392,13 +392,6 @@ def check(value: Any, schema: Any, pages: list[dict]) -> list[dict]:
     # A. printed_but_empty: the most specific empty field whose words the free label shares
     empty = _empty_fields(value, schema)
     lists_ = _list_paths(schema)
-    # A word the schema gives to many lists ("period", "segment" on every metric of a financial schema) cannot tell
-    # one list's table from another's: it does not count when a table is matched to a list.
-    df: dict[str, int] = {}
-    for f in lists_:
-        for w in words.get(f, set()):
-            df[w] = df.get(w, 0) + 1
-    common = {w for w, n in df.items() if n > max(2, len(lists_) // 5)}
     flagged_tables: set = set()
     for p in free:
         if p.kind == "row" and (p.table in flagged_tables or not p.label):
@@ -411,8 +404,6 @@ def check(value: Any, schema: Any, pages: list[dict]) -> list[dict]:
                 continue  # a table's rows are the items of a list, never one single value
             fw = words.get(f, set())
             own = _words(f.rsplit(".", 1)[-1], _BASIC)
-            if p.kind == "row":
-                fw, own = fw - common, own - common
             hit = len(lw & fw) + len(_words(p.label, _BASIC) & own)  # the field's own name counts twice, and
             # there a common word ("Total", "Date") counts: the field is empty and is named exactly that
             if lw and not lw & (fw | own) and not (shape in ("email", "url", "phone") and shape in own):
@@ -444,11 +435,8 @@ def check(value: Any, schema: Any, pages: list[dict]) -> list[dict]:
         took = [r for r in rows if taken[id(r)]]
         if not took or len(took) == len(rows) or (len(took) < 2 and len(rows) > 3):
             continue  # one row matching by chance in a long table says nothing about that table
-        per = [(path, sum(u.took_row(r.value.split(" | ")) for r in took)) for path, u in lists_out]
-        owner, n_own = max(per, key=lambda x: x[1], default=(None, 0))
-        if n_own < 1 or n_own * 3 < len(took) * 2:
-            continue  # the taken rows went to different fields (a financial statement read metric by metric):
-            # the table is not one list's items, so a row nobody took is one the schema did not ask for
+        owner = max(lists_out, key=lambda kv: sum(kv[1].took_row(r.value.split(" | ")) for r in took),
+                    default=(None, None))[0]
         for r in rows:
             if r not in took:
                 out.append({"field": owner, "flag": "row_not_extracted",
