@@ -182,6 +182,7 @@ class Reducto(System):
 def _box(c: dict) -> dict:
     b = c.get("bbox") or {}
     return {"content": c.get("content"), "confidence": c.get("confidence"),
+            "granular": c.get("granular_confidence"), "parent_type": (c.get("parentBlock") or {}).get("type"),
             "bbox": {k: b.get(k) for k in ("page", "left", "top", "width", "height")} if b else None}
 
 

@@ -36,6 +36,9 @@ from .shaping.page_range import PageRangeError, resolve_page_range
 
 MAX_IMAGE_PIXELS = 50_000_000  # Reducto: images up to 50 MP / 15,000 px per side
 MAX_IMAGE_SIDE = 15_000
+# Larger images are shrunk to fit the limits above (a working copy; positions are fractions of the page, so they hold
+# for the original). Beyond this they are refused: decoding them would take gigabytes of memory.
+HARD_IMAGE_PIXELS = 400_000_000
 NATIVE_KEY = "_native_pages"
 
 
@@ -216,6 +219,8 @@ class Intake(Stage):
     # ---- images ----
     def _image(self, doc: Document, path: Path, opts: Options) -> None:
         from PIL import Image
+        if (Image.MAX_IMAGE_PIXELS or 0) < HARD_IMAGE_PIXELS // 2:  # Pillow refuses at twice this value
+            Image.MAX_IMAGE_PIXELS = HARD_IMAGE_PIXELS // 2
         try:
             im = Image.open(path)
         except Exception as e:
@@ -231,13 +236,25 @@ class Intake(Stage):
             for n in wanted:
                 im.seek(n - 1)
                 w, h = im.size
-                if w * h > MAX_IMAGE_PIXELS or max(w, h) > MAX_IMAGE_SIDE:
-                    raise IntakeError(f"image of {w}x{h} px is not supported: the limit is 50 megapixels and "
-                                      f"{MAX_IMAGE_SIDE} px per side")
-                page = Page(index=len(doc.pages), original_page=n, width=float(w), height=float(h), unit="px")
+                if w * h > HARD_IMAGE_PIXELS:
+                    raise IntakeError(f"image of {w}x{h} px is not supported: the limit is "
+                                      f"{HARD_IMAGE_PIXELS // 1_000_000} megapixels")
                 dpi = im.info.get("dpi", (150, 150))[0] or 150
+                shrunk = None
+                if w * h > MAX_IMAGE_PIXELS or max(w, h) > MAX_IMAGE_SIDE:
+                    s = min((MAX_IMAGE_PIXELS / (w * h)) ** 0.5, MAX_IMAGE_SIDE / max(w, h)) * 0.999
+                    shrunk = im.convert("RGB").resize((max(int(w * s), 1), max(int(h * s), 1)), Image.LANCZOS)
+                    doc.note(self.name, f"page {n}: image of {w}x{h} px shrunk to {shrunk.width}x{shrunk.height} px "
+                                        f"(limit 50 megapixels, {MAX_IMAGE_SIDE} px per side)")
+                    w, h, dpi = shrunk.width, shrunk.height, float(dpi) * s
+                page = Page(index=len(doc.pages), original_page=n, width=float(w), height=float(h), unit="px")
                 key = str(int(round(float(dpi))))
-                if frames == 1 and (im.format or "").upper() in ("PNG", "JPEG", "GIF", "WEBP"):
+                if shrunk is not None:
+                    out = paths.cache_dir() / "renders" / f"{doc.id}_f{n}_fit.png"
+                    out.parent.mkdir(parents=True, exist_ok=True)
+                    shrunk.save(out)
+                    page.renders[key] = str(out)
+                elif frames == 1 and (im.format or "").upper() in ("PNG", "JPEG", "GIF", "WEBP"):
                     page.renders[key] = str(path)
                 elif self.opt("save_frames", True):  # readers need one image file per page
                     out = paths.cache_dir() / "renders" / f"{doc.id}_f{n}.png"

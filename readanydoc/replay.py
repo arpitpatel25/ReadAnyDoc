@@ -78,7 +78,9 @@ class ReplayTransport(httpx.BaseTransport):
             with _LOCK, open(self.dir / "live.jsonl", "a") as log:
                 log.write(json.dumps({"t": time.time(), "key": key, "path": request.url.path, "model": model,
                                       "usage": usage}) + "\n")
-        return httpx.Response(resp.status_code, headers=resp.headers, content=resp.content, request=request)
+        headers = {k: v for k, v in resp.headers.items()
+                   if k.lower() not in ("content-encoding", "content-length", "transfer-encoding")}
+        return httpx.Response(resp.status_code, headers=headers, content=resp.content, request=request)
 
 
 def client(timeout: float) -> httpx.Client:

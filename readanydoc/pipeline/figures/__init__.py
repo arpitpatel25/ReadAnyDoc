@@ -38,6 +38,10 @@ _NOT_FIGURE = re.compile(r"^\W*(illegible|signature|signed|redacted|blank|x| )\W
 _FIGURE_WORD = re.compile(r"\b(logo|figure|image|photo|picture|chart|graph|diagram|illustration|seal|emblem|"
                           r"icon|qr code|barcode|map|drawing|plot|stamp|crest|coat of arms)\b", re.I)
 
+# the same in Chinese: "[图：两名工作人员…]", "*图片：…*" (the reader describes pictures in the page's language)
+_CJK_FIGURE_WORD = re.compile(r"(图片|照片|插图|示意图|图像|图表|图示|配图|徽标|标志|印章|二维码|条形码|地图|^\W*图\s*[：:])")
+_CJK_LEAD = re.compile(r"^\s*[*_]?\s*\[?\s*(图片|照片|插图|示意图|图像|图表|图)\s*[：:]")
+
 _DESCRIBES = re.compile(r"\b(pie|bar|line|stacked|area|scatter)?\s*(charts?|graphs?|diagrams?|plots?|maps?|"
                         r"illustrations?|photographs?|photos?|logos?)\s+(shows?|showing|of|depicts?|depicting|"
                         r"displays?|illustrates?|compares?|plots?)\b", re.I)
@@ -82,7 +86,9 @@ def is_figure(region: Region) -> bool:
     c = region.content
     if _PLACEHOLDER.match(c):
         inner = c.strip().strip("*_").strip("[]")
-        return not _NOT_FIGURE.match(inner) and bool(_FIGURE_WORD.search(inner))
+        return not _NOT_FIGURE.match(inner) and bool(_FIGURE_WORD.search(inner) or _CJK_FIGURE_WORD.search(inner))
+    if _CJK_LEAD.match(c):
+        return True
     # the reader's one-line description of a drawing, written as a whole block in italics
     return region.type == RegionType.TEXT and bool(_ITALIC_LINE.match(c)) and bool(_DESCRIBES.search(c))
 

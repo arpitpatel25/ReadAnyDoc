@@ -177,6 +177,10 @@ class Shape(Stage):
                      "warning")
             opts.table_output_format = "dynamic"
         request = self.opt("request") or {}
+        if self.opt("labels", True):
+            from .shaping import labels
+            doc.meta["labels"] = labels.tidy(doc, kv_min=int(self.opt("labels_kv_min", 3)),
+                                             page_numbers=bool(self.opt("labels_page_numbers", True)))
         from . import figures
         if self.opt("figures", True):
             try:
