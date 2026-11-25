@@ -3,7 +3,7 @@
 Use it as a library (``readanydoc.parse``, ``readanydoc.extract``) or run the server (``readanydoc serve``).
 """
 
-__version__ = "0.4.8"
+__version__ = "0.4.9"
 
 from .library import (Block, BoundingBox, Citation, ExtractResult, ParseResult, Usage,  # noqa: E402
                       extract, parse)

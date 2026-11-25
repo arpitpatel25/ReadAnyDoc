@@ -151,6 +151,15 @@ def _bench(args: argparse.Namespace) -> int:
         print(f"Report: {summary['report']}")
         return 0
     specs = [s.strip() for s in args.systems.split(",") if s.strip()] if args.systems else None
+    if getattr(args, "replay_only", False) and not args.replay:
+        print("--replay-only needs --replay DIR (the recorded calls)")
+        return 2
+    if getattr(args, "replay", None):
+        import os
+        os.environ["READANYDOC_REPLAY_DIR"] = os.path.abspath(args.replay)
+        if args.replay_only:
+            os.environ["READANYDOC_REPLAY_ONLY"] = "1"
+            args.budget = None  # nothing can be spent; reported costs are the recorded calls' costs
     if args.bench_cmd == "run":
         plan = bench.prepare(args.set, specs, args.limit, args.out)
     else:
@@ -187,6 +196,14 @@ def _bench(args: argparse.Namespace) -> int:
             rec += f"schema valid {100 * r['schema_valid']:.0f}%  "
         print(f"{name:28} {rec}cost/doc ${r.get('cost_per_document_usd') or 0:.4f}  median {r.get('median_seconds')} s  "
               f"failed {r.get('failed', 0)}")
+        cc = r.get("confidence_check")
+        if cc and cc.get("high_right") is not None and cc.get("low_right") is not None:
+            print(f"{'':28} confidence: high {100 * cc['high_right']:.1f}% right ({cc['high_values']}), "
+                  f"low {100 * cc['low_right']:.1f}% right ({cc['low_values']})")
+    if getattr(args, "replay", None):
+        from . import replay
+        print(f"replay: {replay.STATS['hits']} calls answered from {args.replay}, {replay.STATS['live']} sent to the API"
+              " (costs above include recorded calls; real spend is in live.jsonl)")
     if summary.get("stopped_by_budget"):
         print("Stopped early: the budget was reached.")
     print(f"\nReport: {summary['report']}")
@@ -263,6 +280,10 @@ def main(argv: list[str] | None = None) -> int:
         q.add_argument("--out", help="results folder (default: ./readanydoc-bench/<set>-<time>)")
         q.add_argument("--fresh", action="store_true", help="run documents again even if results exist")
         q.add_argument("--yes", action="store_true", help="do not ask before spending")
+        q.add_argument("--replay", metavar="DIR", help="record every model call in DIR and answer repeats from it: "
+                                                       "re-test a code change and pay only for calls that changed")
+        q.add_argument("--replay-only", action="store_true", help="with --replay: refuse calls not recorded "
+                                                                  "(a run that cannot spend anything)")
     rs = bs.add_parser("rescore", help="score a finished run again and rewrite its report (no model call)")
     rs.add_argument("out", help="the results folder of a run")
     b.set_defaults(fn=_bench)

@@ -51,14 +51,20 @@ def _eb_strip(n: Any) -> Any:
     return n
 
 
+def _eb_schema(folder: str) -> dict:
+    tree = fetch.github_tree(EB_REPO, EB_REV)
+    schema_path = next(p for p in tree if p.startswith(f"dataset/{folder}/") and p.endswith("-schema.json"))
+    schema = json.loads(fetch.github_file(EB_REPO, EB_REV, schema_path).read_text())
+    if "schema_definition" in schema and "type" not in schema:
+        schema = schema["schema_definition"]
+    return schema
+
+
 def _extractbench(folder: str) -> Callable[[Optional[int]], list[dict]]:
     def load(limit: Optional[int]) -> list[dict]:
         tree = fetch.github_tree(EB_REPO, EB_REV)
         base = f"dataset/{folder}/"
-        schema_path = next(p for p in tree if p.startswith(base) and p.endswith("-schema.json"))
-        schema = json.loads(fetch.github_file(EB_REPO, EB_REV, schema_path).read_text())
-        if "schema_definition" in schema and "type" not in schema:
-            schema = schema["schema_definition"]
+        schema = _eb_schema(folder)
         pdfs = sorted(p for p in tree if p.startswith(base + "pdf+gold/") and p.endswith(".pdf")
                       and p[:-4] + ".gold.json" in tree)
         out = []
@@ -313,6 +319,34 @@ def _cuad(limit: Optional[int]) -> list[dict]:
     return out
 
 
+# ---------------------------------------------------------------- 10-Q filings vs SEC XBRL (FinanceBench PDFs)
+
+FB_REPO, FB_REV = "patronus-ai/financebench", "cc39aeb4afdf33909ee1412188bf89035950c2eb"
+# FinanceBench 10-Q PDF -> (SEC CIK, accession number of that filing). One per company, banks left out; Lockheed
+# Martin and PG&E left out because no 10-Q accession matches their cover dates.
+SEC_FILINGS = {
+    "3M_2023Q2_10Q": (66740, "0000066740-23-000058"), "ACTIVSIONBLIZZARD_2023Q2_10Q": (718877, "0001628280-23-026269"),
+    "ADOBE_2022Q2_10Q": (796343, "0000796343-23-000153"), "AMCOR_2023Q2_10Q": (1748790, "0001748790-23-000007"),
+    "AMERICANWATERWORKS_2023Q2_10Q": (1410636, "0001410636-23-000116"), "APPLE_2023Q3_10Q": (320193, "0000320193-23-000077"),
+    "BESTBUY_2024Q2_10Q": (764478, "0000764478-23-000041"), "CORNING_2023Q2_10Q": (24741, "0001437749-23-020854"),
+    "EBAY_2023Q2_10Q": (1065088, "0001065088-23-000026"), "FOOTLOCKER_2023Q3_10Q": (850209, "0000850209-22-000025"),
+    "MGMRESORTS_2023Q2_10Q": (789570, "0000789570-23-000019"), "NETFLIX_2023Q2_10Q": (1065280, "0001065280-23-000198"),
+    "PAYPAL_2023Q2_10Q": (1633917, "0001633917-23-000117"), "Pfizer_2023Q2_10Q": (78003, "0000078003-23-000088"),
+    "SALESFORCE_2023Q3_10Q": (1108524, "0001108524-22-000060"), "WALMART_2024Q1_10Q": (104169, "0000104169-23-000052"),
+}
+
+
+def _sec_filings(limit: Optional[int]) -> list[dict]:
+    from . import sec
+    schema = _eb_schema("finance/10kq")
+    out = []
+    for name, (cik, accn) in list(SEC_FILINGS.items())[:limit] if limit else SEC_FILINGS.items():
+        out.append({"id": name, "file": str(fetch.github_file(FB_REPO, FB_REV, f"pdfs/{name}.pdf")), "schema": schema,
+                    "gold": {"accession": accn, "facts": sec.facts_of(fetch.sec_companyfacts(cik), accn)},
+                    "scorer": "sec"})
+    return out
+
+
 SETS: dict[str, TestSet] = {s.id: s for s in [
     TestSet("invoices", "Invoices", "invoices and credit notes",
             "digital PDFs in US/UK/EU/ZA formats, 6 currencies, VAT, credit notes, multi-page, freight, scans, phone "
@@ -348,6 +382,13 @@ SETS: dict[str, TestSet] = {s.id: s for s in [
             "liability...), against lawyers' answers", 510, "CC-BY-4.0 (The Atticus Project)",
             f"https://huggingface.co/datasets/{CUAD_REPO}", 10, _cuad,
             note="Answer key: CUAD's master_clauses.csv. Fields whose answer is not a plain value are not scored."),
+    TestSet("sec-filings", "10-Q filings checked against SEC data", "financial filings",
+            "income statement, balance sheet and cash-flow values of 16 companies' 10-Qs (40-100 pages), against the "
+            "numbers each company tagged itself in its SEC filing (XBRL): no hand-made answer key",
+            16, "PDFs: FinanceBench (CC-BY-NC-4.0, research use); answer key: SEC data, public domain",
+            f"https://github.com/{FB_REPO}", 3, _sec_filings,
+            note="Recall = tagged values found; precision = extracted company values the company also tagged (a "
+                 "lower bound: untagged sub-lines count as wrong). Scorer: readanydoc/bench/sec.py."),
 ]}
 
 

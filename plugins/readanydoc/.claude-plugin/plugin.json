@@ -1,6 +1,6 @@
 {
   "name": "readanydoc",
-  "version": "0.4.8",
+  "version": "0.4.9",
   "description": "Parse PDFs, scans, photos and Office files into Markdown, and extract typed fields with a citation for every value. Open-source alternative to Reducto, on your own Anthropic key.",
   "author": {
     "name": "Unmute"

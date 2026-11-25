@@ -17,6 +17,23 @@ Before anything is sent, the run shows how many documents and pages it will proc
 and asks you to confirm. `--budget 2` stops it from starting new documents once $2 has been spent. Results are
 saved as each document finishes, so a stopped run picks up where it left off.
 
+## Testing a code change for free
+
+`--replay DIR` records every model call in `DIR` and answers a repeated call from disk. Run a set once with it, change
+the code, and run again: only the calls whose request changed are sent (and paid for), so the difference in the
+scores is the change, not the model's run-to-run variation. `--replay-only` refuses any call that is not recorded, so
+the run cannot spend anything.
+
+```bash
+readanydoc bench run sec-filings --systems readanydoc --replay ./calls              # first run: pays, records
+# ...change the code...
+readanydoc bench run sec-filings --systems readanydoc --replay ./calls --replay-only --out ./after --yes
+```
+
+Costs printed during a replayed run include the recorded calls; the real spend is in `DIR/live.jsonl`. A change that
+alters what is sent to the model (prompts, page images) needs new calls; a change after the model's answer (checks,
+citations, confidence) replays completely.
+
 ## Test sets
 
 | Set | Documents | What it tests | Licence |
@@ -30,6 +47,7 @@ saved as each document finishes, so a stopped run picks up where it left off.
 | `sports-results` | 5 | Rankings, times and records from long result tables | MIT (ExtractBench) |
 | `long-documents` | 50 | Every row of long repeated tables in government and business reports (LongExtract) | CC-BY-4.0 |
 | `contracts` | 510 | Title, parties, agreement, effective and expiry dates, governing law, and whether 12 kinds of clause are present, against lawyers' answers (CUAD) | CC-BY-4.0 (The Atticus Project) |
+| `sec-filings` | 16 | Income statement, balance sheet and cash-flow values of 16 companies' 10-Qs (40-100 pages), checked against the numbers each company tagged itself in its SEC filing (XBRL): no hand-made answer key | PDFs: FinanceBench (CC-BY-NC-4.0, research use); answer key: SEC data, public domain |
 
 Each set is downloaded on first use into the ReadAnyDoc cache, pinned to a fixed revision. A run takes a sample by
 default (`--limit` to change it). Check a set's licence before using it.
@@ -61,7 +79,8 @@ still get cost, time, failures and each system's output side by side.
 
 `readanydoc-bench/<set>-<time>/report.html`:
 
-- **Per system:** answer-key values found, output values that are right, documents fully right, outputs that pass the
+- **Per system:** answer-key values found, output values that are right, documents fully right, how often values
+  labelled `high` and `low` confidence were right (a useful label has high right more often), outputs that pass the
   JSON Schema (by the standard `jsonschema` validator, with `null` for a missing value accepted; strictly too), values
   with a citation, citations whose box shows the value, cost per document and median time.
 - **Per document:** each system's score, cost and time, with any error.
@@ -108,4 +127,5 @@ print(summary["systems"], summary["report"])
 The parsing benchmarks (olmOCR-bench, OmniDocBench, RD-TableBench, FUNSD) were run with the scripts in
 [`research/benchmarks/`](https://github.com/arpitpatel25/ReadAnyDoc/tree/main/research/benchmarks), with results in
 [`results/`](https://github.com/arpitpatel25/ReadAnyDoc/tree/main/results). They are not part of `readanydoc bench`
-yet.
+yet. Charts: `python research/benchmarks/charts.py run OUT` reads the 58 charts of ChartParse-Bench (CC-BY-4.0) with
+ReadAnyDoc's chart reader and scores the data points (about $0.003 a chart; `--replay` works there too).

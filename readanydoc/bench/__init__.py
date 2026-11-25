@@ -92,7 +92,7 @@ def rescore(out: str) -> dict:
                 continue
             rec = json.loads(p.read_text())
             if c.get("gold") is not None:
-                rec["score"] = runner.grade.score(c["gold"], rec.get("data"), c.get("alternatives"), c.get("only"))
+                rec["score"] = runner.grade.score_case(c, rec.get("data"))
             rec["citation_check"] = runner.citation_check(c, rec)
             p.write_text(json.dumps(rec, default=str))
             if s.name not in names:
