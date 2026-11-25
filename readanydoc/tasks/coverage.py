@@ -444,8 +444,11 @@ def check(value: Any, schema: Any, pages: list[dict]) -> list[dict]:
         took = [r for r in rows if taken[id(r)]]
         if not took or len(took) == len(rows) or (len(took) < 2 and len(rows) > 3):
             continue  # one row matching by chance in a long table says nothing about that table
-        owner = max(lists_out, key=lambda kv: sum(kv[1].took_row(r.value.split(" | ")) for r in took),
-                    default=(None, None))[0]
+        per = [(path, sum(u.took_row(r.value.split(" | ")) for r in took)) for path, u in lists_out]
+        owner, n_own = max(per, key=lambda x: x[1], default=(None, 0))
+        if n_own < 1 or n_own * 3 < len(took) * 2:
+            continue  # the taken rows went to different fields (a financial statement read metric by metric):
+            # the table is not one list's items, so a row nobody took is one the schema did not ask for
         for r in rows:
             if r not in took:
                 out.append({"field": owner, "flag": "row_not_extracted",

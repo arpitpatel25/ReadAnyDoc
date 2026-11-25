@@ -79,3 +79,18 @@ def test_stem_and_dates():
         ["line", "party", "tax", "contact", "address"]
     from datetime import date
     assert date(2026, 2, 3) in C._dates("03/02/2026") and date(2026, 3, 13) in C._dates("2026/03/13")
+
+
+def test_statement_rows_taken_by_different_fields_are_not_flagged():
+    """A financial statement read metric by metric: each field takes one row; the rows nobody asked for are fine."""
+    from readanydoc.tasks import coverage
+    schema = {"type": "object", "properties": {
+        m: {"type": "array", "items": {"type": "object", "properties": {"value": {"type": "string"}, "period": {"type": "string"}}}}
+        for m in ("cash", "goodwill", "inventories")}}
+    html = ("<table><tr><th>Item</th><th>2023</th><th>2022</th></tr><tr><td>Cash</td><td>1,111</td><td>1,010</td></tr>"
+            "<tr><td>Goodwill</td><td>2,222</td><td>2,020</td></tr><tr><td>Inventories</td><td>3,333</td><td>3,030</td></tr>"
+            "<tr><td>Prepaid expenses</td><td>4,444</td><td>4,040</td></tr></table>")
+    value = {"cash": [{"value": "1,111", "period": "2023"}], "goodwill": [{"value": "2,222", "period": "2023"}],
+             "inventories": [{"value": "3,333", "period": "2023"}]}
+    pages = [{"number": 1, "regions": [{"type": "Table", "content": html, "label": "r1"}]}]
+    assert not [f for f in coverage.check(value, schema, pages) if f["flag"] == "row_not_extracted"]

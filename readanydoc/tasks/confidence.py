@@ -1,11 +1,15 @@
 """Calibrated confidence for extracted values: a score that says how often values like this one are right.
 
-A value's citation already records how it was found on the page (verbatim once, verbatim several times, fuzzily,
-not where the model said, nowhere). One more signal is free: a value that *conflicts* with another value of the
-same list for the same thing (same period, segment and other text fields, a different number) is often a sub-line
-filed under a total. Each (how found, conflict) group gets the share of such values that were right on the
-benchmarks, measured once with the code grader (CALIBRATION below; method and numbers: docs/decisions.md).
-The score replaces granular_confidence.extract_confidence; the label is "high" at HIGH or above.
+A value's citation carries a raw score from how it was located on the page (0.95 found once verbatim, 0.9 found
+next to its anchor or where the model said, 0.85 fuzzy, 0.8 or 0.6 printed in several places, 0.3 not found in
+the block the model named). On its own that score barely predicts a wrong value (measured: about 95% right either
+way on 10-Qs). One free signal does: a value that *conflicts* with another item of the same list for the same thing
+(same period, segment and other text fields, a different number) is usually a sub-line filed under a total.
+
+Each (raw score, conflict) group with enough measured values gets the share of such values that were right on the
+benchmarks, measured with the code graders (CALIBRATION below; method and numbers: docs/decisions.md). A
+conflicting value with any other score gets at most CONFLICT. Labels only ever go down ("low" below HIGH): a "low"
+the citation already had says the box may be in the wrong place, which the value graders do not measure.
 """
 
 from __future__ import annotations
@@ -14,11 +18,12 @@ from typing import Any, Optional
 
 HIGH = 0.9
 
-# how the value was found -> the raw score build_citations gives it
-KINDS = {0.95: "verbatim", 0.85: "fuzzy", 0.8: "repeated", 0.7: "elsewhere", 0.3: "not_in_cited_block"}
-
-# (kind, conflict) -> share right on the benchmarks. Filled from measurement; missing -> raw score kept.
-CALIBRATION: dict[tuple[str, bool], float] = {}
+# Measured 2026-11-25 on 2,601 values (16 10-Q filings vs their XBRL facts, 100 CUAD contracts vs the lawyers'
+# answers). Only groups with 100+ values are listed.
+CALIBRATION: dict[tuple[float, bool], float] = {
+    (0.9, False): 0.954, (0.9, True): 0.808, (0.95, False): 0.925, (0.95, True): 0.65,
+}
+CONFLICT = 0.779
 
 
 def _scalar(v: Any) -> bool:
@@ -66,18 +71,20 @@ def conflicts(value: Any, path: tuple = ()) -> set[tuple]:
 def calibrate(value: Any, cites: dict, table: Optional[dict] = None) -> dict:
     """The citations with calibrated scores and labels (in place; returns ``cites``)."""
     table = CALIBRATION if table is None else table
-    if not table:
-        return cites
     bad = conflicts(value)
     for path, cs in cites.items():
+        hit = tuple(path) in bad
         for c in cs or []:
             g = c.get("granular_confidence") or {}
             raw = g.get("extract_confidence")
-            kind = KINDS.get(round(raw, 2)) if isinstance(raw, (int, float)) else None
-            score = table.get((kind, tuple(path) in bad)) if kind else None
+            if not isinstance(raw, (int, float)):
+                continue
+            score = table.get((round(raw, 2), hit))
+            if score is None and hit:
+                score = min(raw, CONFLICT)
             if score is None:
                 continue
-            if g.get("extract_confidence") is not None:
-                g["extract_confidence"] = round(score, 3)
-            c["confidence"] = "high" if score >= HIGH else "low"
+            g["extract_confidence"] = round(score, 3)
+            if score < HIGH:
+                c["confidence"] = "low"
     return cites
