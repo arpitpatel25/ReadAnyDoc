@@ -1,0 +1,123 @@
+name: benchmarks
+
+# The published benchmarks, run in the cloud on any version (started by hand only; uses the ANTHROPIC_API_KEY secret).
+# Each job downloads its own data (pinned revisions), runs ReadAnyDoc as shipped (engine mode, Claude Haiku 5.5,
+# Sonnet 5.5 on handwritten pages) and uploads its raw results plus a recording of every model call
+# (READANYDOC_REPLAY_DIR), so a later code change can be re-tested on the same model answers for free.
+# Scoring is done afterwards by the scripts in research/benchmarks/ (no model calls). Cost: about $21 for everything.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Version to test (tag, branch or commit)"
+        default: main
+      only:
+        description: "Comma-separated subset (olmocr,omnidocbench,rdtb,funsd,extract) or all"
+        default: all
+
+permissions:
+  contents: read
+
+jobs:
+  parse:
+    runs-on: ubuntu-latest
+    env:
+      RUN: ${{ inputs.only == 'all' || contains(inputs.only, matrix.bench) }}  # matrix is not known to a job-level if
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { bench: olmocr, shard: 0/4 }
+          - { bench: olmocr, shard: 1/4 }
+          - { bench: olmocr, shard: 2/4 }
+          - { bench: olmocr, shard: 3/4 }
+          - { bench: omnidocbench, shard: 0/4 }
+          - { bench: omnidocbench, shard: 1/4 }
+          - { bench: omnidocbench, shard: 2/4 }
+          - { bench: omnidocbench, shard: 3/4 }
+          - { bench: rdtb, shard: 0/3 }
+          - { bench: rdtb, shard: 1/3 }
+          - { bench: rdtb, shard: 2/3 }
+          - { bench: funsd, shard: 0/1 }
+    steps:
+      - uses: actions/checkout@v4
+        if: env.RUN == 'true'
+        with: { ref: "${{ inputs.ref }}" }
+      - uses: actions/checkout@v4  # the runner script from main, whatever version is tested
+        if: env.RUN == 'true'
+        with: { ref: main, path: _runner, sparse-checkout: research/benchmarks }
+      - uses: astral-sh/setup-uv@v5
+        if: env.RUN == 'true'
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr
+        if: env.RUN == 'true'
+      - run: uv sync --extra engine --locked --python 3.12
+        if: env.RUN == 'true'
+      - name: Start the server
+        if: env.RUN == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          READANYDOC_PROFILE: engine
+          READANYDOC_READER: "anthropic_api:haiku#high"
+          READANYDOC_HANDWRITING_READER: "anthropic_api:sonnet"
+          READANYDOC_TASK_LLM: "anthropic_api:haiku"
+          READANYDOC_DATA_DIR: ${{ runner.temp }}/server
+          READANYDOC_REPLAY_DIR: ${{ github.workspace }}/out/replay
+        run: |
+          mkdir -p out/replay
+          nohup uv run readanydoc serve --port 8884 > out/server.log 2>&1 &
+          for i in $(seq 1 120); do curl -sf http://127.0.0.1:8884/health && exit 0; sleep 2; done
+          cat out/server.log; exit 1
+      - name: Parse
+        if: env.RUN == 'true'
+        run: |
+          uv run python _runner/research/benchmarks/ci_parse.py ${{ matrix.bench }} --shard ${{ matrix.shard }} \
+            --out out/responses --workers 2
+      - name: Name the artifact
+        if: always() && env.RUN == 'true'
+        id: name
+        run: echo "n=${{ matrix.bench }}-$(echo '${{ matrix.shard }}' | tr / of)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always() && env.RUN == 'true'
+        with:
+          name: ${{ steps.name.outputs.n }}
+          path: out/
+          retention-days: 30
+
+  extract:
+    if: inputs.only == 'all' || contains(inputs.only, 'extract')
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { set: invoices, n: 20 }
+          - { set: receipts, n: 20 }
+          - { set: financial-reports, n: 5 }
+          - { set: research-papers, n: 3 }
+          - { set: credit-agreements, n: 3 }
+          - { set: sports-results, n: 5 }
+          - { set: resumes, n: 7 }
+          - { set: long-documents, n: 6 }
+          - { set: contracts, n: 10 }
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ inputs.ref }}" }
+      - uses: astral-sh/setup-uv@v5
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr
+      - run: uv sync --extra engine --locked --python 3.12
+      - name: Run the test set
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          READANYDOC_REPLAY_DIR: ${{ github.workspace }}/out/replay
+        run: |
+          mkdir -p out/replay
+          uv run readanydoc bench run ${{ matrix.set }} --systems readanydoc --limit ${{ matrix.n }} --budget 6 \
+            --workers 3 --out out/results --yes
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: extract-${{ matrix.set }}
+          path: out/
+          retention-days: 30
